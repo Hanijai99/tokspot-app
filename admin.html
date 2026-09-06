@@ -292,7 +292,7 @@
         document.getElementById('docName').value = doc.name||'';
         document.getElementById('docDept').value = doc.department||'';
         document.getElementById('docEmail').value = doc.email||'';
-        document.getElementById('docEmail').disabled = true; // prevent changing email once provisioned
+        document.getElementById('docEmail').disabled = true;
         document.getElementById('docPin').value = doc.pin||'';
         document.getElementById('docStatus').value = doc.status||'open';
         document.getElementById('docAMStart').value = doc.morningStart||'';
@@ -339,7 +339,6 @@
         if (editDoctorId) {
           // Updating an existing doctor
           await window._fs.updateDoc(window._fs.doc(coll, editDoctorId), data);
-          // Also sync global lookup document if exists
           try {
             await window._fs.updateDoc(window._fs.doc(window._db, 'doctors', editDoctorId), {
               name, department: dept, pin, status
@@ -347,17 +346,27 @@
           } catch(err) {}
           showToast('Doctor updated.');
         } else {
-          // Creating a new doctor: Provision Firebase Auth via secondary app
+          // Creating a new doctor: Provision Firebase Auth via safe secondary app
           const tempPassword = 'Doc@' + Math.random().toString(36).slice(-8) + '!';
+          const cfg = window.firebaseConfig || window._firebaseConfig;
           
           let secApp;
-          if (window._firebase.getApps().some(a => a.name === 'DocSetup')) {
-            secApp = window._firebase.getApp('DocSetup');
+          const compat = window.firebase;
+          const modularInit = window._initializeApp || (window._firebase && window._firebase.initializeApp);
+          const modularGetApps = window._getApps || (window._firebase && window._firebase.getApps);
+          const modularGetApp = window._getApp || (window._firebase && window._firebase.getApp);
+
+          if (compat && compat.apps) {
+            secApp = compat.apps.some(a => a.name === 'DocSetup') ? compat.app('DocSetup') : compat.initializeApp(cfg, 'DocSetup');
+          } else if (modularGetApps && modularGetApps().some(a => a.name === 'DocSetup')) {
+            secApp = modularGetApp('DocSetup');
+          } else if (modularInit) {
+            secApp = modularInit(cfg, 'DocSetup');
           } else {
-            secApp = window._firebase.initializeApp(window._firebaseConfig, 'DocSetup');
+            secApp = window._app || window._auth.app;
           }
 
-          const secAuth = window._useAuth.getAuth(secApp);
+          const secAuth = (compat && compat.auth) ? secApp.auth() : (window._useAuth.getAuth ? window._useAuth.getAuth(secApp) : window._auth);
           const cred = await window._useAuth.createUserWithEmailAndPassword(secAuth, email, tempPassword);
           const uid = cred.user.uid;
 
@@ -365,15 +374,15 @@
           data.hospitalSlug = editHospital;
           data.createdAt = window._fs.serverTimestamp();
 
-          // 1. Save to hospital subcollection using uid as doc id
+          // 1. Save in hospital doctors list
           await window._fs.setDoc(window._fs.doc(coll, uid), data);
 
-          // 2. Save to global doctors collection for direct PIN and session login
+          // 2. Save in root doctors collection for quick PIN lookup
           await window._fs.setDoc(window._fs.doc(window._db, 'doctors', uid), data);
 
           // 3. Trigger password setup email
           await window._useAuth.sendPasswordResetEmail(window._auth, email);
-          await window._useAuth.signOut(secAuth);
+          if (secAuth.signOut) await secAuth.signOut();
 
           showToast('Doctor created & password reset link sent to ' + email, false, 5000);
         }
@@ -386,7 +395,8 @@
         editDoctorId = null;
         loadDoctorList();
       } catch (e) {
-        showToast('Operation failed: ' + e.message, true, 4000);
+        console.error(e);
+        showToast('Operation failed: ' + (e.message || e), true, 4000);
       } finally {
         btn.disabled = false;
       }
