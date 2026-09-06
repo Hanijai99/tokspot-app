@@ -300,6 +300,13 @@
         showToast('Action failed: ' + e.message, true);
       }
     }
+    // Session validation check
+const activeDoc = sessionStorage.getItem("activeDoctor");
+firebase.auth().onAuthStateChanged((user) => {
+  if (!user && !activeDoc) {
+    window.location.replace("doctor-login.html");
+  }
+});
   </script>
 </body>
 </html>
