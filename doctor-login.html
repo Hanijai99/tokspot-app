@@ -1,1 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>Doctor Login — TokSpot</title>
+  <link rel="stylesheet" href="/css/style.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+  <link rel="icon" type="image/png" href="logo.png" />
+  <style>
+    .auth-wrapper { max-width: 440px; margin: 60px auto; padding: 0 16px; }
+    .auth-card { padding: 30px 24px; border-radius: 16px; background: var(--card); border: 1px solid var(--line); box-shadow: var(--shadow); }
+    .auth-title { text-align: center; font-size: 1.5rem; font-weight: 900; color: var(--ink); margin-bottom: 6px; }
+    .auth-sub { text-align: center; font-size: 0.88rem; color: var(--slate-500); margin-bottom: 24px; }
+    .form-group { margin-bottom: 14px; }
+    .form-group label { display: block; font-size: 0.84rem; font-weight: 700; color: var(--slate-700); margin-bottom: 6px; }
+    .form-control { width: 100%; padding: 12px; border-radius: 8px; border: 1px solid var(--line); box-sizing: border-box; font-size: 0.95rem; }
+    .btn-submit { width: 100%; padding: 12px; border-radius: 8px; border: none; font-weight: 800; cursor: pointer; font-size: 0.95rem; }
+    .divider { display: flex; align-items: center; text-align: center; margin: 24px 0; color: var(--slate-400); font-size: 0.82rem; font-weight: 700; }
+    .divider::before, .divider::after { content: ''; flex: 1; border-bottom: 1px solid var(--line); }
+    .divider span { padding: 0 12px; }
+    .pin-box { text-align: center; letter-spacing: 8px; font-size: 1.4rem; font-weight: 800; }
+  </style>
+</head>
+<body>
 
+  <div class="topbar">
+    <a class="brand" href="index.html">
+      <span class="logomark"><img src="logo.png" alt="TokSpot" /></span>TokSpot
+    </a>
+  </div>
+
+  <div class="auth-wrapper">
+    <div class="auth-card card">
+      <div class="auth-title"><i class="fa-solid fa-user-doctor" style="color:var(--green)"></i> Doctor Portal</div>
+      <div class="auth-sub">Sign in to manage your clinic queue station</div>
+
+      <!-- Option 1: Standard Email & Password -->
+      <div>
+        <div class="form-group">
+          <label>Email Address</label>
+          <input type="email" id="loginEmail" class="form-control" placeholder="doctor@hospital.com" />
+        </div>
+        <div class="form-group">
+          <label>Password</label>
+          <input type="password" id="loginPassword" class="form-control" placeholder="••••••••" />
+        </div>
+        <button class="btn btn-green btn-submit mt-8" onclick="doctorEmailLogin()">Sign In with Email</button>
+
+        <div style="text-align: center; margin-top: 12px;">
+          <a href="javascript:void(0)" onclick="handleForgotPassword()" style="color: var(--green); font-size: 0.85rem; font-weight: 600; text-decoration: none;">
+            Forgot / Set New Password?
+          </a>
+        </div>
+      </div>
+
+      <div class="divider"><span>OR QUICK STATION PIN</span></div>
+
+      <!-- Option 2: Station PIN Access -->
+      <div>
+        <div class="form-group">
+          <label style="text-align:center;">Enter 4-Digit Station PIN</label>
+          <input type="password" maxlength="4" id="stationPin" class="form-control pin-box" placeholder="••••" />
+        </div>
+        <button class="btn btn-submit" style="background: #0f766e; color: white;" onclick="doctorPinLogin()">
+          <i class="fa-solid fa-key"></i> Open Station via PIN
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Firebase Scripts -->
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+  <script src="/js/firebase-config.js"></script>
+
+  <script>
+    if (!firebase.apps.length) {
+      firebase.initializeApp(firebaseConfig);
+    }
+    const auth = firebase.auth();
+    const db = firebase.firestore();
+
+    // 1. Email + Password Sign In
+    async function doctorEmailLogin() {
+      const email = document.getElementById('loginEmail').value.trim();
+      const pass = document.getElementById('loginPassword').value;
+      if (!email || !pass) return alert("Please enter both email and password.");
+
+      try {
+        const userCred = await auth.signInWithEmailAndPassword(email, pass);
+        const docSnap = await db.collection("doctors").doc(userCred.user.uid).get();
+        if (docSnap.exists) {
+          sessionStorage.setItem("activeDoctor", JSON.stringify(docSnap.data()));
+        }
+        window.location.href = "doctor.html";
+      } catch (err) {
+        alert("Login Error: " + err.message);
+      }
+    }
+
+    // 2. Forgot Password Email Dispatch
+    async function handleForgotPassword() {
+      const email = prompt("Enter your registered Doctor Email to receive the reset link:");
+      if (!email || !email.trim()) return;
+
+      try {
+        await auth.sendPasswordResetEmail(email.trim());
+        alert("Password reset link sent! Check your inbox or spam folder.");
+      } catch (err) {
+        alert("Error: " + err.message);
+      }
+    }
+
+    // 3. Quick PIN Access
+    async function doctorPinLogin() {
+      const pin = document.getElementById('stationPin').value.trim();
+      if (pin.length !== 4) return alert("Please enter a valid 4-digit PIN.");
+
+      try {
+        const snap = await db.collection("doctors").where("pin", "==", pin).limit(1).get();
+        if (snap.empty) {
+          return alert("Invalid PIN. Verify with hospital administration.");
+        }
+        const doctorData = snap.docs[0].data();
+        sessionStorage.setItem("activeDoctor", JSON.stringify(doctorData));
+
+        if (!auth.currentUser) {
+          await auth.signInAnonymously();
+        }
+        window.location.href = "doctor.html";
+      } catch (err) {
+        alert("PIN Login Error: " + err.message);
+      }
+    }
+  </script>
+</body>
+</html>
