@@ -2,159 +2,212 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
-  <title>TokSpot — Smart Hospital Queue</title>
-  <link rel="stylesheet" href="css/style.css" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>Admin Dashboard — TokSpot</title>
+  <link rel="stylesheet" href="/css/style.css" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
-  <link rel="manifest" href="manifest.json" />
   <link rel="icon" type="image/png" href="logo.png" />
-  <link rel="apple-touch-icon" href="logo.png" />
   <style>
-    .hero { text-align:center; padding:56px 10px 8px; }
-    .hero .logo {
-      width:74px; height:74px; border-radius:24px; margin:0 auto 18px;
-      background:linear-gradient(135deg,#22c55e,#0d9488);
-      display:flex; align-items:center; justify-content:center; font-size:2.4rem;
-      box-shadow:0 16px 40px rgba(22,163,74,.32); overflow:hidden;
+    .admin-container { max-width: 900px; margin: 30px auto; padding: 0 16px 60px; }
+    .page-title { font-size: 1.6rem; font-weight: 900; color: var(--ink); margin-bottom: 20px; display: flex; align-items: center; gap: 10px; }
+    .form-grid { display: grid; grid-template-columns: 1fr; gap: 16px; margin-top: 14px; }
+    @media(min-width: 600px) {
+      .form-grid-2 { grid-template-columns: 1fr 1fr; }
     }
-    .hero .logo img { width:100%; height:100%; object-fit:cover; }
-    .hero h1 { font-size:2.3rem; font-weight:900; color:var(--ink); letter-spacing:-.7px; line-height:1.15; }
-    .hero p { color:var(--slate-500); font-size:1.02rem; margin-top:10px; line-height:1.6; }
-    .hero .cta { max-width:360px; margin:26px auto 0; }
-
-    .role-cards { margin-top:40px; display:flex; flex-direction:column; gap:14px; }
-    .role {
-      display:flex; align-items:center; gap:16px; text-decoration:none;
-      background:var(--card); border:1px solid var(--line); border-radius:var(--r-lg);
-      padding:18px 18px; box-shadow:var(--shadow); transition:transform var(--ease), box-shadow var(--ease), border-color var(--ease);
-    }
-    .role:hover { transform:translateY(-3px); box-shadow:var(--shadow-md); border-color:var(--green); }
-    .role:active { transform:scale(.98); }
-    .role .rt {
-      width:54px; height:54px; border-radius:16px; flex-shrink:0;
-      background:var(--green-050); display:flex; align-items:center; justify-content:center; font-size:1.6rem;
-    }
-    .role .rm { flex:1; }
-    .role .rt-tt { font-weight:800; color:var(--ink); font-size:1.02rem; }
-    .role .rt-sb { color:var(--slate-500); font-size:.86rem; margin-top:2px; line-height:1.4; }
-    .role .arrow { color:var(--slate-400); font-size:1.1rem; font-weight:700; }
-
-    .feat { margin-top:38px; }
-    .feat h2 { font-size:1.1rem; font-weight:800; color:var(--ink); margin-bottom:6px; }
-    .feat .fh { color:var(--slate-500); font-size:.9rem; margin-bottom:16px; }
-    .feat-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
-    .fi { display:flex; gap:9px; align-items:center; font-size:.88rem; color:var(--slate-600); }
-    .fi .c { color:var(--green); font-weight:900; }
-
-    body.dark .hero h1 { color:#f1f5f9; }
-    body.dark .role { background:#121a2b; border-color:#24314a; }
-    body.dark .role .rt { background:#052e16; }
-    body.dark .role .rt-tt { color:#f1f5f9; }
-    body.dark .feat h2 { color:#f1f5f9; }
+    .form-group label { display: block; font-size: 0.86rem; font-weight: 700; color: var(--slate-700); margin-bottom: 6px; }
+    .form-control { width: 100%; padding: 12px; border-radius: 8px; border: 1px solid var(--line); box-sizing: border-box; font-size: 0.95rem; }
+    .form-control:focus { outline: none; border-color: var(--green); }
+    .btn-submit { width: 100%; padding: 13px; font-size: 1rem; border-radius: 10px; font-weight: 800; cursor: pointer; border: none; }
+    .pin-input { letter-spacing: 5px; font-weight: 800; font-size: 1.1rem; }
   </style>
 </head>
 <body>
 
+  <!-- Top Navigation -->
   <div class="topbar">
-    <a class="brand" href="index.html"><span class="logomark"><img src="logo.png" alt="TokSpot" /></span>TokSpot</a>
+    <a class="brand" href="index.html">
+      <span class="logomark"><img src="logo.png" alt="TokSpot" /></span>TokSpot
+    </a>
     <span class="spacer"></span>
+    <a href="doctor-login.html" class="btn btn-outline btn-sm" style="margin-right: 8px; text-decoration: none;">
+      <i class="fa-solid fa-user-doctor"></i> Doctor Portal
+    </a>
     <button class="icn-btn" onclick="hk.toggleDark()" title="Theme"><i class="fa-solid fa-moon"></i></button>
   </div>
 
-  <div class="page">
+  <div class="admin-container">
+    <div class="page-title">
+      <i class="fa-solid fa-hospital-user" style="color: var(--green);"></i> Admin Console
+    </div>
 
-    <div class="hero">
-      <div class="logo"><img src="logo.png" alt="TokSpot" /></div>
-      <h1>Skip the Queue.<br/>Get Your Token Fast.</h1>
-      <p>Simple hospital token booking with live queue updates and instant alerts.</p>
-      <div class="cta">
-        <a href="book.html" class="btn btn-green btn-lg btn-block"><i class="fa-solid fa-ticket"></i> Book a Token</a>
+    <!-- 1. Provision Doctor Account Card -->
+    <div class="card p-24">
+      <h3 style="font-weight: 800; color: var(--ink); margin-bottom: 6px; font-size: 1.2rem;">
+        <i class="fa-solid fa-user-plus" style="color: var(--green);"></i> Add New Doctor
+      </h3>
+      <p style="color: var(--slate-500); font-size: 0.9rem; margin-bottom: 16px;">
+        Creates a Firebase user and automatically triggers a password-setup email link.
+      </p>
+
+      <div class="form-grid">
+        <div class="form-group">
+          <label>Doctor Full Name</label>
+          <input type="text" id="newDocName" class="form-control" placeholder="e.g. Dr. Rajesh Kumar" required />
+        </div>
+
+        <div class="form-grid form-grid-2" style="margin-top: 0;">
+          <div class="form-group">
+            <label>Doctor Official Email</label>
+            <input type="email" id="newDocEmail" class="form-control" placeholder="e.g. doctor@hospital.com" required />
+          </div>
+          <div class="form-group">
+            <label>Station 4-Digit Quick PIN</label>
+            <input type="password" maxlength="4" id="newDocPin" class="form-control pin-input" placeholder="••••" required />
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>Department / Specialty</label>
+          <input type="text" id="newDocDept" class="form-control" placeholder="e.g. General Medicine / Pediatrics" />
+        </div>
+      </div>
+
+      <button id="btnCreateDoc" class="btn btn-green btn-submit mt-16" onclick="adminRegisterDoctor()">
+        <i class="fa-solid fa-plus-circle"></i> Provision Doctor Account
+      </button>
+    </div>
+
+    <!-- 2. Existing Doctors Roster Card -->
+    <div class="card p-24 mt-24">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px;">
+        <h3 style="font-weight: 800; font-size: 1.15rem; color: var(--ink);">
+          <i class="fa-solid fa-stethoscope" style="color: var(--mint-dark);"></i> Onboarded Doctors
+        </h3>
+        <button class="btn btn-outline btn-sm" onclick="fetchDoctorsList()"><i class="fa-solid fa-rotate"></i> Refresh</button>
+      </div>
+
+      <div id="doctorsListContainer" style="color: var(--slate-500); font-size: 0.9rem;">
+        Loading doctor records...
       </div>
     </div>
-
-    <div class="role-cards">
-      <a class="role" href="book.html">
-        <div class="rt"><i class="fa-solid fa-user-doctor"></i></div>
-        <div class="rm">
-          <div class="rt-tt">I'm a Patient</div>
-          <div class="rt-sb">Book a token and track your position live.</div>
-        </div>
-        <span class="arrow"><i class="fa-solid fa-chevron-right"></i></span>
-      </a>
-      <a class="role" href="frontdesk.html">
-        <div class="rt"><i class="fa-solid fa-building-columns"></i></div>
-        <div class="rm">
-          <div class="rt-tt">Front Desk</div>
-          <div class="rt-sb">Issue, call & manage queue tokens.</div>
-        </div>
-        <span class="arrow"><i class="fa-solid fa-chevron-right"></i></span>
-      </a>
-      <a class="role" href="display.html">
-        <div class="rt"><i class="fa-solid fa-tv"></i></div>
-        <div class="rm">
-          <div class="rt-tt">Display Board</div>
-          <div class="rt-sb">Big-screen waiting room board.</div>
-        </div>
-        <span class="arrow"><i class="fa-solid fa-chevron-right"></i></span>
-      </a>
-      <a class="role" href="admin.html">
-        <div class="rt"><i class="fa-solid fa-gear"></i></div>
-        <div class="rm">
-          <div class="rt-tt">Admin</div>
-          <div class="rt-sb">Manage hospitals, doctors & timings.</div>
-        </div>
-        <span class="arrow"><i class="fa-solid fa-chevron-right"></i></span>
-      </a>
-    </div>
-
-    <div class="feat">
-      <h2>Everything you need</h2>
-      <div class="fh">Smart, simple, hospital-ready.</div>
-      <div class="feat-grid">
-        <div class="fi"><span class="c">✓</span> Live queue position</div>
-        <div class="fi"><span class="c">✓</span> Multi-hospital</div>
-        <div class="fi"><span class="c">✓</span> SMS &amp; WhatsApp alerts</div>
-        <div class="fi"><span class="c">✓</span> Auto display board</div>
-        <div class="fi"><span class="c">✓</span> Doctor timings</div>
-        <div class="fi"><span class="c">✓</span> Daily stats</div>
-      </div>
-    </div>
-
-    <div class="card mt-24 center">
-      <div class="htitle" style="font-size:1.05rem;"><i class="fa-solid fa-bell"></i> Get notified</div>
-      <div class="hsub mt-6">Allow notifications to be alerted when your token is called.</div>
-      <button class="btn btn-green btn-block mt-16" onclick="enablePush()"><i class="fa-solid fa-bell"></i> Enable Notifications</button>
-    </div>
-
   </div>
 
-  <button class="theme-toggle" onclick="hk.toggleDark()"><i class="fa-solid fa-moon"></i></button>
+  <!-- Firebase SDKs -->
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+  <script src="/js/firebase-config.js"></script>
+  <script src="/js/app.js"></script>
 
   <script>
-    if ('serviceWorker' in navigator) { window.addEventListener('load', () => navigator.serviceWorker.register('/sw.js').catch(()=>{})); }
-  </script>
-  <!-- Fixed Script Loading Order -->
-  <script src="js/firebase-config.js"></script>
-  <script src="js/app.js"></script>
-  <script src="js/firebase.js"></script>
-  <script src="js/push.js"></script>
-  <script>
-    hk.applyDark();
-    window._VAPID = 'REPLACE_WITH_VAPID_PUBLIC_KEY';
-    window.enablePush = async function () {
-      await initFirebase();
-      await waitForFB();
-      if (!window._FB_READY) return showToast('Firebase not configured.', true);
-      if (!window._VAPID || window._VAPID.startsWith('REPLACE')) { 
-        showToast('Push keys not configured. SMS/WhatsApp alerts are active.', false, 4000); 
-        return; 
+    // Initialize Primary App
+    if (!firebase.apps.length) {
+      firebase.initializeApp(firebaseConfig);
+    }
+    const db = firebase.firestore();
+
+    // 1. Provision Doctor Account Logic
+    async function adminRegisterDoctor() {
+      const name = document.getElementById('newDocName').value.trim();
+      const email = document.getElementById('newDocEmail').value.trim();
+      const pin = document.getElementById('newDocPin').value.trim();
+      const dept = document.getElementById('newDocDept').value.trim() || 'General';
+      const btn = document.getElementById('btnCreateDoc');
+
+      if (!name || !email || pin.length !== 4) {
+        return alert("Please fill doctor name, valid email, and a 4-digit numeric PIN.");
       }
-      const t = await window.requestPushPermission();
-      if (t) {
-        localStorage.setItem('hk_fcm', t);
-        showToast('Notifications enabled.');
+
+      const tempPassword = "Doc@" + Math.random().toString(36).slice(-8) + "!";
+      btn.disabled = true;
+      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Provisioning...';
+
+      try {
+        // Initialize or reuse Secondary App Instance so current Admin does not get signed out
+        let secondaryApp;
+        try {
+          secondaryApp = firebase.app("DoctorProvisioner");
+        } catch (e) {
+          secondaryApp = firebase.initializeApp(firebaseConfig, "DoctorProvisioner");
+        }
+
+        // A. Create Authentication account
+        const userCred = await secondaryApp.auth().createUserWithEmailAndPassword(email, tempPassword);
+        const uid = userCred.user.uid;
+
+        // B. Store Doctor Profile in Firestore
+        await db.collection("doctors").doc(uid).set({
+          uid: uid,
+          name: name,
+          email: email,
+          pin: pin,
+          department: dept,
+          role: "doctor",
+          status: "active",
+          createdAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+
+        // C. Send automated password setup email
+        await firebase.auth().sendPasswordResetEmail(email);
+        await secondaryApp.auth().signOut();
+
+        alert(`Success! Account created for ${name}.\nA setup link has been emailed to ${email}.`);
+        
+        // Reset Inputs
+        document.getElementById('newDocName').value = '';
+        document.getElementById('newDocEmail').value = '';
+        document.getElementById('newDocPin').value = '';
+        document.getElementById('newDocDept').value = '';
+
+        fetchDoctorsList();
+      } catch (err) {
+        console.error(err);
+        alert("Registration failed: " + err.message);
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fa-solid fa-plus-circle"></i> Provision Doctor Account';
       }
-    };
+    }
+
+    // 2. Fetch and Display Active Doctors List
+    async function fetchDoctorsList() {
+      const container = document.getElementById('doctorsListContainer');
+      try {
+        const snap = await db.collection("doctors").orderBy("createdAt", "desc").limit(15).get();
+        if (snap.empty) {
+          container.innerHTML = '<p>No doctors registered yet.</p>';
+          return;
+        }
+
+        let html = '<div style="display:flex; flex-direction:column; gap:10px;">';
+        snap.forEach(doc => {
+          const d = doc.data();
+          html += `
+            <div style="display:flex; justify-content:space-between; align-items:center; padding:12px; border:1px solid var(--line); border-radius:8px; background:var(--card);">
+              <div>
+                <strong style="color:var(--ink);">${d.name}</strong> 
+                <span style="font-size:0.8rem; color:var(--slate-400); margin-left:6px;">(${d.department || 'General'})</span>
+                <div style="font-size:0.82rem; color:var(--slate-500);">${d.email}</div>
+              </div>
+              <div style="text-align:right;">
+                <span class="badge" style="background:var(--green-050); color:var(--green); padding:4px 8px; border-radius:6px; font-weight:700; font-size:0.8rem;">PIN: ${d.pin}</span>
+              </div>
+            </div>
+          `;
+        });
+        html += '</div>';
+        container.innerHTML = html;
+      } catch (e) {
+        console.warn("Could not load doctor roster:", e);
+        container.innerHTML = '<p style="color:var(--slate-400);">Doctor list will show once records are added.</p>';
+      }
+    }
+
+    // Run on load
+    window.addEventListener('DOMContentLoaded', () => {
+      if (window.hk && hk.applyDark) hk.applyDark();
+      fetchDoctorsList();
+    });
   </script>
 </body>
 </html>
