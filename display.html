@@ -56,7 +56,7 @@
 
     /* Multi-Doctor Split Grid */
     .multi-grid {
-      display:grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      display:grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
       gap: 16px; margin-top: 10px;
     }
     .doc-grid-card {
@@ -100,7 +100,7 @@
 </head>
 <body>
 
-  <!-- Smart TV / Browser Audio Unlock Banner -->
+  <!-- Audio Unlock Banner -->
   <div id="audioUnlockBanner" onclick="unlockAudio()">
     <button class="unlock-btn"><i class="fa-solid fa-volume-high"></i> Click Screen to Enable Sound</button>
     <div style="color:#94a3b8;margin-top:14px;font-size:1rem;font-weight:600;">
@@ -128,7 +128,7 @@
 
   <div class="board-wrap">
 
-    <!-- Nurse Fast-Action Control Bar -->
+    <!-- Nurse Control Bar -->
     <section class="nurse-controls hidden" id="nurseBar">
       <div style="display:flex;align-items:center;gap:10px;">
         <span style="font-weight:800;color:var(--green-deep);"><i class="fa-solid fa-bolt"></i> Desk Control:</span>
@@ -148,7 +148,7 @@
       </div>
     </section>
 
-    <!-- Multi-Doctor Grid Container (Shown when All Doctors selected) -->
+    <!-- Multi-Doctor Grid Container -->
     <div id="multiGridWrap" class="multi-grid hidden"></div>
 
     <!-- Single Doctor View Elements -->
@@ -191,9 +191,9 @@
     let isAudioUnlocked = false;
     let cachedVoices = [];
     let hospitalDoctorsList = [];
+    let latestLoadedTokens = [];
     let audioCtx = null;
 
-    // Voice Initialization
     function loadVoices() {
       if ('speechSynthesis' in window) {
         cachedVoices = window.speechSynthesis.getVoices();
@@ -204,7 +204,6 @@
       loadVoices();
     }
 
-    // Audio Chime Synthesizer
     function getAudioContext() {
       if (!audioCtx) {
         const AudioClass = window.AudioContext || window.webkitAudioContext;
@@ -238,16 +237,13 @@
       if (ctx.state === 'suspended') ctx.resume();
 
       if (chimeMode === 'airport') {
-        // 2-tone airport ding-dong: F4 (349Hz) -> C5 (523Hz)
         playTone(349.23, 0.0, 0.45);
         playTone(523.25, 0.32, 0.65);
       } else if (chimeMode === 'hospital') {
-        // Soft hospital pulse: A4 (440Hz)
         playTone(440.00, 0.0, 0.55);
       }
     }
 
-    // Smart TV 1-Click Audio Unlock
     function unlockAudio() {
       isAudioUnlocked = true;
       const ctx = getAudioContext();
@@ -262,19 +258,16 @@
       playCustomChime();
     }
 
-    // Dual Language Audio Announcement with Chime
     window.announceToken = function(num, name, counter) {
       if (!('speechSynthesis' in window)) return;
       window.speechSynthesis.cancel();
 
       playCustomChime();
 
-      // Delay speech slightly to let chime ring clearly
       setTimeout(() => {
         const splitNum = String(num).split('').join(' ');
         const ctrVal = counter || 'A';
 
-        // 1. English Announcement
         const engText = `Token number ${splitNum}, please proceed to Counter ${ctrVal}.`;
         const uEng = new SpeechSynthesisUtterance(engText);
         uEng.lang = 'en-IN';
@@ -284,7 +277,6 @@
         const inVoice = cachedVoices.find(v => v.lang === 'en-IN');
         if (inVoice) uEng.voice = inVoice;
 
-        // 2. Tamil Announcement
         const tamText = `டோக்கன் எண் ${num}, கவுண்டர் ${ctrVal}-க்கு வரவும்.`;
         const uTam = new SpeechSynthesisUtterance(tamText);
         uTam.lang = 'ta-IN';
@@ -380,7 +372,6 @@
         document.getElementById('statsRow').classList.remove('hidden');
         lbl.textContent = sel.options[sel.selectedIndex]?.textContent || 'Consultation';
       } else {
-        // Multi-Doctor Split Mode
         document.getElementById('singleDoctorWrap').classList.add('hidden');
         document.getElementById('multiGridWrap').classList.remove('hidden');
       }
@@ -389,15 +380,14 @@
 
     function subscribe() {
       unsubs.forEach(u => u()); unsubs = [];
-      const today = window.todayStr();
       const base = window._fs.collection(window._db, 'hospitals', dispHospital, 'tokens');
       let q;
       if (dispDoctor) {
-        q = window._fs.query(base, window._fs.where('doctorId','==',dispDoctor), window._fs.where('date','==',today));
+        q = window._fs.query(base, window._fs.where('doctorId','==',dispDoctor));
       } else {
-        q = window._fs.query(base, window._fs.where('date','==',today), window._fs.limit(100));
+        q = window._fs.query(base, window._fs.limit(150));
       }
-      unsubs.push(window._fs.onSnapshot(q, renderBoard, (e) => console.error(e)));
+      unsubs.push(window._fs.onSnapshot(q, renderBoard, (e) => console.error("Snapshot error:", e)));
     }
 
     function renderBoard(snap) {
@@ -407,8 +397,8 @@
         t.docId = d.id;
         allTokens.push(t);
       });
+      latestLoadedTokens = allTokens;
 
-      // Split View Logic: If All Doctors Selected
       if (!dispDoctor) {
         renderMultiDoctorGrid(allTokens);
         return;
@@ -417,9 +407,10 @@
       // Single Doctor Hero Mode
       const waiting = [], called = [], done = [];
       allTokens.forEach(t => { 
-        if (t.status === 'waiting') waiting.push(t); 
-        else if (t.status === 'called') called.push(t); 
-        else if (t.status === 'completed') done.push(t); 
+        const st = (t.status || '').toLowerCase();
+        if (st === 'waiting') waiting.push(t); 
+        else if (st === 'called' || st === 'calling' || st === 'serving') called.push(t); 
+        else if (st === 'completed' || st === 'served') done.push(t); 
       });
 
       waiting.sort((a,b) => (b.priority ? 1 : 0) - (a.priority ? 1 : 0) || String(a.number).localeCompare(String(b.number)));
@@ -428,11 +419,10 @@
       document.getElementById('cntCalled').textContent = called.length;
       document.getElementById('cntDone').textContent = done.length;
 
-      currentServingDoc = called.length ? called[called.length - 1] : (waiting.length ? waiting[0] : null);
-      nextWaitingDoc = called.length ? (waiting.length ? waiting[0] : null) : (waiting.length > 1 ? waiting[1] : null);
+      currentServingDoc = called.length ? called[called.length - 1] : null;
+      nextWaitingDoc = waiting.length ? waiting[0] : null;
 
       const curNum = currentServingDoc ? currentServingDoc.number : null;
-
       const hero = document.getElementById('hero');
       if (hero) hero.classList.toggle('emergency', !!(currentServingDoc && currentServingDoc.priority));
 
@@ -444,13 +434,13 @@
       document.getElementById('bCurrent').textContent = curNum || '—';
       document.getElementById('bPatient').textContent = currentServingDoc 
         ? (currentServingDoc.priority ? '[EMERGENCY] ' : '') + (currentServingDoc.patientName || '') + (currentServingDoc.counter ? ' · Counter ' + currentServingDoc.counter : '') 
-        : (waiting.length ? '' : 'No tokens waiting');
+        : (waiting.length ? waiting.length + ' patient(s) waiting' : 'No tokens waiting');
 
       document.getElementById('bNext').textContent = nextWaitingDoc ? nextWaitingDoc.number : '—';
       document.getElementById('bLast').textContent = done.length ? done[done.length - 1].number : '—';
     }
 
-    // Render Multi-Doctor Room Grid
+    // Render Multi-Doctor Room Grid with Quick Call Action
     function renderMultiDoctorGrid(allTokens) {
       const grid = document.getElementById('multiGridWrap');
       if (!hospitalDoctorsList.length) {
@@ -459,9 +449,10 @@
       }
 
       grid.innerHTML = hospitalDoctorsList.map(doc => {
-        const docTokens = allTokens.filter(t => t.doctorId === doc.id);
-        const called = docTokens.filter(t => t.status === 'called').pop();
-        const waitingCount = docTokens.filter(t => t.status === 'waiting').length;
+        // Matches doctor either by document id or doctor name
+        const docTokens = allTokens.filter(t => t.doctorId === doc.id || t.doctorId === doc.name);
+        const called = docTokens.filter(t => ['called', 'calling', 'serving'].includes((t.status || '').toLowerCase())).pop();
+        const waitingList = docTokens.filter(t => (t.status || '').toLowerCase() === 'waiting');
         const isEmergency = called && called.priority;
 
         return `
@@ -479,19 +470,50 @@
               <div class="dgc-name">${called ? (isEmergency ? '[EMERGENCY] ' : '') + escHtml(called.patientName) : '<span style="color:#94a3b8;font-weight:400;">No active patient</span>'}</div>
             </div>
             <div class="dgc-footer">
-              <span><i class="fa-solid fa-users"></i> ${waitingCount} in queue</span>
-              <span>${called ? 'In Consultation' : 'Available'}</span>
+              <span><i class="fa-solid fa-users"></i> ${waitingList.length} in queue</span>
+              <button class="btn btn-green btn-sm" onclick="callDoctorSpecific('${doc.id}')" style="padding:4px 10px;font-size:0.8rem;">
+                <i class="fa-solid fa-forward"></i> Call Next
+              </button>
             </div>
           </div>
         `;
       }).join('');
     }
 
-    /* Nurse Desk Actions */
+    // Call Next Token specifically for a Doctor in Multi-Doctor Grid
+    async function callDoctorSpecific(docId) {
+      const waiting = latestLoadedTokens.filter(t => (t.doctorId === docId || t.doctorId === (hospitalDoctorsList.find(d=>d.id===docId)?.name)) && (t.status || '').toLowerCase() === 'waiting');
+      if (!waiting.length) return showToast('No waiting patients for this doctor.', true);
+
+      waiting.sort((a,b) => (b.priority ? 1 : 0) - (a.priority ? 1 : 0) || String(a.number).localeCompare(String(b.number)));
+      const nextToken = waiting[0];
+      const counterVal = document.getElementById('nurseCounter').value;
+
+      try {
+        await window._fs.updateDoc(window._fs.doc(window._db, 'hospitals', dispHospital, 'tokens', nextToken.docId), {
+          status: 'called',
+          counter: counterVal,
+          calledAt: window._fs.serverTimestamp()
+        });
+        showToast('Called Token ' + nextToken.number);
+        window.announceToken(nextToken.number, nextToken.patientName, counterVal);
+      } catch(e) {
+        showToast('Call failed: ' + e.message, true);
+      }
+    }
+
+    /* Top Nurse Desk Actions */
     async function callNextToken() {
-      if (!nextWaitingDoc && !currentServingDoc) return showToast('No tokens in waiting queue.', true);
-      const target = (currentServingDoc && currentServingDoc.status === 'waiting') ? currentServingDoc : nextWaitingDoc;
-      if (!target) return showToast('No more waiting patients.', true);
+      let target = null;
+      if (dispDoctor) {
+        const waiting = latestLoadedTokens.filter(t => t.doctorId === dispDoctor && (t.status || '').toLowerCase() === 'waiting');
+        if (waiting.length) target = waiting[0];
+      } else {
+        const waiting = latestLoadedTokens.filter(t => (t.status || '').toLowerCase() === 'waiting');
+        if (waiting.length) target = waiting[0];
+      }
+
+      if (!target) return showToast('No waiting patients found in queue.', true);
 
       const counterVal = document.getElementById('nurseCounter').value;
       try {
@@ -501,6 +523,7 @@
           calledAt: window._fs.serverTimestamp()
         });
         showToast('Called Token ' + target.number);
+        window.announceToken(target.number, target.patientName, counterVal);
       } catch (e) { showToast('Action failed: ' + e.message, true); }
     }
 
