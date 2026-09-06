@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
+  <title>Admin — Manage — TokSpot</title>
+  <link rel="stylesheet" href="css/style.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+  <link rel="manifest" href="manifest.json" />
+  <link rel="icon" type="image/png" href="logo.png" />
+  <link rel="apple-touch-icon" href="logo.png" />
+</head>
+<body>
+  <div class="topbar">
+    <a class="brand" href="index.html"><span class="logomark"><img src="logo.png" alt="TokSpot" /></span>TokSpot</a>
+    <span class="spacer"></span>
+    <button class="icn-btn" onclick="location.href='index.html'" title="Home"><i class="fa-solid fa-house"></i></button>
+    <button class="icn-btn" onclick="hk.toggleDark()"><i class="fa-solid fa-moon"></i></button>
+  </div>
+
+  <div class="page wide">
+
+    <!-- Login -->
+    <section id="loginCard" class="card" style="max-width:420px;margin:40px auto;text-align:center;">
+      <div style="width:64px;height:64px;border-radius:20px;background:linear-gradient(135deg,#22c55e,#0d9488);display:flex;align-items:center;justify-content:center;font-size:1.9rem;margin:0 auto 16px;box-shadow:0 12px 30px rgba(22,163,74,.3);color:#fff;"><i class="fa-solid fa-shield-halved"></i></div>
+      <div class="htitle">Admin Login</div>
+      <div class="hsub mt-6">Sign in to manage hospitals & doctors.</div>
+      <div class="mt-16" style="text-align:left;">
+        <div class="field"><label class="label">Email</label><input class="input" id="loginEmail" type="email" placeholder="admin@hospital.com" /></div>
+        <div class="field"><label class="label">Password</label><input class="input" id="loginPass" type="password" /></div>
+      </div>
+      <button class="btn btn-green btn-block btn-lg" onclick="adminLogin()"><i class="fa-solid fa-right-to-bracket"></i> Sign In</button>
+      <p class="muted" style="font-size:.78rem;line-height:1.5;margin-top:14px;">
+        Create the admin account in Firebase Console → Authentication → Users → Add user.<br/>(Enable Email/Password first.)
+      </p>
+    </section>
+
+    <!-- Main -->
+    <section class="hidden" id="mainCard">
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:4px;">
+        <div class="htitle">Admin Panel</div>
+        <span class="spacer"></span>
+        <span class="chip gray" id="adminEmail">—</span>
+        <button class="btn btn-slate btn-sm" onclick="adminLogout()">Logout</button>
+      </div>
+      <div class="hsub">Manage hospitals, doctors & timings.</div>
+
+      <!-- Hospitals -->
+      <div class="card mt-24">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;">
+          <span style="width:36px;height:36px;border-radius:12px;background:var(--green-050);display:flex;align-items:center;justify-content:center;"><i class="fa-solid fa-hospital"></i></span>
+          <h2 style="font-size:1.05rem;font-weight:800;">Hospitals</h2>
+        </div>
+        <div id="hospitalList"></div>
+        <div class="divider"></div>
+        <div class="htitle" style="font-size:1rem;">Add Hospital</div>
+        <div class="mt-12">
+          <div class="field"><label class="label">Hospital Name <span class="req">*</span></label><input class="input" id="newHosName" placeholder="e.g. City Care Hospital" /></div>
+          <div class="field"><label class="label">City</label><input class="input" id="newHosCity" placeholder="e.g. Chennai" /></div>
+          <div class="field"><label class="label">Slug <span class="muted">(unique id, optional)</span></label><input class="input" id="newHosSlug" placeholder="auto-generated if empty" /></div>
+          <button class="btn btn-green btn-block" onclick="addHospital()"><i class="fa-solid fa-plus"></i> Add Hospital</button>
+        </div>
+      </div>
+
+      <!-- Doctors -->
+      <div class="card mt-24">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;">
+          <span style="width:36px;height:36px;border-radius:12px;background:var(--green-050);display:flex;align-items:center;justify-content:center;"><i class="fa-solid fa-user-doctor"></i></span>
+          <h2 style="font-size:1.05rem;font-weight:800;">Doctors</h2>
+        </div>
+        <div class="field"><label class="label">Hospital</label><select class="input" id="hosForDoctor" onchange="loadDoctorList()"><option value="">Choose a hospital…</option></select></div>
+        <div id="doctorList"></div>
+
+        <div class="panel hidden" id="doctorForm" style="margin-top:16px;background:var(--bg);border-radius:14px;padding:16px;">
+          <div class="htitle" style="font-size:1rem;">Doctor Details</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px;">
+            <div class="field"><label class="label">Name <span class="req">*</span></label><input class="input" id="docName" placeholder="Dr. Name" /></div>
+            <div class="field"><label class="label">Department</label><input class="input" id="docDept" placeholder="e.g. Cardiology" /></div>
+          </div>
+          <div class="field"><label class="label">Status</label><select class="input" id="docStatus"><option value="open">Open</option><option value="closed">Closed</option></select></div>
+          <div style="background:var(--card);border-radius:12px;padding:14px;margin-top:6px;">
+            <div class="label"><i class="fa-solid fa-sun"></i> Morning Timing <span class="muted">(optional)</span></div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+              <input class="input" id="docAMStart" type="time" />
+              <input class="input" id="docAMEnd" type="time" />
+            </div>
+            <div class="label" style="margin-top:10px;"><i class="fa-solid fa-cloud-sun"></i> Evening Timing <span class="muted">(optional)</span></div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+              <input class="input" id="docPMStart" type="time" />
+              <input class="input" id="docPMEnd" type="time" />
+            </div>
+          </div>
+          <div class="btn-row mt-16">
+            <button class="btn btn-green" onclick="saveDoctor()"><i class="fa-solid fa-floppy-disk"></i> Save</button>
+            <button class="btn btn-slate" onclick="cancelDoctorEdit()">Cancel</button>
+          </div>
+        </div>
+
+        <button class="btn btn-mint btn-block mt-16" onclick="showDoctorForm()"><i class="fa-solid fa-plus"></i> Add Doctor</button>
+      </div>
+
+      <!-- Quick Actions -->
+      <div class="card mt-24">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;">
+          <span style="width:36px;height:36px;border-radius:12px;background:var(--green-050);display:flex;align-items:center;justify-content:center;"><i class="fa-solid fa-bolt"></i></span>
+          <h2 style="font-size:1.05rem;font-weight:800;">Quick Actions</h2>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:12px;">
+          <a class="role" href="qr.html" style="text-decoration:none;display:flex;align-items:center;gap:14px;background:var(--card);border:1px solid var(--line);border-radius:16px;padding:16px;box-shadow:var(--shadow);">
+            <div class="rt" style="width:44px;height:44px;border-radius:13px;background:var(--green-050);display:flex;align-items:center;justify-content:center;font-size:1.3rem;flex-shrink:0;"><i class="fa-solid fa-qrcode"></i></div>
+            <div style="flex:1;"><div style="font-weight:700;">QR Check-in</div><div class="hsub" style="margin:2px 0 0;font-size:.8rem;">Print a code so patients book instantly.</div></div>
+            <span style="color:var(--slate-400);font-weight:700;"><i class="fa-solid fa-chevron-right"></i></span>
+          </a>
+          <a class="role" href="analytics.html" style="text-decoration:none;display:flex;align-items:center;gap:14px;background:var(--card);border:1px solid var(--line);border-radius:16px;padding:16px;box-shadow:var(--shadow);">
+            <div class="rt" style="width:44px;height:44px;border-radius:13px;background:var(--green-050);display:flex;align-items:center;justify-content:center;font-size:1.3rem;flex-shrink:0;"><i class="fa-solid fa-chart-column"></i></div>
+            <div style="flex:1;"><div style="font-weight:700;">Analytics &amp; Peak Hours</div><div class="hsub" style="margin:2px 0 0;font-size:.8rem;">Waiting time &amp; busiest hours today.</div></div>
+            <span style="color:var(--slate-400);font-weight:700;"><i class="fa-solid fa-chevron-right"></i></span>
+          </a>
+        </div>
+      </div>
+    </section>
+
+  </div>
+
+  <button class="theme-toggle" onclick="hk.toggleDark()"><i class="fa-solid fa-moon"></i></button>
+
+  <script>
+    if ('serviceWorker' in navigator) { window.addEventListener('load', () => navigator.serviceWorker.register('/sw.js').catch(()=>{})); }
+  </script>
+  <script src="js/firebase-config.js"></script>
+  <script src="js/app.js"></script>
+  <script src="js/firebase.js"></script>
+  <script>
+    let editHospital = null;
+    let editDoctorId = null;
+
+    window.addEventListener('load', async () => {
+      hk.applyDark();
+      await initFirebase();
+      await waitForFB();
+      if (!window._FB_READY) return showToast('Firebase not configured.', true);
+      window._useAuth.onAuthStateChanged(window._auth, u => { if (u) showMain(u); });
+    });
+
+    function showMain(u) {
+      document.getElementById('loginCard').classList.add('hidden');
+      document.getElementById('mainCard').classList.remove('hidden');
+      document.getElementById('adminEmail').textContent = u.email;
+      loadHospitals();
+    }
+
+    async function adminLogin() {
+      const email = document.getElementById('loginEmail').value.trim();
+      const pass = document.getElementById('loginPass').value;
+      if (!email || !pass) return showToast('Enter email and password.', true);
+      await waitForFB();
+      try { await window._useAuth.signInWithEmailAndPassword(window._auth, email, pass); showToast('Signed in.'); }
+      catch (e) { showToast('Login failed: ' + (e.message||e.code), true, 4000); }
+    }
+
+    async function adminLogout() {
+      await window._useAuth.signOut(window._auth);
+      document.getElementById('loginCard').classList.remove('hidden');
+      document.getElementById('mainCard').classList.add('hidden');
+    }
+
+    async function loadHospitals() {
+      await waitForFB();
+      if (!window._FB_READY) return;
+      try {
+        const snap = await window._fs.getDocs(window._fs.collection(window._db, 'hospitals'));
+        const list = document.getElementById('hospitalList');
+        const sel = document.getElementById('hosForDoctor');
+        list.innerHTML = '';
+        sel.innerHTML = '<option value="">Choose a hospital…</option>';
+        if (snap.empty) list.innerHTML = '<div class="empty" style="padding:18px;"><div class="e-t">No hospitals yet</div><div class="e-s">Add your first one below.</div></div>';
+        snap.docs.forEach(d => {
+          const h = d.data();
+          list.innerHTML += `<div class="mgmt-card">
+            <div style="display:flex;align-items:center;gap:12px;">
+              <div style="flex:1;"><div style="font-weight:700;">${escHtml(h.name||d.id)}</div><div class="muted" style="font-size:.82rem;margin-top:2px;">${escHtml(d.id)}${h.city?' · '+escHtml(h.city):''}</div></div>
+              <button class="icn-btn danger" onclick="deleteHospital('${d.id}')" title="Delete"><i class="fa-solid fa-trash-can"></i></button>
+            </div>
+          </div>`;
+          const o = document.createElement('option');
+          o.value = d.id; o.textContent = h.name || d.id;
+          sel.appendChild(o);
+        });
+      } catch (e) { showToast('Failed to load: ' + e.message, true); }
+    }
+
+    async function addHospital() {
+      const name = document.getElementById('newHosName').value.trim();
+      const city = document.getElementById('newHosCity').value.trim();
+      let slug = document.getElementById('newHosSlug').value.trim().toLowerCase().replace(/[^a-z0-9-]/g,'-');
+      if (!name) return showToast('Enter a hospital name.', true);
+      if (!slug) slug = name.toLowerCase().replace(/[^a-z0-9]/g,'').slice(0,20);
+      await waitForFB();
+      if (!window._FB_READY) return showToast('Firebase not configured.', true);
+      try {
+        await window._fs.setDoc(window._fs.doc(window._db, 'hospitals', slug), { name, city, createdAt: window._fs.serverTimestamp() });
+        showToast('Hospital added.');
+        document.getElementById('newHosName').value=''; document.getElementById('newHosCity').value=''; document.getElementById('newHosSlug').value='';
+        loadHospitals();
+      } catch (e) { showToast('Failed: ' + e.message, true); }
+    }
+
+    async function deleteHospital(id) {
+      if (!confirm('Delete hospital ' + id + '?')) return;
+      await waitForFB();
+      try { await window._fs.deleteDoc(window._fs.doc(window._db, 'hospitals', id)); showToast('Deleted.'); loadHospitals(); }
+      catch (e) { showToast('Failed: ' + e.message, true); }
+    }
+
+    async function loadDoctorList() {
+      const slug = document.getElementById('hosForDoctor').value;
+      if (!slug) return;
+      editHospital = slug;
+      await waitForFB();
+      const list = document.getElementById('doctorList');
+      try {
+        const snap = await window._fs.getDocs(window._fs.collection(window._db, 'hospitals', slug, 'doctors'));
+        list.innerHTML = '';
+        if (snap.empty) list.innerHTML = '<div class="empty" style="padding:16px;"><div class="e-s">No doctors yet.</div></div>';
+        snap.docs.forEach(d => {
+          const doc = d.data();
+          const slots = timeSlots(doc);
+          const statusBadge = doc.status==='closed' ? '<span class="badge red">closed</span>' : '<span class="badge green">open</span>';
+          list.innerHTML += `<div class="mgmt-card">
+            <div style="display:flex;align-items:center;gap:12px;">
+              <div style="flex:1;">
+                <div style="font-weight:700;">${escHtml(doc.name||d.id)} ${statusBadge}</div>
+                <div class="muted" style="font-size:.82rem;margin-top:2px;">${escHtml(doc.department||'')} ${slots}</div>
+              </div>
+              <button class="icn-btn" onclick="editDoctor('${d.id}')" title="Edit"><i class="fa-solid fa-pen"></i></button>
+              <button class="icn-btn danger" onclick="deleteDoctor('${d.id}')" title="Delete"><i class="fa-solid fa-trash-can"></i></button>
+            </div>
+          </div>`;
+        });
+      } catch (e) { console.error(e); }
+    }
+
+    function timeSlots(doc) {
+      let s = '';
+      if (doc.morningStart && doc.morningEnd) s += '<span class="slot on">🌅 ' + escHtml(doc.morningStart) + '–' + escHtml(doc.morningEnd) + '</span>';
+      if (doc.eveningStart && doc.eveningEnd) s += '<span class="slot on">🌇 ' + escHtml(doc.eveningStart) + '–' + escHtml(doc.eveningEnd) + '</span>';
+      return s;
+    }
+
+    function showDoctorForm() { document.getElementById('doctorForm').classList.remove('hidden'); }
+    function cancelDoctorEdit() { document.getElementById('doctorForm').classList.add('hidden'); editDoctorId = null; }
+
+    async function editDoctor(id) {
+      await waitForFB();
+      document.getElementById('doctorForm').classList.remove('hidden');
+      editDoctorId = id;
+      try {
+        const snap = await window._fs.getDoc(window._fs.doc(window._db, 'hospitals', editHospital, 'doctors', id));
+        const doc = snap.data();
+        document.getElementById('docName').value = doc.name||'';
+        document.getElementById('docDept').value = doc.department||'';
+        document.getElementById('docStatus').value = doc.status||'open';
+        document.getElementById('docAMStart').value = doc.morningStart||'';
+        document.getElementById('docAMEnd').value = doc.morningEnd||'';
+        document.getElementById('docPMStart').value = doc.eveningStart||'';
+        document.getElementById('docPMEnd').value = doc.eveningEnd||'';
+        document.getElementById('doctorForm').scrollIntoView({ behavior:'smooth' });
+      } catch (e) { console.error(e); }
+    }
+
+    async function saveDoctor() {
+      const name = document.getElementById('docName').value.trim();
+      const dept = document.getElementById('docDept').value.trim();
+      const status = document.getElementById('docStatus').value;
+      const data = { name, department: dept, status,
+        morningStart: document.getElementById('docAMStart').value,
+        morningEnd: document.getElementById('docAMEnd').value,
+        eveningStart: document.getElementById('docPMStart').value,
+        eveningEnd: document.getElementById('docPMEnd').value };
+      if (!name) return showToast('Enter doctor name.', true);
+      if (!editHospital) return showToast('Choose a hospital first.', true);
+      await waitForFB();
+      if (!window._FB_READY) return showToast('Firebase not configured.', true);
+      const coll = window._fs.collection(window._db, 'hospitals', editHospital, 'doctors');
+      try {
+        if (editDoctorId) await window._fs.updateDoc(window._fs.doc(coll, editDoctorId), data);
+        else await window._fs.addDoc(coll, data);
+        showToast('Saved.');
+        document.getElementById('docName').value=''; document.getElementById('docDept').value='';
+        document.getElementById('doctorForm').classList.add('hidden');
+        editDoctorId = null;
+        loadDoctorList();
+      } catch (e) { showToast('Failed: ' + e.message, true); }
+    }
+
+    async function deleteDoctor(id) {
+      if (!confirm('Delete this doctor?')) return;
+      await waitForFB();
+      try { await window._fs.deleteDoc(window._fs.doc(window._db, 'hospitals', editHospital, 'doctors', id)); showToast('Deleted.'); loadDoctorList(); }
+      catch (e) { showToast('Failed: ' + e.message, true); }
+    }
+  </script>
+</body>
+</html>

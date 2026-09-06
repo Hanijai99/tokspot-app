@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
+  <title>TokSpot — Smart Hospital Queue</title>
+  <link rel="stylesheet" href="css/style.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+  <link rel="manifest" href="manifest.json" />
+  <link rel="icon" type="image/png" href="logo.png" />
+  <link rel="apple-touch-icon" href="logo.png" />
+  <style>
+    .hero { text-align:center; padding:56px 10px 8px; }
+    .hero .logo {
+      width:74px; height:74px; border-radius:24px; margin:0 auto 18px;
+      background:linear-gradient(135deg,#22c55e,#0d9488);
+      display:flex; align-items:center; justify-content:center; font-size:2.4rem;
+      box-shadow:0 16px 40px rgba(22,163,74,.32); overflow:hidden;
+    }
+    .hero .logo img { width:100%; height:100%; object-fit:cover; }
+    .hero h1 { font-size:2.3rem; font-weight:900; color:var(--ink); letter-spacing:-.7px; line-height:1.15; }
+    .hero p { color:var(--slate-500); font-size:1.02rem; margin-top:10px; line-height:1.6; }
+    .hero .cta { max-width:360px; margin:26px auto 0; }
+
+    .role-cards { margin-top:40px; display:flex; flex-direction:column; gap:14px; }
+    .role {
+      display:flex; align-items:center; gap:16px; text-decoration:none;
+      background:var(--card); border:1px solid var(--line); border-radius:var(--r-lg);
+      padding:18px 18px; box-shadow:var(--shadow); transition:transform var(--ease), box-shadow var(--ease), border-color var(--ease);
+    }
+    .role:hover { transform:translateY(-3px); box-shadow:var(--shadow-md); border-color:var(--green); }
+    .role:active { transform:scale(.98); }
+    .role .rt {
+      width:54px; height:54px; border-radius:16px; flex-shrink:0;
+      background:var(--green-050); display:flex; align-items:center; justify-content:center; font-size:1.6rem;
+    }
+    .role .rm { flex:1; }
+    .role .rt-tt { font-weight:800; color:var(--ink); font-size:1.02rem; }
+    .role .rt-sb { color:var(--slate-500); font-size:.86rem; margin-top:2px; line-height:1.4; }
+    .role .arrow { color:var(--slate-400); font-size:1.1rem; font-weight:700; }
+
+    .feat { margin-top:38px; }
+    .feat h2 { font-size:1.1rem; font-weight:800; color:var(--ink); margin-bottom:6px; }
+    .feat .fh { color:var(--slate-500); font-size:.9rem; margin-bottom:16px; }
+    .feat-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+    .fi { display:flex; gap:9px; align-items:center; font-size:.88rem; color:var(--slate-600); }
+    .fi .c { color:var(--green); font-weight:900; }
+
+    body.dark .hero h1 { color:#f1f5f9; }
+    body.dark .role { background:#121a2b; border-color:#24314a; }
+    body.dark .role .rt { background:#052e16; }
+    body.dark .role .rt-tt { color:#f1f5f9; }
+    body.dark .feat h2 { color:#f1f5f9; }
+  </style>
+</head>
+<body>
+
+  <div class="topbar">
+    <a class="brand" href="index.html"><span class="logomark"><img src="logo.png" alt="TokSpot" /></span>TokSpot</a>
+    <span class="spacer"></span>
+    <button class="icn-btn" onclick="hk.toggleDark()" title="Theme"><i class="fa-solid fa-moon"></i></button>
+  </div>
+
+  <div class="page">
+
+    <div class="hero">
+      <div class="logo"><img src="logo.png" alt="TokSpot" /></div>
+      <h1>Skip the Queue.<br/>Get Your Token Fast.</h1>
+      <p>Simple hospital token booking with live queue updates and instant alerts.</p>
+      <div class="cta">
+        <a href="book.html" class="btn btn-green btn-lg btn-block"><i class="fa-solid fa-ticket"></i> Book a Token</a>
+      </div>
+    </div>
+
+    <div class="role-cards">
+      <a class="role" href="book.html">
+        <div class="rt"><i class="fa-solid fa-user-doctor"></i></div>
+        <div class="rm">
+          <div class="rt-tt">I'm a Patient</div>
+          <div class="rt-sb">Book a token and track your position live.</div>
+        </div>
+        <span class="arrow"><i class="fa-solid fa-chevron-right"></i></span>
+      </a>
+      <a class="role" href="frontdesk.html">
+        <div class="rt"><i class="fa-solid fa-building-columns"></i></div>
+        <div class="rm">
+          <div class="rt-tt">Front Desk</div>
+          <div class="rt-sb">Issue, call & manage queue tokens.</div>
+        </div>
+        <span class="arrow"><i class="fa-solid fa-chevron-right"></i></span>
+      </a>
+      <a class="role" href="display.html">
+        <div class="rt"><i class="fa-solid fa-tv"></i></div>
+        <div class="rm">
+          <div class="rt-tt">Display Board</div>
+          <div class="rt-sb">Big-screen waiting room board.</div>
+        </div>
+        <span class="arrow"><i class="fa-solid fa-chevron-right"></i></span>
+      </a>
+      <a class="role" href="admin.html">
+        <div class="rt"><i class="fa-solid fa-gear"></i></div>
+        <div class="rm">
+          <div class="rt-tt">Admin</div>
+          <div class="rt-sb">Manage hospitals, doctors & timings.</div>
+        </div>
+        <span class="arrow"><i class="fa-solid fa-chevron-right"></i></span>
+      </a>
+    </div>
+
+    <div class="feat">
+      <h2>Everything you need</h2>
+      <div class="fh">Smart, simple, hospital-ready.</div>
+      <div class="feat-grid">
+        <div class="fi"><span class="c">✓</span> Live queue position</div>
+        <div class="fi"><span class="c">✓</span> Multi-hospital</div>
+        <div class="fi"><span class="c">✓</span> SMS &amp; WhatsApp alerts</div>
+        <div class="fi"><span class="c">✓</span> Auto display board</div>
+        <div class="fi"><span class="c">✓</span> Doctor timings</div>
+        <div class="fi"><span class="c">✓</span> Daily stats</div>
+      </div>
+    </div>
+
+    <div class="card mt-24 center">
+      <div class="htitle" style="font-size:1.05rem;"><i class="fa-solid fa-bell"></i> Get notified</div>
+      <div class="hsub mt-6">Allow notifications to be alerted when your token is called.</div>
+      <button class="btn btn-green btn-block mt-16" onclick="enablePush()"><i class="fa-solid fa-bell"></i> Enable Notifications</button>
+    </div>
+
+  </div>
+
+  <button class="theme-toggle" onclick="hk.toggleDark()"><i class="fa-solid fa-moon"></i></button>
+
+  <script>
+    if ('serviceWorker' in navigator) { window.addEventListener('load', () => navigator.serviceWorker.register('/sw.js').catch(()=>{})); }
+  </script>
+  <!-- Fixed Script Loading Order -->
+  <script src="js/firebase-config.js"></script>
+  <script src="js/app.js"></script>
+  <script src="js/firebase.js"></script>
+  <script src="js/push.js"></script>
+  <script>
+    hk.applyDark();
+    window._VAPID = 'REPLACE_WITH_VAPID_PUBLIC_KEY';
+    window.enablePush = async function () {
+      await initFirebase();
+      await waitForFB();
+      if (!window._FB_READY) return showToast('Firebase not configured.', true);
+      if (!window._VAPID || window._VAPID.startsWith('REPLACE')) { 
+        showToast('Push keys not configured. SMS/WhatsApp alerts are active.', false, 4000); 
+        return; 
+      }
+      const t = await window.requestPushPermission();
+      if (t) {
+        localStorage.setItem('hk_fcm', t);
+        showToast('Notifications enabled.');
+      }
+    };
+  </script>
+</body>
+</html>

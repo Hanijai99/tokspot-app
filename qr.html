@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
+  <title>QR Check-in — TokSpot</title>
+  <link rel="stylesheet" href="css/style.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+  <link rel="manifest" href="manifest.json" />
+  <link rel="icon" type="image/png" href="logo.png" />
+  <link rel="apple-touch-icon" href="logo.png" />
+  <style>
+    .qrbox { background:#fff; border-radius:22px; padding:18px; display:inline-block; box-shadow:var(--shadow-md); }
+    .qrbox img, .qrbox canvas { width:220px; height:220px; display:block; margin:0 auto; }
+    .qr-hint { font-size:.85rem; color:var(--slate-500); margin-top:14px; line-height:1.5; }
+  </style>
+</head>
+<body>
+  <div class="topbar">
+    <a class="brand" href="index.html"><span class="logomark"><img src="logo.png" alt="TokSpot" /></span>TokSpot</a>
+    <span class="spacer"></span>
+    <button class="icn-btn" onclick="location.href='index.html'" title="Home"><i class="fa-solid fa-house"></i></button>
+    <button class="icn-btn" onclick="hk.toggleDark()" title="Theme"><i class="fa-solid fa-moon"></i></button>
+  </div>
+
+  <div class="page">
+    <div class="htitle mt-12"><i class="fa-solid fa-qrcode"></i> QR Check-in</div>
+    <div class="hsub">Print this QR so patients can scan and book instantly.</div>
+
+    <div class="card mt-16" id="selectCard">
+      <div class="field">
+        <label class="label">Hospital</label>
+        <select class="input" id="hospitalSelect" onchange="onHos()"><option value="">Choose…</option></select>
+      </div>
+      <div class="field">
+        <label class="label">Doctor / Department <span class="muted">(optional — all if empty)</span></label>
+        <select class="input" id="doctorSelect" onchange="gen()"><option value="">All Doctors</option></select>
+      </div>
+      <button class="btn btn-mint btn-block" onclick="gen()">Generate QR</button>
+    </div>
+
+    <div class="card mt-16 hidden center" id="qrCard">
+      <div class="htitle">Scan to Book</div>
+      <div class="mt-12">
+        <div class="qrbox" id="qrBox"></div>
+      </div>
+      <div class="qr-hint">Patient scans → opens booking pre-filled → gets token in seconds.</div>
+      <div class="btn-row mt-12">
+        <button class="btn btn-slate" onclick="window.print()"><i class="fa-solid fa-print"></i> Print</button>
+        <button class="btn btn-green" onclick="downloadQR()"><i class="fa-solid fa-download"></i> Download</button>
+      </div>
+    </div>
+  </div>
+
+  <button class="theme-toggle" onclick="hk.toggleDark()"><i class="fa-solid fa-moon"></i></button>
+
+  <script>
+    if ('serviceWorker' in navigator) { window.addEventListener('load', () => navigator.serviceWorker.register('/sw.js').catch(()=>{})); }
+  </script>
+  <script src="js/firebase-config.js"></script>
+  <script src="js/app.js"></script>
+  <script src="js/firebase.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+  <script>
+    let qHos = null;
+    let qDoc = null;
+    let qr = null;
+
+    window.addEventListener('load', async () => {
+      hk.applyDark();
+      await initFirebase();
+      await loadHospitals();
+    });
+
+    async function loadHospitals() {
+      await waitForFB();
+      if (!window._FB_READY) return;
+      try {
+        const snap = await window._fs.getDocs(window._fs.collection(window._db, 'hospitals'));
+        const sel = document.getElementById('hospitalSelect');
+        snap.docs.forEach(d => { const h=d.data(); const o=document.createElement('option'); o.value=d.id; o.textContent=(h.name||d.id)+(h.city?' — '+h.city:''); sel.appendChild(o); });
+      } catch (e) { showToast('Failed to load: ' + e.message, true); }
+    }
+
+    async function onHos() {
+      qHos = document.getElementById('hospitalSelect').value;
+      qDoc = null;
+      const ds = document.getElementById('doctorSelect');
+      ds.innerHTML = '<option value="">All Doctors</option>';
+      if (!qHos || !window._FB_READY) return;
+      try {
+        const snap = await window._fs.getDocs(window._fs.collection(window._db, 'hospitals', qHos, 'doctors'));
+        snap.docs.forEach(d => { const doc=d.data(); if(doc.status==='closed') return; const o=document.createElement('option'); o.value=d.id; o.textContent=(doc.name||d.id)+(doc.department?' · '+doc.department:''); ds.appendChild(o); });
+      } catch (e) { console.error(e); }
+      gen();
+    }
+
+    function gen() {
+      qDoc = document.getElementById('doctorSelect').value;
+      if (!qHos) return showToast('Choose a hospital first.', true);
+      const url = window.qrUrl(qHos, qDoc || '');
+      document.getElementById('qrCard').classList.remove('hidden');
+      const box = document.getElementById('qrBox');
+      box.innerHTML = '';
+      qr = new QRCode(box, { width: 220, height: 220 });
+      qr.makeCode(url);
+      document.getElementById('qrCard').scrollIntoView({ behavior: 'smooth' });
+    }
+
+    function downloadQR() {
+      const canvas = document.querySelector('#qrBox canvas');
+      if (!canvas) return showToast('No QR yet.', true);
+      const a = document.createElement('a');
+      a.download = 'checkin-qr.png';
+      a.href = canvas.toDataURL('image/png');
+      a.click();
+    }
+  </script>
+</body>
+</html>

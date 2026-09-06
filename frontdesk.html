@@ -1,0 +1,700 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
+  <title>Front Desk — TokSpot</title>
+  <link rel="stylesheet" href="css/style.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+  <link rel="manifest" href="manifest.json" />
+  <link rel="icon" type="image/png" href="logo.png" />
+  <link rel="apple-touch-icon" href="logo.png" />
+  <style>
+    /* 58mm Thermal Print Slip Styles */
+    #printSlip { display: none; }
+
+    @media print {
+      body * { visibility: hidden; }
+      #printSlip, #printSlip * { visibility: visible; }
+      #printSlip {
+        display: block !important;
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 58mm;
+        margin: 0;
+        padding: 4mm;
+        font-family: monospace, -apple-system, sans-serif;
+        color: #000;
+        background: #fff;
+        text-align: center;
+      }
+      .slip-title { font-size: 14px; font-weight: 900; text-transform: uppercase; margin-bottom: 2px; }
+      .slip-sub { font-size: 10px; margin-bottom: 6px; }
+      .slip-divider { border-top: 1px dashed #000; margin: 6px 0; }
+      .slip-token { font-size: 42px; font-weight: 900; line-height: 1; margin: 8px 0; }
+      .slip-row { display: flex; justify-content: space-between; font-size: 10px; margin: 3px 0; }
+      .slip-footer { font-size: 9px; margin-top: 8px; }
+      @page { size: 58mm auto; margin: 0; }
+    }
+
+    /* Hotkeys Help Bar */
+    .hotkey-bar {
+      display: flex;
+      gap: 10px;
+      justify-content: center;
+      flex-wrap: wrap;
+      font-size: 0.76rem;
+      color: var(--slate-500);
+      margin-top: 10px;
+    }
+    .hotkey-bar kbd {
+      background: #e2e8f0;
+      color: #0f172a;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-weight: 800;
+      border: 1px solid #cbd5e1;
+      font-family: monospace;
+    }
+    body.dark .hotkey-bar kbd {
+      background: #1e293b;
+      color: #f1f5f9;
+      border-color: #334155;
+    }
+  </style>
+</head>
+<body>
+  <div class="topbar">
+    <a class="brand" href="index.html"><span class="logomark"><img src="logo.png" alt="TokSpot" /></span>TokSpot</a>
+    <span class="spacer"></span>
+    <button class="icn-btn" onclick="location.href='index.html'" title="Home"><i class="fa-solid fa-house"></i></button>
+    <button class="icn-btn" onclick="location.href='book.html'" title="Patient Booking"><i class="fa-solid fa-ticket"></i></button>
+    <button class="icn-btn" onclick="location.href='display.html'" title="Board"><i class="fa-solid fa-tv"></i></button>
+    <button class="icn-btn" onclick="location.href='qr.html'" title="QR"><i class="fa-solid fa-qrcode"></i></button>
+    <button class="icn-btn" onclick="location.href='analytics.html'" title="Analytics"><i class="fa-solid fa-chart-column"></i></button>
+    <button class="icn-btn" onclick="hk.toggleDark()"><i class="fa-solid fa-moon"></i></button>
+  </div>
+
+  <div class="page wide">
+    <div class="hsub mt-12">Front Desk — Issue & manage tokens.</div>
+
+    <section class="card mt-12" id="selectors">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+        <div class="field" style="margin:0;">
+          <label class="label">Hospital</label>
+          <select class="input" id="hospitalSelect" onchange="onHospital()">
+            <option value="">Choose…</option>
+          </select>
+        </div>
+        <div class="field" style="margin:0;">
+          <label class="label">Doctor</label>
+          <select class="input" id="doctorSelect" onchange="onDoctor()" disabled>
+            <option value="">Choose…</option>
+          </select>
+        </div>
+      </div>
+      <div class="mt-16 center" id="pickMsg"><span class="muted">Pick a hospital to continue.</span></div>
+    </section>
+
+    <section class="hidden" id="desk">
+      <!-- Issue New Token -->
+      <div class="card">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;">
+          <span style="width:38px;height:38px;border-radius:12px;background:var(--green-050);display:flex;align-items:center;justify-content:center;font-size:1.2rem;"><i class="fa-solid fa-ticket"></i></span>
+          <h2 style="font-size:1.05rem;font-weight:800;">Issue New Token</h2>
+        </div>
+        <div class="field"><label class="label">Patient Name <span class="req">*</span></label><input class="input" id="newName" placeholder="Patient name" /></div>
+        <div class="field"><label class="label">Mobile <span class="muted">(for SMS/WhatsApp)</span></label><input class="input" id="newPhone" placeholder="10-digit mobile" maxlength="10" inputmode="numeric" /></div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+          <div class="field" style="margin-bottom:0;">
+            <label class="label">Type</label>
+            <select class="input" id="newMode">
+              <option value="walkin">Walk-in</option>
+              <option value="call">Phone</option>
+              <option value="self">Self-booked</option>
+            </select>
+          </div>
+          <div class="field" style="margin-bottom:0;">
+            <label class="label">Counter</label>
+            <select class="input" id="newCounter">
+              <option value="A">Counter A</option>
+              <option value="B">Counter B</option>
+              <option value="C">Counter C</option>
+            </select>
+          </div>
+        </div>
+        <div class="field" style="display:flex;align-items:center;gap:10px;background:#fff7ed;border:1px solid #fed7aa;border-radius:12px;padding:12px 14px;margin-top:14px;">
+          <input type="checkbox" id="newPriority" style="width:20px;height:20px;accent-color:var(--red);" />
+          <div style="flex:1;">
+            <div style="font-weight:700;font-size:.9rem;color:#c2410c;"><i class="fa-solid fa-truck-medical"></i> Emergency / Priority</div>
+            <div class="muted" style="font-size:.78rem;">Fast-track ahead of normal tokens.</div>
+          </div>
+        </div>
+
+        <!-- 58mm Slip Toggle -->
+        <div style="display:flex;align-items:center;gap:8px;margin-top:10px;padding:4px;">
+          <input type="checkbox" id="autoPrintSlip" checked style="width:16px;height:16px;accent-color:var(--green);" />
+          <label for="autoPrintSlip" style="font-size:0.85rem;font-weight:600;color:var(--ink);cursor:pointer;">
+            <i class="fa-solid fa-print"></i> Auto-print 58mm thermal slip
+          </label>
+        </div>
+
+        <div class="btn-row mt-16">
+          <button class="btn btn-green" id="btnIssue" onclick="issueToken()" style="flex:1;"><i class="fa-solid fa-ticket"></i> Issue Token</button>
+          <button class="btn btn-slate" onclick="location.href='qr.html'" title="QR Check-in"><i class="fa-solid fa-qrcode"></i></button>
+        </div>
+
+        <!-- Keyboard Shortcuts Legend -->
+        <div class="hotkey-bar">
+          <span><kbd>F2</kbd> Focus Name</span>
+          <span><kbd>Enter</kbd> Issue Token</span>
+          <span><kbd>F4</kbd> Call Next</span>
+          <span><kbd>F8</kbd> Recall</span>
+          <span><kbd>F9</kbd> Skip</span>
+          <span><kbd>F10</kbd> Done</span>
+          <span><kbd>Alt + P</kbd> Reprint</span>
+        </div>
+      </div>
+
+      <!-- Now Serving -->
+      <div class="token-hero mt-16" style="padding:26px 16px;">
+        <div class="t-label"><i class="fa-solid fa-bullhorn"></i> Now Serving</div>
+        <div class="t-num" id="currentToken" style="font-size:4.6rem;">—</div>
+        <div class="t-name" id="currentPatient" style="font-size:1rem;">Waiting for next token…</div>
+      </div>
+
+      <!-- Overview Stats -->
+      <h2 style="font-size:1.05rem;font-weight:800;margin:22px 0 12px;">Today's Overview</h2>
+      <div class="stats" style="grid-template-columns: repeat(4, 1fr);">
+        <div class="stat"><div class="n amber" id="stWaiting">0</div><div class="k">Waiting</div></div>
+        <div class="stat"><div class="n" id="stCalled">0</div><div class="k">Called</div></div>
+        <div class="stat"><div class="n red" id="stSkipped" style="color:#dc2626;">0</div><div class="k">Skipped</div></div>
+        <div class="stat"><div class="n green" id="stDone">0</div><div class="k">Served</div></div>
+      </div>
+
+      <!-- Waiting Queue -->
+      <h2 style="font-size:1.05rem;font-weight:800;margin:22px 0 12px;">Waiting Queue</h2>
+      <div id="queueList"></div>
+      <div class="empty hidden" id="queueEmpty"><div class="e-ic"><i class="fa-regular fa-clock"></i></div><div class="e-t">No tokens waiting</div><div class="e-s">Issue a token to get started.</div></div>
+
+      <!-- Skipped Patients Recovery Section -->
+      <div id="skippedSection" class="hidden mt-24">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;">
+          <span style="color:#dc2626;font-size:1.1rem;"><i class="fa-solid fa-user-clock"></i></span>
+          <h2 style="font-size:1.05rem;font-weight:800;color:#991b1b;margin:0;">Skipped / Absent Patients</h2>
+        </div>
+        <div class="card" style="border: 1px dashed #f87171; background: #fff5f5;" id="skippedList"></div>
+      </div>
+
+      <!-- History -->
+      <h2 style="font-size:1.05rem;font-weight:800;margin:24px 0 12px;">Served Recently</h2>
+      <div id="historyList"></div>
+
+      <button class="btn btn-ghost btn-block mt-24" onclick="resetDesk()"><i class="fa-solid fa-rotate-left"></i> Change Hospital / Doctor</button>
+    </section>
+  </div>
+
+  <!-- Hidden 58mm Thermal Receipt Element -->
+  <div id="printSlip">
+    <div class="slip-title" id="slpHospital">HOSPITAL NAME</div>
+    <div class="slip-sub" id="slpDoctor">Doctor Name</div>
+    <div class="slip-divider"></div>
+    <div style="font-size:11px;font-weight:700;">TOKEN NUMBER</div>
+    <div class="slip-token" id="slpNumber">000</div>
+    <div style="font-size:12px;font-weight:700;" id="slpPatient">Patient Name</div>
+    <div class="slip-divider"></div>
+    <div class="slip-row"><span>Counter:</span><b id="slpCounter">Counter A</b></div>
+    <div class="slip-row"><span>Date:</span><span id="slpDate">--/--/----</span></div>
+    <div class="slip-row"><span>Time:</span><span id="slpTime">--:--</span></div>
+    <div class="slip-divider"></div>
+    <div class="slip-footer">
+      <div>Live Tracker Link:</div>
+      <div id="slpTrackUrl" style="font-size:8px;word-break:break-all;margin-top:2px;"></div>
+      <div style="margin-top:6px;font-weight:700;">Please wait for announcement</div>
+    </div>
+  </div>
+
+  <button class="theme-toggle" onclick="hk.toggleDark()"><i class="fa-solid fa-moon"></i></button>
+
+  <script>
+    if ('serviceWorker' in navigator) { window.addEventListener('load', () => navigator.serviceWorker.register('/sw.js').catch(()=>{})); }
+  </script>
+  <script src="js/firebase-config.js"></script>
+  <script src="js/app.js"></script>
+  <script src="js/firebase.js"></script>
+  <script>
+    let currentHospital = null;
+    let currentHospitalName = 'Hospital';
+    let currentDoctor = null;
+    let currentDoctorName = 'Doctor';
+    let unsubQueue = null;
+    let lastIssuedTokenId = null;
+
+    // Helper: Dynamic Base URL for Live Tracking
+    function getAppBaseUrl() {
+      return window.location.origin;
+    }
+
+    window.addEventListener('load', async () => {
+      hk.applyDark();
+      await initFirebase();
+      await loadHospitals();
+    });
+
+    async function loadHospitals() {
+      await waitForFB();
+      if (!window._FB_READY) return;
+      try {
+        const snap = await window._fs.getDocs(window._fs.collection(window._db, 'hospitals'));
+        const sel = document.getElementById('hospitalSelect');
+        sel.innerHTML = '<option value="">Choose…</option>';
+        snap.docs.forEach(d => {
+          const h = d.data();
+          const o = document.createElement('option');
+          o.value = d.id;
+          o.dataset.name = h.name || d.id;
+          o.textContent = (h.name || d.id) + (h.city ? ' — ' + h.city : '');
+          sel.appendChild(o);
+        });
+      } catch (e) { showToast('Failed to load: ' + e.message, true); }
+    }
+
+    async function onHospital() {
+      const sel = document.getElementById('hospitalSelect');
+      currentHospital = sel.value;
+      currentHospitalName = sel.options[sel.selectedIndex]?.dataset?.name || 'TokSpot Hospital';
+      currentDoctor = null;
+      document.getElementById('doctorSelect').innerHTML = '<option value="">Choose…</option>';
+      document.getElementById('doctorSelect').disabled = true;
+      document.getElementById('desk').classList.add('hidden');
+      if (!currentHospital) return;
+      document.getElementById('doctorSelect').disabled = false;
+      document.getElementById('pickMsg').innerHTML = '<span class="muted">Now choose a doctor.</span>';
+      if (!window._FB_READY) return;
+      try {
+        const snap = await window._fs.getDocs(window._fs.collection(window._db, 'hospitals', currentHospital, 'doctors'));
+        const ds = document.getElementById('doctorSelect');
+        snap.docs.forEach(d => {
+          const doc = d.data();
+          if (doc.status === 'closed') return;
+          const o = document.createElement('option');
+          o.value = d.id;
+          o.dataset.name = doc.name || d.id;
+          o.textContent = (doc.name || d.id) + (doc.department ? ' · ' + doc.department : '');
+          ds.appendChild(o);
+        });
+      } catch (e) { console.error(e); }
+    }
+
+    function onDoctor() {
+      const ds = document.getElementById('doctorSelect');
+      currentDoctor = ds.value;
+      currentDoctorName = ds.options[ds.selectedIndex]?.dataset?.name || 'Doctor';
+      if (!currentDoctor) { document.getElementById('desk').classList.add('hidden'); return; }
+      document.getElementById('selectors').classList.add('hidden');
+      document.getElementById('desk').classList.remove('hidden');
+      setupQueueListener();
+      loadHistory();
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    function resetDesk() {
+      currentDoctor = null;
+      document.getElementById('desk').classList.add('hidden');
+      document.getElementById('selectors').classList.remove('hidden');
+      document.getElementById('doctorSelect').value = '';
+      if (unsubQueue) { unsubQueue(); unsubQueue = null; }
+    }
+
+    function setupQueueListener() {
+      if (unsubQueue) unsubQueue();
+      const today = window.todayStr();
+      unsubQueue = window._fs.onSnapshot(
+        window._fs.query(
+          window._fs.collection(window._db, 'hospitals', currentHospital, 'tokens'),
+          window._fs.where('doctorId','==',currentDoctor),
+          window._fs.where('date','==',today),
+          window._fs.where('status','in',['waiting','called','skipped'])
+        ),
+        (snap) => renderQueue(snap),
+        (e) => console.error(e)
+      );
+    }
+
+    function renderQueue(snap) {
+      const waiting = [], called = [], skipped = [];
+      snap.docs.forEach(d => {
+        const t = d.data(); t.id = d.id;
+        if (t.status === 'waiting') waiting.push(t);
+        else if (t.status === 'called') called.push(t);
+        else if (t.status === 'skipped') skipped.push(t);
+      });
+
+      waiting.sort((a, b) => (b.priority ? 1 : 0) - (a.priority ? 1 : 0) || String(a.number).localeCompare(String(b.number)));
+      
+      document.getElementById('stWaiting').textContent = waiting.length;
+      document.getElementById('stCalled').textContent = called.length;
+      document.getElementById('stSkipped').textContent = skipped.length;
+
+      const activeCurrent = called.length ? called[called.length - 1] : (waiting.length ? waiting[0] : null);
+      if (activeCurrent) {
+        document.getElementById('currentToken').textContent = activeCurrent.number;
+        document.getElementById('currentPatient').textContent = (activeCurrent.priority ? '[EMERGENCY] ' : '') + (activeCurrent.patientName || 'Patient') + (activeCurrent.counter ? ' · Counter ' + activeCurrent.counter : '');
+      } else {
+        document.getElementById('currentToken').textContent = '—';
+        document.getElementById('currentPatient').textContent = 'Waiting for next token…';
+      }
+
+      // Render Active Waiting
+      const empty = document.getElementById('queueEmpty');
+      const list = document.getElementById('queueList');
+      if (waiting.length === 0) {
+        empty.classList.remove('hidden');
+        list.innerHTML = '';
+      } else {
+        empty.classList.add('hidden');
+        list.innerHTML = waiting.map((t, i) => {
+          const pos = i + 1;
+          const pri = t.priority ? '<span class="badge red"><i class="fa-solid fa-truck-medical"></i> EMERGENCY</span>' : '';
+          const ctr = t.counter ? '<span class="badge blue">Counter ' + escHtml(t.counter) + '</span>' : '';
+          return `
+          <div class="qrow" style="${t.priority ? 'border-color:var(--red);background:#fef2f2;' : ''}">
+            <div class="qnum" style="${t.priority ? 'background:#fee2e2;color:#b91c1c;' : ''}">${escHtml(t.number)}</div>
+            <div class="qbody">
+              <div class="qname">${escHtml(t.patientName||'Patient')} <span class="qpos ${pos===1?'top':''}">${pos===1?'Next':'Pos '+pos}</span> ${pri} ${ctr}</div>
+              <div class="qmeta">${t.phone?('<i class="fa-solid fa-phone"></i> '+escHtml(t.phone)):''}${t.source?' · '+t.source:''}</div>
+              <div class="btn-row mt-12" style="flex-wrap:wrap;">
+                <button class="btn btn-green btn-sm" onclick="setStatus('${t.id}','called')"><i class="fa-solid fa-bullhorn"></i> Call</button>
+                <button class="btn btn-mint btn-sm" onclick="setStatus('${t.id}','completed')"><i class="fa-solid fa-check"></i> Done</button>
+                <button class="btn btn-slate btn-sm" onclick="setStatus('${t.id}','skipped')"><i class="fa-solid fa-user-xmark"></i> Skip</button>
+                <button class="btn btn-slate btn-sm" onclick="printSingleSlip('${t.id}')"><i class="fa-solid fa-print"></i> Print</button>
+                <button class="btn btn-slate btn-sm" onclick="notifyPatient('${t.id}','sms')"><i class="fa-solid fa-message"></i> SMS</button>
+                <button class="btn btn-slate btn-sm" onclick="notifyPatient('${t.id}','wa')"><i class="fa-brands fa-whatsapp"></i> WA</button>
+                <button class="icn-btn danger" onclick="cancelToken('${t.id}')" title="Cancel"><i class="fa-solid fa-xmark"></i></button>
+              </div>
+            </div>
+          </div>`;
+        }).join('');
+      }
+
+      // Render Skipped List (Recovery Box)
+      const skipSec = document.getElementById('skippedSection');
+      const skipList = document.getElementById('skippedList');
+      if (skipped.length > 0) {
+        skipSec.classList.remove('hidden');
+        skipList.innerHTML = skipped.map(t => `
+          <div class="qrow" style="background:#fff;border-color:#fca5a5;margin-bottom:8px;">
+            <div class="qnum" style="background:#fee2e2;color:#b91c1c;">${escHtml(t.number)}</div>
+            <div class="qbody">
+              <div class="qname">${escHtml(t.patientName||'Patient')} <span class="badge red">Absent / Skipped</span></div>
+              <div class="qmeta">${t.phone?('<i class="fa-solid fa-phone"></i> '+escHtml(t.phone)):''} (Skipped when called)</div>
+              <div class="btn-row mt-8">
+                <button class="btn btn-green btn-sm" onclick="recoverPatient('${t.id}')"><i class="fa-solid fa-rotate-left"></i> Re-queue (Priority)</button>
+                <button class="btn btn-slate btn-sm" onclick="cancelToken('${t.id}')">Cancel</button>
+              </div>
+            </div>
+          </div>
+        `).join('');
+      } else {
+        skipSec.classList.add('hidden');
+        skipList.innerHTML = '';
+      }
+    }
+
+    async function recoverPatient(id) {
+      try {
+        await window._fs.updateDoc(window._fs.doc(window._db, 'hospitals', currentHospital, 'tokens', id), {
+          status: 'waiting',
+          priority: true,
+          recoveredAt: window._fs.serverTimestamp()
+        });
+        showToast('Patient restored to queue with priority!');
+      } catch (e) { showToast('Recovery failed: ' + e.message, true); }
+    }
+
+    async function issueToken() {
+      const name = document.getElementById('newName').value.trim();
+      const phone = document.getElementById('newPhone').value.trim().replace(/\D/g,'');
+      const mode = document.getElementById('newMode').value;
+      if (!name) return showToast('Enter patient name.', true);
+      if (!currentDoctor) return showToast('Select a doctor first.', true);
+      if (!window._FB_READY) return showToast('Firebase not configured.', true);
+      if (phone && phone.length !== 10) return showToast('Enter a valid 10-digit mobile.', true);
+
+      const today = window.todayStr();
+      const isPriority = document.getElementById('newPriority').checked;
+      const counter = document.getElementById('newCounter').value;
+      const counterRef = window._fs.doc(window._db, 'hospitals', currentHospital, 'counters', today);
+
+      try {
+        let createdTokenId = '';
+        const tokenNum = await window._fs.runTransaction(window._db, async (transaction) => {
+          const counterDoc = await transaction.get(counterRef);
+          let nextCount = 1;
+          if (counterDoc.exists()) {
+            nextCount = (counterDoc.data().count || 0) + 1;
+            transaction.update(counterRef, { count: nextCount });
+          } else {
+            transaction.set(counterRef, { count: 1 });
+          }
+          const tNum = pad3(nextCount);
+          const tokenId = today + '-' + currentDoctor + '-' + nextCount;
+          createdTokenId = tokenId;
+          lastIssuedTokenId = tokenId;
+          const tokenDocRef = window._fs.doc(window._db, 'hospitals', currentHospital, 'tokens', tokenId);
+
+          transaction.set(tokenDocRef, {
+            id: tokenId, number: tNum, patientName: name, phone: phone || '',
+            doctorId: currentDoctor, hospitalId: currentHospital, date: today,
+            department: 'consultation',
+            status: 'waiting', source: mode, createdAt: window._fs.serverTimestamp(),
+            priority: isPriority, counter: counter, pushToken: ''
+          });
+          return tNum;
+        });
+
+        document.getElementById('newName').value = '';
+        document.getElementById('newPhone').value = '';
+        document.getElementById('newPriority').checked = false;
+        playBeep(1);
+        showToast('Token ' + tokenNum + ' issued');
+
+        // Optional 58mm Auto-Print Trigger
+        if (document.getElementById('autoPrintSlip').checked) {
+          triggerPrintSlip(tokenNum, name, counter, createdTokenId);
+        }
+
+        // WhatsApp / SMS Live Tracker Trigger
+        if (phone) {
+          const trackLink = `${getAppBaseUrl()}/track.html?h=${currentHospital}&t=${createdTokenId}`;
+          queueFreeSMS(phone, `TokSpot Alert: Hello ${name}, your Token #${tokenNum} is booked. Live status: ${trackLink}`);
+        }
+      } catch (e) { showToast('Failed: ' + e.message, true); }
+    }
+
+    /* Print Helpers */
+    function triggerPrintSlip(tokenNum, patientName, counter, tokenId) {
+      document.getElementById('slpHospital').textContent = currentHospitalName;
+      document.getElementById('slpDoctor').textContent = currentDoctorName;
+      document.getElementById('slpNumber').textContent = tokenNum;
+      document.getElementById('slpPatient').textContent = patientName;
+      document.getElementById('slpCounter').textContent = 'Counter ' + (counter || 'A');
+      
+      const now = new Date();
+      document.getElementById('slpDate').textContent = now.toLocaleDateString();
+      document.getElementById('slpTime').textContent = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      document.getElementById('slpTrackUrl').textContent = `${getAppBaseUrl()}/track.html?h=${currentHospital}&t=${tokenId}`;
+
+      setTimeout(() => { window.print(); }, 200);
+    }
+
+    async function printSingleSlip(id) {
+      try {
+        const snap = await window._fs.getDoc(window._fs.doc(window._db, 'hospitals', currentHospital, 'tokens', id));
+        if (snap.exists()) {
+          const t = snap.data();
+          triggerPrintSlip(t.number, t.patientName, t.counter, id);
+        }
+      } catch (e) { showToast('Print error: ' + e.message, true); }
+    }
+
+    async function setStatus(id, status) {
+      try {
+        await window._fs.updateDoc(window._fs.doc(window._db, 'hospitals', currentHospital, 'tokens', id), { status, updatedAt: window._fs.serverTimestamp() });
+        if (status === 'called') { 
+          playBeep(2); 
+          maybeAnnounce(id);
+
+          window._fs.getDoc(window._fs.doc(window._db, 'hospitals', currentHospital, 'tokens', id)).then(snap => {
+            const t = snap.data();
+            if (t && t.phone) {
+              const trackLink = `${getAppBaseUrl()}/track.html?h=${currentHospital}&t=${id}`;
+              queueFreeSMS(t.phone, `TokSpot Alert: Token #${t.number}, please proceed to Counter ${t.counter || 'A'}. Status: ${trackLink}`);
+            }
+          });
+        }
+        if (status === 'completed') loadHistory();
+      } catch (e) { showToast('Failed: ' + e.message, true); }
+    }
+
+    async function maybeAnnounce(id) {
+      try {
+        const snap = await window._fs.getDoc(window._fs.doc(window._db, 'hospitals', currentHospital, 'tokens', id));
+        const t = snap.data();
+        window.announceToken(t.number, t.patientName, t.counter);
+      } catch (e) {}
+    }
+
+    async function cancelToken(id) {
+      if (!confirm('Cancel this token?')) return;
+      setStatus(id, 'canceled');
+    }
+
+    async function notifyPatient(id, method) {
+      try {
+        const snap = await window._fs.getDoc(window._fs.doc(window._db, 'hospitals', currentHospital, 'tokens', id));
+        const t = snap.data();
+        if (!t.phone) return showToast('No phone number.', true);
+
+        let cleanPhone = String(t.phone).replace(/\D/g, '');
+        if (cleanPhone.length === 10) cleanPhone = '91' + cleanPhone;
+
+        const trackUrl = `${getAppBaseUrl()}/track.html?h=${currentHospital}&t=${id}`;
+        const msg = `TokSpot Alert: Hello ${t.patientName}, your token ${t.number} is ready. Please proceed to Counter ${t.counter || 'A'}.\n\nLive Tracker: ${trackUrl}`;
+        const text = encodeURIComponent(msg);
+
+        const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+
+        if (method === 'sms') {
+          if (isMobile) {
+            window.location.href = `sms:${cleanPhone.replace(/^91/, '')}?body=${text}`;
+          } else {
+            showToast('Opening chat in WhatsApp Web...', false, 2000);
+            window.open(`https://web.whatsapp.com/send/?phone=${cleanPhone}&text=${text}&type=phone_number&app_absent=0`, '_blank');
+          }
+        } else {
+          if (isMobile) {
+            window.location.href = `whatsapp://send?phone=${cleanPhone}&text=${text}`;
+          } else {
+            window.open(`https://web.whatsapp.com/send/?phone=${cleanPhone}&text=${text}&type=phone_number&app_absent=0`, '_blank');
+          }
+        }
+      } catch (e) {
+        showToast('Notify failed: ' + e.message, true);
+      }
+    }
+
+    async function loadHistory() {
+      if (!currentHospital || !currentDoctor || !window._FB_READY) return;
+      const today = window.todayStr();
+      try {
+        const snap = await window._fs.getDocs(window._fs.query(
+          window._fs.collection(window._db, 'hospitals', currentHospital, 'tokens'),
+          window._fs.where('doctorId','==',currentDoctor),
+          window._fs.where('date','==',today)
+        ));
+        let done = 0;
+        const history = [];
+        snap.docs.forEach(d => {
+          const t = d.data();
+          if (t.status === 'completed') { done++; history.push(t); }
+        });
+        document.getElementById('stDone').textContent = done;
+        const hl = document.getElementById('historyList');
+        hl.innerHTML = history.slice(-8).reverse().map(t => `
+          <div class="qrow" style="opacity:.8;padding:12px 16px;">
+            <div class="qnum" style="width:44px;height:44px;font-size:1.05rem;">${escHtml(t.number)}</div>
+            <div class="qbody"><div class="qname">${escHtml(t.patientName||'Patient')}</div><div class="qmeta">${t.source||'walk-in'}</div></div>
+            <span class="badge green"><i class="fa-solid fa-check"></i> served</span>
+          </div>`).join('') || '<div class="empty" style="padding:20px;"><div class="e-s">No patients served yet.</div></div>';
+      } catch (e) { console.error(e); }
+    }
+
+    async function queueFreeSMS(phone, messageText) {
+      if (!phone || phone.length !== 10 || !window._FB_READY) return;
+      try {
+        await window._fs.addDoc(window._fs.collection(window._db, 'sms_queue'), {
+          hospitalId: currentHospital,
+          to: '+91' + phone,
+          message: messageText,
+          status: 'pending',
+          createdAt: window._fs.serverTimestamp()
+        });
+        console.log('Queued to Android Gateway');
+      } catch (err) {
+        console.error('Queue error:', err);
+      }
+    }
+
+    /* Receptionist Keyboard Shortcuts / Hotkeys */
+    window.addEventListener('keydown', (e) => {
+      const activeEl = document.activeElement;
+      const activeTag = activeEl ? activeEl.tagName.toLowerCase() : '';
+      const isInputFocused = activeTag === 'input' || activeTag === 'textarea' || activeTag === 'select';
+
+      // 1. F2 or Alt+N: Jump to Patient Name Input
+      if (e.key === 'F2' || (e.altKey && (e.key === 'n' || e.key === 'N'))) {
+        e.preventDefault();
+        const nInput = document.getElementById('newName');
+        if (nInput) {
+          nInput.focus();
+          nInput.select();
+        }
+        return;
+      }
+
+      // Enter inside Name or Phone triggers token generation
+      if (e.key === 'Enter' && isInputFocused) {
+        if (activeEl.id === 'newName' || activeEl.id === 'newPhone') {
+          e.preventDefault();
+          issueToken();
+          return;
+        }
+      }
+
+      // Avoid shortcut conflicts while receptionist is typing text
+      if (isInputFocused && !e.altKey && !e.key.startsWith('F')) return;
+
+      // 2. F4: Call Next Patient
+      if (e.key === 'F4') {
+        e.preventDefault();
+        const callBtn = document.querySelector('#queueList .btn-green');
+        if (callBtn) {
+          callBtn.click();
+          showToast('Calling next token (F4)...');
+        } else {
+          showToast('No waiting patients in queue.', true);
+        }
+      }
+
+      // 3. F8: Recall Current Token
+      if (e.key === 'F8') {
+        e.preventDefault();
+        const activeNum = document.getElementById('currentToken')?.textContent?.trim();
+        if (activeNum && activeNum !== '—') {
+          const activeName = document.getElementById('currentPatient')?.textContent || '';
+          const counterVal = document.getElementById('newCounter')?.value || 'A';
+          playBeep(2);
+          if (window.announceToken) window.announceToken(activeNum, activeName, counterVal);
+          showToast(`Recalled Token ${activeNum} (F8)`);
+        } else {
+          showToast('No active token being served.', true);
+        }
+      }
+
+      // 4. F9: Skip Current Token
+      if (e.key === 'F9') {
+        e.preventDefault();
+        const skipBtn = document.querySelector('#queueList .btn-slate[onclick*="skipped"]');
+        if (skipBtn) {
+          skipBtn.click();
+          showToast('Token skipped (F9)');
+        }
+      }
+
+      // 5. F10: Mark Served / Done
+      if (e.key === 'F10') {
+        e.preventDefault();
+        const doneBtn = document.querySelector('#queueList .btn-mint');
+        if (doneBtn) {
+          doneBtn.click();
+          showToast('Token served (F10)');
+        }
+      }
+
+      // 6. Alt + P: Reprint Slip
+      if (e.altKey && (e.key === 'p' || e.key === 'P')) {
+        e.preventDefault();
+        if (lastIssuedTokenId) {
+          printSingleSlip(lastIssuedTokenId);
+        } else {
+          const firstPrintBtn = document.querySelector('#queueList .btn-slate[onclick*="printSingleSlip"]');
+          if (firstPrintBtn) firstPrintBtn.click();
+          else window.print();
+        }
+      }
+    });
+  </script>
+</body>
+</html>

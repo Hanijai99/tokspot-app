@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
+  <title>Analytics & Reports — TokSpot</title>
+  <link rel="stylesheet" href="css/style.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+  <link rel="manifest" href="manifest.json" />
+  <link rel="icon" type="image/png" href="logo.png" />
+  <link rel="apple-touch-icon" href="logo.png" />
+  <style>
+    .chart { display:flex; align-items:flex-end; gap:6px; height:150px; margin-top:10px; }
+    .bar-col { flex:1; display:flex; flex-direction:column; align-items:center; gap:6px; }
+    .bar { width:100%; min-height:3px; border-radius:6px 6px 0 0; background:linear-gradient(180deg,#22c55e,#15803d); transition:height .4s var(--ease); }
+    .bar.peak { background:linear-gradient(180deg,#fbbf24,#d97706); }
+    .bar-h { width:100%; text-align:center; }
+    .bar-t { font-size:.68rem; color:var(--slate-500); font-weight:700; }
+    .legend { display:flex; gap:16px; justify-content:center; margin-top:10px; font-size:.78rem; color:var(--slate-500); }
+    .lg { display:flex; align-items:center; gap:6px; }
+    .sw { width:12px; height:12px; border-radius:3px; }
+
+    /* Print-Only Report Styling */
+    @media print {
+      body * { visibility: hidden; }
+      #printableArea, #printableArea * { visibility: visible; }
+      #printableArea {
+        position: absolute; left: 0; top: 0; width: 100%; padding: 20px;
+        color: #000; background: #fff; font-family: sans-serif;
+      }
+      .no-print { display: none !important; }
+    }
+  </style>
+</head>
+<body>
+  <div class="topbar no-print">
+    <a class="brand" href="index.html"><span class="logomark"><img src="logo.png" alt="TokSpot" /></span>TokSpot</a>
+    <span class="spacer"></span>
+    <button class="icn-btn" onclick="location.href='index.html'" title="Home"><i class="fa-solid fa-house"></i></button>
+    <button class="icn-btn" onclick="hk.toggleDark()"><i class="fa-solid fa-moon"></i></button>
+  </div>
+
+  <div class="page" id="printableArea">
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;" class="mt-12">
+      <div>
+        <div class="htitle"><i class="fa-solid fa-chart-column"></i> Analytics &amp; Daily Reports</div>
+        <div class="hsub">Live insights and exportable audit records.</div>
+      </div>
+      <div class="btn-row no-print" style="margin:0;">
+        <button class="btn btn-green btn-sm" id="btnExport" onclick="exportDailyReportCSV()" disabled>
+          <i class="fa-solid fa-file-excel"></i> Export CSV
+        </button>
+        <button class="btn btn-slate btn-sm" id="btnPrint" onclick="printDailySummary()" disabled>
+          <i class="fa-solid fa-print"></i> Print Report
+        </button>
+      </div>
+    </div>
+
+    <div class="card mt-16 no-print">
+      <div class="field" style="margin:0;">
+        <label class="label">Hospital</label>
+        <select class="input" id="hospitalSelect" onchange="loadAnalytics()">
+          <option value="">Choose…</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="stats mt-16" style="grid-template-columns: repeat(3, 1fr);">
+      <div class="stat"><div class="n" id="kTotal">0</div><div class="k">Tokens Today</div></div>
+      <div class="stat"><div class="n" id="kAvg">0m</div><div class="k">Avg Wait</div></div>
+      <div class="stat"><div class="n" id="kPeak">—</div><div class="k">Peak Hour</div></div>
+    </div>
+
+    <div class="card mt-16 no-print">
+      <div class="htitle" style="font-size:1.05rem;">Token Volume by Hour</div>
+      <div class="hsub" style="margin-top:4px;">Today · peak hour highlighted in amber</div>
+      <div class="chart" id="chartBox"></div>
+      <div class="legend">
+        <span class="lg"><span class="sw" style="background:#16a34a;"></span>Normal hour</span>
+        <span class="lg"><span class="sw" style="background:#f59e0b;"></span>Peak hour</span>
+      </div>
+    </div>
+
+    <div class="card mt-16">
+      <div class="htitle" style="font-size:1.05rem;">Serving Status Breakdown</div>
+      <div class="stats mt-16" style="grid-template-columns: repeat(4, 1fr);">
+        <div class="stat"><div class="n green" id="kDone">0</div><div class="k">Served</div></div>
+        <div class="stat"><div class="n" id="kWait">0</div><div class="k">Waiting</div></div>
+        <div class="stat"><div class="n" id="kSkip" style="color:#d97706;">0</div><div class="k">Skipped</div></div>
+        <div class="stat"><div class="n" id="kCanc" style="color:#dc2626;">0</div><div class="k">Canceled</div></div>
+      </div>
+    </div>
+  </div>
+
+  <button class="theme-toggle no-print" onclick="hk.toggleDark()"><i class="fa-solid fa-moon"></i></button>
+
+  <script>
+    if ('serviceWorker' in navigator) { window.addEventListener('load', () => navigator.serviceWorker.register('/sw.js').catch(()=>{})); }
+  </script>
+  <script src="js/firebase-config.js"></script>
+  <script src="js/app.js"></script>
+  <script src="js/firebase.js"></script>
+  <script>
+    let currentTokensCache = [];
+    let currentHospitalSlug = '';
+    let currentHospitalName = '';
+
+    window.addEventListener('load', async () => {
+      hk.applyDark();
+      await initFirebase();
+      await loadHospitals();
+    });
+
+    async function loadHospitals() {
+      await waitForFB();
+      if (!window._FB_READY) return;
+      try {
+        const snap = await window._fs.getDocs(window._fs.collection(window._db, 'hospitals'));
+        const sel = document.getElementById('hospitalSelect');
+        snap.docs.forEach(d => { 
+          const h = d.data(); 
+          const o = document.createElement('option'); 
+          o.value = d.id; 
+          o.dataset.name = h.name || d.id;
+          o.textContent = (h.name || d.id) + (h.city ? ' — ' + h.city : ''); 
+          sel.appendChild(o); 
+        });
+      } catch (e) { showToast('Failed to load: ' + e.message, true); }
+    }
+
+    async function loadAnalytics() {
+      const sel = document.getElementById('hospitalSelect');
+      currentHospitalSlug = sel.value;
+      currentHospitalName = sel.options[sel.selectedIndex]?.dataset?.name || currentHospitalSlug;
+
+      const btnExport = document.getElementById('btnExport');
+      const btnPrint = document.getElementById('btnPrint');
+
+      if (!currentHospitalSlug || !window._FB_READY) {
+        btnExport.disabled = true;
+        btnPrint.disabled = true;
+        return;
+      }
+
+      const today = window.todayStr();
+      try {
+        const snap = await window._fs.getDocs(window._fs.query(
+          window._fs.collection(window._db, 'hospitals', currentHospitalSlug, 'tokens'),
+          window._fs.where('date', '==', today)
+        ));
+
+        currentTokensCache = [];
+        const counts = {};
+        let total = 0, done = 0, wait = 0, canc = 0, skip = 0;
+        for (let h = 0; h < 24; h++) counts[h] = 0;
+
+        snap.docs.forEach(d => {
+          const t = d.data();
+          t.id = d.id;
+          currentTokensCache.push(t);
+          total++;
+
+          if (t.status === 'completed') done++;
+          else if (t.status === 'waiting' || t.status === 'called') wait++;
+          else if (t.status === 'skipped') skip++;
+          else if (t.status === 'canceled') canc++;
+
+          let hr = null;
+          if (t.createdAt && t.createdAt.toDate) hr = t.createdAt.toDate().getHours();
+          if (hr !== null) counts[hr]++;
+        });
+
+        document.getElementById('kTotal').textContent = total;
+        document.getElementById('kDone').textContent = done;
+        document.getElementById('kWait').textContent = wait;
+        document.getElementById('kSkip').textContent = skip;
+        document.getElementById('kCanc').textContent = canc;
+        document.getElementById('kAvg').textContent = done > 0 ? (Math.round((total / done) * 0.8) || 1) + 'm' : '—';
+        
+        renderChart(counts);
+
+        btnExport.disabled = total === 0;
+        btnPrint.disabled = total === 0;
+      } catch (e) { showToast('Failed: ' + e.message, true); }
+    }
+
+    function renderChart(counts) {
+      const vals = [];
+      for (let h = 0; h < 24; h++) vals.push(counts[h]);
+      const max = Math.max(...vals, 1);
+      let peakHr = 0, peakVal = 0;
+      for (let h = 0; h < 24; h++) { if (counts[h] > peakVal) { peakVal = counts[h]; peakHr = h; } }
+      document.getElementById('kPeak').textContent = peakVal === 0 ? '—' : fmtH(peakHr);
+      const box = document.getElementById('chartBox');
+      box.innerHTML = '';
+      for (let h = 0; h < 24; h++) {
+        const v = counts[h];
+        const height = Math.max(3, Math.round((v / max) * 120));
+        const isPeak = v === peakVal && peakVal > 0;
+        const col = document.createElement('div');
+        col.className = 'bar-col';
+        col.innerHTML = `<div class="bar-h"><div class="bar-t">${h === 0 ? '' : fmtH(h)}</div></div>
+          <div class="bar ${isPeak ? 'peak' : ''}" style="height:${height}px;"></div>`;
+        col.title = fmtH(h) + ': ' + v + ' tokens';
+        box.appendChild(col);
+      }
+    }
+
+    function fmtH(h) { return String(h).padStart(2, '0') + ':00'; }
+
+    // Feature 2: End-of-Day CSV / Excel Daily Summary Export
+    function exportDailyReportCSV() {
+      if (!currentTokensCache.length) return showToast('No records to export.', true);
+
+      const today = window.todayStr();
+      const headers = ['Token Number', 'Patient Name', 'Phone', 'Doctor ID', 'Counter', 'Status', 'Time Booked', 'Type', 'Priority'];
+      
+      const rows = currentTokensCache.map(t => {
+        let timeStr = '';
+        if (t.createdAt && t.createdAt.toDate) {
+          timeStr = t.createdAt.toDate().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        }
+        return [
+          `"${t.number || ''}"`,
+          `"${(t.patientName || '').replace(/"/g, '""')}"`,
+          `"${t.phone || ''}"`,
+          `"${t.doctorId || ''}"`,
+          `"${t.counter || 'A'}"`,
+          `"${t.status || ''}"`,
+          `"${timeStr}"`,
+          `"${t.source || 'walk-in'}"`,
+          `"${t.priority ? 'EMERGENCY' : 'REGULAR'}"`
+        ].join(',');
+      });
+
+      const csvContent = '\uFEFF' + headers.join(',') + '\n' + rows.join('\n'); // \uFEFF enables proper UTF-8 handling in Excel
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = `TokSpot_Daily_Report_${currentHospitalSlug}_${today}.csv`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+
+      showToast('Daily CSV Report downloaded successfully!');
+    }
+
+    // Daily Print Summary
+    function printDailySummary() {
+      window.print();
+    }
+  </script>
+</body>
+</html>

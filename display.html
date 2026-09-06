@@ -1,0 +1,539 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
+  <title>Display Board & Nurse Control — TokSpot</title>
+  <link rel="stylesheet" href="css/style.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+  <link rel="manifest" href="manifest.json" />
+  <link rel="icon" type="image/png" href="logo.png" />
+  <link rel="apple-touch-icon" href="logo.png" />
+  <style>
+    body { padding:0; background:#eef2f7; }
+    .board-tools {
+      max-width:1100px; margin:0 auto; padding:16px 20px;
+      display:flex; gap:10px; align-items:center; flex-wrap:wrap;
+    }
+    .board-tools select.input { max-width:200px; }
+    .board-wrap { max-width:1100px; margin:0 auto; padding:10px 20px 30px; }
+    
+    /* Nurse Control Bar */
+    .nurse-controls {
+      background:#ffffff; border-radius:18px; padding:14px 18px;
+      margin-bottom:18px; box-shadow:var(--shadow); display:flex;
+      align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px;
+      border:1px solid var(--line);
+    }
+    .nurse-actions { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+
+    /* Single Doctor Hero Board */
+    .board-hero {
+      background:linear-gradient(160deg,#14532d,#15803d 55%,#0d9488);
+      border-radius:28px; color:#fff; text-align:center; padding:40px 24px;
+      box-shadow:0 20px 50px rgba(22,163,74,.3); position:relative; overflow:hidden;
+      transition:outline .3s; outline:4px solid transparent;
+    }
+    .board-hero.emergency { background:linear-gradient(160deg,#7f1d1d,#dc2626 55%,#ea580c); box-shadow:0 20px 50px rgba(220,38,38,.35); outline-color:#fecaca; }
+    .board-hero::before { content:''; position:absolute; top:-55%; right:-12%; width:460px; height:460px; background:radial-gradient(circle,rgba(255,255,255,.12),transparent 62%); border-radius:50%; }
+    .bh-hos { font-size:1.3rem; font-weight:800; }
+    .bh-doc { font-size:.95rem; opacity:.85; margin-top:2px; }
+    .bh-label { font-size:.95rem; font-weight:700; letter-spacing:4px; text-transform:uppercase; opacity:.9; margin-top:14px; }
+    .bh-num { font-size:8.4rem; font-weight:900; line-height:.95; letter-spacing:10px; animation:pulse 2s infinite ease-in-out; }
+    .bh-name { font-size:1.6rem; font-weight:600; margin-top:6px; }
+    @keyframes pulse { 0%,100%{transform:scale(1);} 50%{transform:scale(1.03);} }
+
+    .board-side { display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-top:20px; }
+    @media(max-width:560px){ .board-side { grid-template-columns:1fr; } }
+    .side-card { background:#fff; border-radius:20px; padding:22px; box-shadow:var(--shadow); }
+    .side-card h4 { color:var(--slate-500); font-size:.78rem; letter-spacing:1.5px; text-transform:uppercase; margin-bottom:4px; }
+    .side-card .n { font-size:3.4rem; font-weight:900; color:var(--ink); line-height:1; }
+    .side-card.next .n { color:#ea580c; }
+    .side-card.last .n { color:var(--green); }
+
+    .stats-row { display:flex; justify-content:center; gap:12px; margin:20px 0 0; flex-wrap:wrap; }
+    .st-pill { background:#fff; border-radius:999px; padding:10px 20px; font-weight:700; color:var(--ink); box-shadow:var(--shadow); font-size:.9rem; }
+
+    /* Multi-Doctor Split Grid */
+    .multi-grid {
+      display:grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 16px; margin-top: 10px;
+    }
+    .doc-grid-card {
+      background:#ffffff; border-radius:22px; padding:22px; box-shadow:var(--shadow);
+      border:2px solid #e2e8f0; display:flex; flex-direction:column; justify-content:space-between;
+      position:relative; overflow:hidden;
+    }
+    .doc-grid-card.active { border-color:#16a34a; }
+    .doc-grid-card.emergency { border-color:#dc2626; background:#fff5f5; }
+    .dgc-top { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:12px; }
+    .dgc-title { font-size:1.15rem; font-weight:800; color:var(--ink); }
+    .dgc-dept { font-size:0.8rem; color:var(--slate-500); font-weight:600; margin-top:2px; }
+    .dgc-badge { background:#e0f2fe; color:#0369a1; padding:4px 10px; border-radius:99px; font-size:0.75rem; font-weight:800; }
+    .dgc-num { font-size:4.8rem; font-weight:900; line-height:1; color:#0f172a; text-align:center; margin:14px 0 6px; letter-spacing:2px; }
+    .dgc-name { text-align:center; font-size:1rem; font-weight:700; color:#334155; min-height:24px; }
+    .dgc-footer { display:flex; justify-content:space-between; align-items:center; margin-top:16px; padding-top:12px; border-top:1px dashed #e2e8f0; font-size:0.85rem; font-weight:600; color:#64748b; }
+
+    /* Smart TV Audio Unlock Overlay */
+    #audioUnlockBanner {
+      position: fixed; inset: 0; background: rgba(15, 23, 42, 0.88);
+      backdrop-filter: blur(6px); display: flex; flex-direction: column;
+      align-items: center; justify-content: center; z-index: 99999; cursor: pointer;
+    }
+    .unlock-btn {
+      background: #16a34a; color: #fff; font-size: 1.5rem; font-weight: 800;
+      border: none; padding: 18px 36px; border-radius: 999px;
+      box-shadow: 0 0 40px rgba(22,163,74,.6); animation: bounceBtn 1.2s infinite alternate;
+      cursor: pointer;
+    }
+    @keyframes bounceBtn { from { transform: translateY(0); } to { transform: translateY(-8px); } }
+
+    body.dark { background:#060b16; }
+    body.dark .board-tools select.input { background:#0f172a; }
+    body.dark .nurse-controls { background:#121a2b; border-color:#24314a; }
+    body.dark .side-card, body.dark .doc-grid-card { background:#121a2b; border-color:#24314a; }
+    body.dark .st-pill { background:#121a2b; color:#e2e8f0; }
+    body.dark .side-card .n, body.dark .doc-grid-card .dgc-num { color:#f1f5f9; }
+    body.dark .dgc-title { color:#f8fafc; }
+    body.dark .dgc-name { color:#cbd5e1; }
+  </style>
+</head>
+<body>
+
+  <!-- Smart TV / Browser Audio Unlock Banner -->
+  <div id="audioUnlockBanner" onclick="unlockAudio()">
+    <button class="unlock-btn"><i class="fa-solid fa-volume-high"></i> Click Screen to Enable Sound</button>
+    <div style="color:#94a3b8;margin-top:14px;font-size:1rem;font-weight:600;">
+      TV / Browser voice announcement & chime sound activate panna screen-la touch pannunga
+    </div>
+  </div>
+
+  <div class="board-tools">
+    <a class="brand" style="display:inline-flex;align-items:center;gap:8px;font-weight:800;color:var(--green-deep);text-decoration:none;" href="index.html">
+      <span class="logomark" style="width:34px;height:34px;border-radius:9px;display:inline-flex;align-items:center;justify-content:center;overflow:hidden;">
+        <img src="logo.png" alt="TokSpot" style="width:100%;height:100%;object-fit:cover;display:block;" />
+      </span>Home
+    </a>
+    <span class="spacer"></span>
+    <select class="input hidden" id="hospitalSelect"><option value="">Hospital…</option></select>
+    <select class="input hidden" id="doctorSelect"><option value="">All Doctors (Split View)</option></select>
+    <select class="input hidden" id="chimeSelect" style="max-width:140px;" title="Chime Tone">
+      <option value="airport">Airport Chime</option>
+      <option value="hospital">Hospital Bell</option>
+      <option value="none">No Chime</option>
+    </select>
+    <button class="btn btn-slate btn-sm" onclick="toggleNursePanel()" title="Toggle Controls"><i class="fa-solid fa-user-nurse"></i> Controls</button>
+    <button class="icn-btn" onclick="hk.toggleDark()" title="Theme"><i class="fa-solid fa-moon"></i></button>
+  </div>
+
+  <div class="board-wrap">
+
+    <!-- Nurse Fast-Action Control Bar -->
+    <section class="nurse-controls hidden" id="nurseBar">
+      <div style="display:flex;align-items:center;gap:10px;">
+        <span style="font-weight:800;color:var(--green-deep);"><i class="fa-solid fa-bolt"></i> Desk Control:</span>
+        <select class="input" id="nurseCounter" style="width:auto;padding:6px 12px;font-weight:700;">
+          <option value="A">Counter A</option>
+          <option value="B">Counter B</option>
+          <option value="C">Counter C</option>
+          <option value="1">Room 1</option>
+          <option value="2">Room 2</option>
+        </select>
+      </div>
+      <div class="nurse-actions">
+        <button class="btn btn-green btn-sm" onclick="callNextToken()"><i class="fa-solid fa-forward"></i> Call Next</button>
+        <button class="btn btn-mint btn-sm" onclick="recallCurrent()"><i class="fa-solid fa-bullhorn"></i> Recall</button>
+        <button class="btn btn-slate btn-sm" onclick="skipCurrentToken()"><i class="fa-solid fa-angles-right"></i> Skip (Absent)</button>
+        <button class="btn btn-slate btn-sm" onclick="markCurrentDone()"><i class="fa-solid fa-check"></i> Served</button>
+      </div>
+    </section>
+
+    <!-- Multi-Doctor Grid Container (Shown when All Doctors selected) -->
+    <div id="multiGridWrap" class="multi-grid hidden"></div>
+
+    <!-- Single Doctor View Elements -->
+    <div id="singleDoctorWrap">
+      <div class="stats-row hidden" id="statsRow">
+        <span class="st-pill">👥 <b id="cntWaiting">0</b> Waiting</span>
+        <span class="st-pill">📣 <b id="cntCalled">0</b> Called</span>
+        <span class="st-pill">✅ <b id="cntDone">0</b> Served</span>
+      </div>
+
+      <div class="board-hero hidden mt-16" id="hero">
+        <div class="bh-hos" id="bHospital">Select Hospital</div>
+        <div class="bh-doc" id="bDoctor">—</div>
+        <div class="bh-label">Now Serving</div>
+        <div class="bh-num" id="bCurrent">—</div>
+        <div class="bh-name" id="bPatient"></div>
+      </div>
+
+      <div class="board-side hidden" id="side">
+        <div class="side-card next"><h4>Next Up</h4><div class="n" id="bNext">—</div></div>
+        <div class="side-card last"><h4>Last Served</h4><div class="n" id="bLast">—</div></div>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    if ('serviceWorker' in navigator) { window.addEventListener('load', () => navigator.serviceWorker.register('/sw.js').catch(()=>{})); }
+  </script>
+  <script src="js/firebase-config.js"></script>
+  <script src="js/app.js"></script>
+  <script src="js/firebase.js"></script>
+  <script>
+    let dispHospital = null;
+    let dispDoctor = null;
+    let unsubs = [];
+    let prevCurrent = null;
+    let currentServingDoc = null;
+    let nextWaitingDoc = null;
+    let isAudioUnlocked = false;
+    let cachedVoices = [];
+    let hospitalDoctorsList = [];
+    let audioCtx = null;
+
+    // Voice Initialization
+    function loadVoices() {
+      if ('speechSynthesis' in window) {
+        cachedVoices = window.speechSynthesis.getVoices();
+      }
+    }
+    if ('speechSynthesis' in window) {
+      window.speechSynthesis.onvoiceschanged = loadVoices;
+      loadVoices();
+    }
+
+    // Audio Chime Synthesizer
+    function getAudioContext() {
+      if (!audioCtx) {
+        const AudioClass = window.AudioContext || window.webkitAudioContext;
+        if (AudioClass) audioCtx = new AudioClass();
+      }
+      return audioCtx;
+    }
+
+    function playTone(freq, startTime, duration) {
+      const ctx = getAudioContext();
+      if (!ctx) return;
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(freq, ctx.currentTime + startTime);
+
+      gain.gain.setValueAtTime(0.25, ctx.currentTime + startTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + startTime + duration);
+
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(ctx.currentTime + startTime);
+      osc.stop(ctx.currentTime + startTime + duration);
+    }
+
+    function playCustomChime() {
+      const chimeMode = document.getElementById('chimeSelect')?.value || 'airport';
+      if (chimeMode === 'none') return;
+      const ctx = getAudioContext();
+      if (!ctx) return;
+      if (ctx.state === 'suspended') ctx.resume();
+
+      if (chimeMode === 'airport') {
+        // 2-tone airport ding-dong: F4 (349Hz) -> C5 (523Hz)
+        playTone(349.23, 0.0, 0.45);
+        playTone(523.25, 0.32, 0.65);
+      } else if (chimeMode === 'hospital') {
+        // Soft hospital pulse: A4 (440Hz)
+        playTone(440.00, 0.0, 0.55);
+      }
+    }
+
+    // Smart TV 1-Click Audio Unlock
+    function unlockAudio() {
+      isAudioUnlocked = true;
+      const ctx = getAudioContext();
+      if (ctx) ctx.resume();
+
+      if ('speechSynthesis' in window) {
+        const silentUtter = new SpeechSynthesisUtterance('');
+        window.speechSynthesis.speak(silentUtter);
+      }
+
+      document.getElementById('audioUnlockBanner').style.display = 'none';
+      playCustomChime();
+    }
+
+    // Dual Language Audio Announcement with Chime
+    window.announceToken = function(num, name, counter) {
+      if (!('speechSynthesis' in window)) return;
+      window.speechSynthesis.cancel();
+
+      playCustomChime();
+
+      // Delay speech slightly to let chime ring clearly
+      setTimeout(() => {
+        const splitNum = String(num).split('').join(' ');
+        const ctrVal = counter || 'A';
+
+        // 1. English Announcement
+        const engText = `Token number ${splitNum}, please proceed to Counter ${ctrVal}.`;
+        const uEng = new SpeechSynthesisUtterance(engText);
+        uEng.lang = 'en-IN';
+        uEng.rate = 0.88;
+        uEng.pitch = 1.0;
+
+        const inVoice = cachedVoices.find(v => v.lang === 'en-IN');
+        if (inVoice) uEng.voice = inVoice;
+
+        // 2. Tamil Announcement
+        const tamText = `டோக்கன் எண் ${num}, கவுண்டர் ${ctrVal}-க்கு வரவும்.`;
+        const uTam = new SpeechSynthesisUtterance(tamText);
+        uTam.lang = 'ta-IN';
+        uTam.rate = 0.85;
+        uTam.pitch = 1.0;
+
+        const taVoice = cachedVoices.find(v => v.lang.includes('ta') || v.name.toLowerCase().includes('tamil'));
+        if (taVoice) uTam.voice = taVoice;
+
+        window.speechSynthesis.speak(uEng);
+        window.speechSynthesis.speak(uTam);
+      }, 700);
+    };
+
+    window.addEventListener('load', async () => {
+      hk.applyDark();
+      await initFirebase();
+      await loadHospitals();
+    });
+
+    function toggleNursePanel() {
+      document.getElementById('nurseBar').classList.toggle('hidden');
+    }
+
+    async function loadHospitals() {
+      await waitForFB();
+      if (!window._FB_READY) return;
+      try {
+        const snap = await window._fs.getDocs(window._fs.collection(window._db, 'hospitals'));
+        const sel = document.getElementById('hospitalSelect');
+        sel.classList.remove('hidden');
+        document.getElementById('chimeSelect').classList.remove('hidden');
+
+        snap.docs.forEach(d => {
+          const h = d.data();
+          const o = document.createElement('option');
+          o.value = d.id;
+          o.textContent = (h.name || d.id) + (h.city ? ' — ' + h.city : '');
+          sel.appendChild(o);
+        });
+        sel.addEventListener('change', initBoard);
+        if (snap.docs.length) {
+          sel.value = snap.docs[0].id;
+          initBoard();
+        }
+      } catch (e) { console.error(e); }
+    }
+
+    function initBoard() {
+      const slug = document.getElementById('hospitalSelect').value;
+      if (!slug) return;
+      dispHospital = slug;
+      document.getElementById('nurseBar').classList.remove('hidden');
+      document.getElementById('bHospital').textContent = document.getElementById('hospitalSelect').options[document.getElementById('hospitalSelect').selectedIndex].textContent;
+      
+      if (!window._FB_READY) return;
+      window._fs.getDocs(window._fs.collection(window._db, 'hospitals', slug, 'doctors'))
+        .then(snap => {
+          hospitalDoctorsList = [];
+          const sel = document.getElementById('doctorSelect');
+          sel.classList.remove('hidden');
+          sel.innerHTML = '<option value="">All Doctors (Split View)</option>';
+          snap.docs.forEach(d => {
+            const doc = d.data();
+            doc.id = d.id;
+            if (doc.status === 'closed') return;
+            hospitalDoctorsList.push(doc);
+
+            const o = document.createElement('option');
+            o.value = d.id;
+            o.textContent = (doc.name || d.id) + (doc.department ? ' · ' + doc.department : '');
+            sel.appendChild(o);
+          });
+          sel.removeEventListener('change', onDoctorSel);
+          sel.addEventListener('change', onDoctorSel);
+          setupDoctor();
+        })
+        .catch(e => console.error(e));
+    }
+
+    function onDoctorSel() { setupDoctor(); }
+
+    function setupDoctor() {
+      const sel = document.getElementById('doctorSelect');
+      dispDoctor = sel.value || null;
+      const lbl = document.getElementById('bDoctor');
+
+      if (dispDoctor) {
+        document.getElementById('multiGridWrap').classList.add('hidden');
+        document.getElementById('singleDoctorWrap').classList.remove('hidden');
+        document.getElementById('hero').classList.remove('hidden');
+        document.getElementById('side').classList.remove('hidden');
+        document.getElementById('statsRow').classList.remove('hidden');
+        lbl.textContent = sel.options[sel.selectedIndex]?.textContent || 'Consultation';
+      } else {
+        // Multi-Doctor Split Mode
+        document.getElementById('singleDoctorWrap').classList.add('hidden');
+        document.getElementById('multiGridWrap').classList.remove('hidden');
+      }
+      subscribe();
+    }
+
+    function subscribe() {
+      unsubs.forEach(u => u()); unsubs = [];
+      const today = window.todayStr();
+      const base = window._fs.collection(window._db, 'hospitals', dispHospital, 'tokens');
+      let q;
+      if (dispDoctor) {
+        q = window._fs.query(base, window._fs.where('doctorId','==',dispDoctor), window._fs.where('date','==',today));
+      } else {
+        q = window._fs.query(base, window._fs.where('date','==',today), window._fs.limit(100));
+      }
+      unsubs.push(window._fs.onSnapshot(q, renderBoard, (e) => console.error(e)));
+    }
+
+    function renderBoard(snap) {
+      const allTokens = [];
+      snap.docs.forEach(d => {
+        const t = d.data();
+        t.docId = d.id;
+        allTokens.push(t);
+      });
+
+      // Split View Logic: If All Doctors Selected
+      if (!dispDoctor) {
+        renderMultiDoctorGrid(allTokens);
+        return;
+      }
+
+      // Single Doctor Hero Mode
+      const waiting = [], called = [], done = [];
+      allTokens.forEach(t => { 
+        if (t.status === 'waiting') waiting.push(t); 
+        else if (t.status === 'called') called.push(t); 
+        else if (t.status === 'completed') done.push(t); 
+      });
+
+      waiting.sort((a,b) => (b.priority ? 1 : 0) - (a.priority ? 1 : 0) || String(a.number).localeCompare(String(b.number)));
+
+      document.getElementById('cntWaiting').textContent = waiting.length;
+      document.getElementById('cntCalled').textContent = called.length;
+      document.getElementById('cntDone').textContent = done.length;
+
+      currentServingDoc = called.length ? called[called.length - 1] : (waiting.length ? waiting[0] : null);
+      nextWaitingDoc = called.length ? (waiting.length ? waiting[0] : null) : (waiting.length > 1 ? waiting[1] : null);
+
+      const curNum = currentServingDoc ? currentServingDoc.number : null;
+
+      const hero = document.getElementById('hero');
+      if (hero) hero.classList.toggle('emergency', !!(currentServingDoc && currentServingDoc.priority));
+
+      if (curNum && curNum !== prevCurrent) { 
+        prevCurrent = curNum; 
+        window.announceToken(curNum, currentServingDoc.patientName, currentServingDoc.counter); 
+      }
+
+      document.getElementById('bCurrent').textContent = curNum || '—';
+      document.getElementById('bPatient').textContent = currentServingDoc 
+        ? (currentServingDoc.priority ? '[EMERGENCY] ' : '') + (currentServingDoc.patientName || '') + (currentServingDoc.counter ? ' · Counter ' + currentServingDoc.counter : '') 
+        : (waiting.length ? '' : 'No tokens waiting');
+
+      document.getElementById('bNext').textContent = nextWaitingDoc ? nextWaitingDoc.number : '—';
+      document.getElementById('bLast').textContent = done.length ? done[done.length - 1].number : '—';
+    }
+
+    // Render Multi-Doctor Room Grid
+    function renderMultiDoctorGrid(allTokens) {
+      const grid = document.getElementById('multiGridWrap');
+      if (!hospitalDoctorsList.length) {
+        grid.innerHTML = '<div class="empty" style="grid-column:1/-1;">No doctors configured.</div>';
+        return;
+      }
+
+      grid.innerHTML = hospitalDoctorsList.map(doc => {
+        const docTokens = allTokens.filter(t => t.doctorId === doc.id);
+        const called = docTokens.filter(t => t.status === 'called').pop();
+        const waitingCount = docTokens.filter(t => t.status === 'waiting').length;
+        const isEmergency = called && called.priority;
+
+        return `
+          <div class="doc-grid-card ${called ? 'active' : ''} ${isEmergency ? 'emergency' : ''}">
+            <div class="dgc-top">
+              <div>
+                <div class="dgc-title">${escHtml(doc.name || 'Doctor')}</div>
+                <div class="dgc-dept">${escHtml(doc.department || 'Consultation')}</div>
+              </div>
+              <span class="dgc-badge"><i class="fa-solid fa-door-open"></i> Counter ${escHtml(doc.counter || 'A')}</span>
+            </div>
+            <div>
+              <div style="font-size:0.75rem;text-transform:uppercase;color:#64748b;text-align:center;font-weight:800;letter-spacing:1px;">Now Calling</div>
+              <div class="dgc-num" style="${isEmergency ? 'color:#dc2626;' : ''}">${called ? escHtml(called.number) : '—'}</div>
+              <div class="dgc-name">${called ? (isEmergency ? '[EMERGENCY] ' : '') + escHtml(called.patientName) : '<span style="color:#94a3b8;font-weight:400;">No active patient</span>'}</div>
+            </div>
+            <div class="dgc-footer">
+              <span><i class="fa-solid fa-users"></i> ${waitingCount} in queue</span>
+              <span>${called ? 'In Consultation' : 'Available'}</span>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    /* Nurse Desk Actions */
+    async function callNextToken() {
+      if (!nextWaitingDoc && !currentServingDoc) return showToast('No tokens in waiting queue.', true);
+      const target = (currentServingDoc && currentServingDoc.status === 'waiting') ? currentServingDoc : nextWaitingDoc;
+      if (!target) return showToast('No more waiting patients.', true);
+
+      const counterVal = document.getElementById('nurseCounter').value;
+      try {
+        await window._fs.updateDoc(window._fs.doc(window._db, 'hospitals', dispHospital, 'tokens', target.docId), {
+          status: 'called',
+          counter: counterVal,
+          calledAt: window._fs.serverTimestamp()
+        });
+        showToast('Called Token ' + target.number);
+      } catch (e) { showToast('Action failed: ' + e.message, true); }
+    }
+
+    function recallCurrent() {
+      if (!currentServingDoc) return showToast('No active token being served.', true);
+      const counterVal = document.getElementById('nurseCounter').value;
+      window.announceToken(currentServingDoc.number, currentServingDoc.patientName, counterVal);
+      showToast('Re-announced Token ' + currentServingDoc.number);
+    }
+
+    async function skipCurrentToken() {
+      if (!currentServingDoc) return showToast('No active token to skip.', true);
+      const tokenNum = currentServingDoc.number;
+      try {
+        await window._fs.updateDoc(window._fs.doc(window._db, 'hospitals', dispHospital, 'tokens', currentServingDoc.docId), {
+          status: 'skipped',
+          skippedAt: window._fs.serverTimestamp()
+        });
+        showToast('Token ' + tokenNum + ' skipped.');
+        setTimeout(callNextToken, 400);
+      } catch (e) { showToast('Skip failed: ' + e.message, true); }
+    }
+
+    async function markCurrentDone() {
+      if (!currentServingDoc) return showToast('No active token.', true);
+      try {
+        await window._fs.updateDoc(window._fs.doc(window._db, 'hospitals', dispHospital, 'tokens', currentServingDoc.docId), {
+          status: 'completed',
+          completedAt: window._fs.serverTimestamp()
+        });
+        showToast('Token ' + currentServingDoc.number + ' served.');
+      } catch (e) { showToast('Error: ' + e.message, true); }
+    }
+  </script>
+</body>
+</html>

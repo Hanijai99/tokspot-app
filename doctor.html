@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>Doctor Desk — TokSpot</title>
+  <link rel="stylesheet" href="css/style.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+  <link rel="manifest" href="manifest.json" />
+  <link rel="icon" type="image/png" href="logo.png" />
+  <link rel="apple-touch-icon" href="logo.png" />
+  <style>
+    body { background: #0f172a; color: #f8fafc; min-height: 100vh; padding: 0; }
+    .doc-container { max-width: 680px; margin: 0 auto; padding: 16px 20px 40px; }
+    
+    .current-card { 
+      background: #1e293b; border-radius: 24px; padding: 32px 20px; 
+      text-align: center; border: 1px solid #334155; margin-top: 16px;
+      box-shadow: 0 20px 40px rgba(0,0,0,0.35); position: relative;
+    }
+    .current-card.priority { border-color: #ef4444; background: linear-gradient(180deg, #2a1b1b, #1e293b); }
+    
+    .curr-num { font-size: 5.8rem; font-weight: 900; color: #38bdf8; letter-spacing: -2px; line-height: 1; margin: 10px 0; }
+    .curr-name { font-size: 1.4rem; font-weight: 700; color: #fff; }
+    
+    .action-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 24px; }
+    .call-btn { 
+      grid-column: span 2; height: 64px; font-size: 1.25rem; font-weight: 800; 
+      background: #16a34a; border: none; border-radius: 16px; color: #fff; 
+      display: flex; align-items: center; justify-content: center; gap: 10px; cursor: pointer;
+      box-shadow: 0 8px 24px rgba(22,163,74,0.3); transition: transform 0.15s;
+    }
+    .call-btn:active { transform: scale(0.98); }
+    .sec-btn { height: 50px; font-size: 0.95rem; font-weight: 700; border-radius: 14px; border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; }
+    .btn-skip { background: #dc2626; color: #fff; }
+    .btn-done { background: #0284c7; color: #fff; }
+    
+    .queue-list { background: #1e293b; border-radius: 20px; padding: 18px; margin-top: 20px; border: 1px solid #334155; }
+    .queue-item { display: flex; align-items: center; justify-content: space-between; padding: 12px 14px; border-bottom: 1px solid #334155; border-radius: 10px; }
+    .queue-item:hover { background: #24314a; }
+    .queue-item:last-child { border-bottom: none; }
+
+    .doc-select-bar {
+      display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-top: 14px;
+    }
+    .doc-select-bar select.input { background: #1e293b; color: #fff; border-color: #334155; }
+    
+    /* Notes input */
+    .note-box {
+      width: 100%; box-sizing: border-box; background: #0f172a; border: 1px solid #334155;
+      border-radius: 12px; color: #fff; padding: 10px 14px; margin-top: 14px; font-size: 0.9rem;
+      resize: none;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Topbar -->
+  <div class="topbar" style="background:#1e293b;border-bottom:1px solid #334155;">
+    <a class="brand" href="index.html" style="color:#38bdf8;">
+      <span class="logomark"><img src="logo.png" alt="TokSpot" /></span>TokSpot Doctor
+    </a>
+    <span class="spacer"></span>
+    <button class="icn-btn" onclick="location.href='index.html'" title="Home"><i class="fa-solid fa-house"></i></button>
+    <button class="icn-btn" onclick="location.href='frontdesk.html'" title="Front Desk"><i class="fa-solid fa-building-columns"></i></button>
+    <button class="icn-btn" onclick="location.href='display.html'" title="Display Board"><i class="fa-solid fa-tv"></i></button>
+    <button class="icn-btn" onclick="location.href='analytics.html'" title="Analytics"><i class="fa-solid fa-chart-column"></i></button>
+  </div>
+
+  <div class="doc-container">
+    <!-- Selector Bar -->
+    <div class="doc-select-bar">
+      <select id="hospSelect" class="input" style="flex:1;" onchange="onHospitalChange()">
+        <option value="">Select Hospital…</option>
+      </select>
+      <select id="docSelect" class="input" style="flex:1;" onchange="onDoctorSelect()" disabled>
+        <option value="">Select Doctor Profile…</option>
+      </select>
+    </div>
+
+    <!-- Active Patient Card -->
+    <div class="current-card" id="activeCard">
+      <div style="font-size:0.85rem;text-transform:uppercase;color:#94a3b8;letter-spacing:1.5px;font-weight:700;">
+        Currently In Room
+      </div>
+      <div class="curr-num" id="activeNumber">—</div>
+      <div class="curr-name" id="activeName">No patient called yet</div>
+      <div id="activeMeta" style="color:#94a3b8;font-size:0.85rem;margin-top:4px;"></div>
+
+      <!-- Quick Consultation Notes -->
+      <textarea id="consultNotes" class="note-box" rows="2" placeholder="Prescription / Quick doctor notes (Optional)..."></textarea>
+
+      <div class="action-grid">
+        <button class="call-btn" onclick="callNext()"><i class="fa-solid fa-bullhorn"></i> Call Next Patient</button>
+        <button class="sec-btn btn-skip" onclick="skipCurrent()"><i class="fa-solid fa-user-xmark"></i> Absent / Skip</button>
+        <button class="sec-btn btn-done" onclick="completeCurrent()"><i class="fa-solid fa-check-double"></i> Complete</button>
+      </div>
+    </div>
+
+    <!-- Upcoming Waiting Queue -->
+    <div class="queue-list">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;padding:0 6px;">
+        <span style="font-weight:800;color:#94a3b8;font-size:0.85rem;letter-spacing:1px;text-transform:uppercase;">Upcoming Queue</span>
+        <span style="font-weight:800;color:#38bdf8;font-size:0.85rem;" id="queueCount">0 Waiting</span>
+      </div>
+      <div id="queueRows"></div>
+    </div>
+  </div>
+
+  <script src="js/firebase-config.js"></script>
+  <script src="js/app.js"></script>
+  <script src="js/firebase.js"></script>
+  <script>
+    let activeDoctor = null;
+    let currentHospital = null;
+    let currentActiveToken = null;
+    let waitingTokens = [];
+    let unsubQueue = null;
+
+    window.addEventListener('load', async () => {
+      await initFirebase();
+      await loadHospitals();
+    });
+
+    async function loadHospitals() {
+      await waitForFB();
+      if (!window._FB_READY) return;
+      try {
+        const snap = await window._fs.getDocs(window._fs.collection(window._db, 'hospitals'));
+        const hSel = document.getElementById('hospSelect');
+        hSel.innerHTML = '<option value="">Select Hospital…</option>';
+
+        snap.docs.forEach(d => {
+          const h = d.data();
+          const opt = document.createElement('option');
+          opt.value = d.id;
+          opt.textContent = (h.name || d.id) + (h.city ? ' — ' + h.city : '');
+          hSel.appendChild(opt);
+        });
+
+        // Check URL parameter or cached hospital
+        const paramH = window.getParam ? window.getParam('h') : null;
+        if (paramH && snap.docs.some(d => d.id === paramH)) {
+          hSel.value = paramH;
+        } else if (snap.docs.length > 0) {
+          hSel.value = snap.docs[0].id;
+        }
+
+        if (hSel.value) onHospitalChange();
+      } catch (e) {
+        showToast('Hospital load error: ' + e.message, true);
+      }
+    }
+
+    async function onHospitalChange() {
+      currentHospital = document.getElementById('hospSelect').value;
+      const dSel = document.getElementById('docSelect');
+      dSel.innerHTML = '<option value="">Select Doctor Profile…</option>';
+      dSel.disabled = !currentHospital;
+
+      if (!currentHospital) return;
+
+      try {
+        const snap = await window._fs.getDocs(window._fs.collection(window._db, 'hospitals', currentHospital, 'doctors'));
+        snap.docs.forEach(d => {
+          const doc = d.data();
+          if (doc.status === 'closed') return;
+          const opt = document.createElement('option');
+          opt.value = d.id;
+          opt.textContent = (doc.name || d.id) + (doc.department ? ' · ' + doc.department : '');
+          dSel.appendChild(opt);
+        });
+
+        const paramD = window.getParam ? window.getParam('d') : null;
+        if (paramD && snap.docs.some(d => d.id === paramD)) {
+          dSel.value = paramD;
+        } else if (dSel.options.length > 1) {
+          dSel.selectedIndex = 1;
+        }
+
+        onDoctorSelect();
+      } catch (e) {
+        console.error(e);
+      }
+    }
+
+    function onDoctorSelect() {
+      activeDoctor = document.getElementById('docSelect').value;
+      if (!activeDoctor || !currentHospital) return;
+      listenQueue();
+    }
+
+    function listenQueue() {
+      if (unsubQueue) { unsubQueue(); unsubQueue = null; }
+      const today = window.todayStr();
+
+      unsubQueue = window._fs.onSnapshot(
+        window._fs.query(
+          window._fs.collection(window._db, 'hospitals', currentHospital, 'tokens'),
+          window._fs.where('doctorId', '==', activeDoctor),
+          window._fs.where('date', '==', today),
+          window._fs.where('status', 'in', ['waiting', 'called'])
+        ),
+        (snap) => {
+          waitingTokens = [];
+          currentActiveToken = null;
+
+          snap.docs.forEach(d => {
+            const t = d.data(); t.id = d.id;
+            if (t.status === 'called') currentActiveToken = t;
+            else if (t.status === 'waiting') waitingTokens.push(t);
+          });
+
+          waitingTokens.sort((a, b) => (b.priority ? 1 : 0) - (a.priority ? 1 : 0) || String(a.number).localeCompare(String(b.number)));
+
+          document.getElementById('queueCount').textContent = `${waitingTokens.length} Waiting`;
+
+          const card = document.getElementById('activeCard');
+          if (currentActiveToken) {
+            document.getElementById('activeNumber').textContent = currentActiveToken.number;
+            document.getElementById('activeName').textContent = currentActiveToken.patientName || 'Patient';
+            document.getElementById('activeMeta').textContent = `Mobile: ${currentActiveToken.phone || 'N/A'} · Source: ${currentActiveToken.source || 'walk-in'}`;
+            card.classList.toggle('priority', !!currentActiveToken.priority);
+          } else {
+            document.getElementById('activeNumber').textContent = '—';
+            document.getElementById('activeName').textContent = 'No patient called yet';
+            document.getElementById('activeMeta').textContent = '';
+            card.classList.remove('priority');
+          }
+
+          document.getElementById('queueRows').innerHTML = waitingTokens.map((t, idx) => `
+            <div class="queue-item">
+              <div>
+                <span style="font-weight:800;color:#fff;font-size:1.15rem;margin-right:10px;">${escHtml(t.number)}</span>
+                <span style="color:#cbd5e1;font-weight:600;font-size:0.95rem;">${escHtml(t.patientName || 'Patient')}</span>
+                ${t.priority ? '<span class="badge red" style="margin-left:6px;"><i class="fa-solid fa-truck-medical"></i> PRIORITY</span>' : ''}
+              </div>
+              <span style="color:#64748b;font-size:0.85rem;font-weight:700;">#${idx + 1}</span>
+            </div>
+          `).join('') || '<div style="padding:18px;text-align:center;color:#64748b;">No patients in queue</div>';
+        },
+        (err) => console.error(err)
+      );
+    }
+
+    async function callNext() {
+      if (!waitingTokens.length) return showToast('No waiting patients in queue.', true);
+
+      // Complete previous patient if still active
+      if (currentActiveToken) {
+        const notes = document.getElementById('consultNotes').value.trim();
+        await window._fs.updateDoc(window._fs.doc(window._db, 'hospitals', currentHospital, 'tokens', currentActiveToken.id), {
+          status: 'completed',
+          doctorNotes: notes || '',
+          completedAt: window._fs.serverTimestamp()
+        });
+        document.getElementById('consultNotes').value = '';
+      }
+
+      const nextToken = waitingTokens[0];
+      try {
+        await window._fs.updateDoc(window._fs.doc(window._db, 'hospitals', currentHospital, 'tokens', nextToken.id), {
+          status: 'called',
+          calledAt: window._fs.serverTimestamp()
+        });
+        if (window.playBeep) window.playBeep(2);
+        showToast('Called Token ' + nextToken.number);
+      } catch (e) {
+        showToast('Call failed: ' + e.message, true);
+      }
+    }
+
+    async function skipCurrent() {
+      if (!currentActiveToken) return showToast('No active patient to skip.', true);
+      try {
+        await window._fs.updateDoc(window._fs.doc(window._db, 'hospitals', currentHospital, 'tokens', currentActiveToken.id), {
+          status: 'skipped',
+          skippedAt: window._fs.serverTimestamp()
+        });
+        document.getElementById('consultNotes').value = '';
+        showToast('Token ' + currentActiveToken.number + ' skipped.');
+        setTimeout(callNext, 300);
+      } catch (e) {
+        showToast('Skip failed: ' + e.message, true);
+      }
+    }
+
+    async function completeCurrent() {
+      if (!currentActiveToken) return showToast('No active patient.', true);
+      const notes = document.getElementById('consultNotes').value.trim();
+      try {
+        await window._fs.updateDoc(window._fs.doc(window._db, 'hospitals', currentHospital, 'tokens', currentActiveToken.id), {
+          status: 'completed',
+          doctorNotes: notes || '',
+          completedAt: window._fs.serverTimestamp()
+        });
+        document.getElementById('consultNotes').value = '';
+        showToast('Token ' + currentActiveToken.number + ' completed.');
+      } catch (e) {
+        showToast('Action failed: ' + e.message, true);
+      }
+    }
+  </script>
+</body>
+</html>
