@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
+  <title>Your Token Pass — TokSpot</title>
+  <link rel="stylesheet" href="css/style.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+  <link rel="manifest" href="manifest.json" />
+  <link rel="icon" type="image/png" href="logo.png" />
+  <style>
+    body { background: #f8fafc; color: var(--ink); margin: 0; padding-bottom: 40px; }
+    .pass-container { max-width: 440px; margin: 30px auto; padding: 0 16px; }
+
+    /* Digital Boarding Pass */
+    .token-ticket {
+      background: #ffffff; border: 1px solid var(--line); border-radius: 28px;
+      overflow: hidden; box-shadow: 0 20px 45px rgba(0,0,0,0.08); position: relative;
+    }
+    .ticket-header {
+      background: linear-gradient(135deg, #16a34a, #0d9488);
+      color: #ffffff; padding: 24px 20px; text-align: center;
+    }
+    .ticket-body { padding: 24px 20px; text-align: center; }
+
+    .token-big-num {
+      font-size: 4.8rem; font-weight: 900; line-height: 1;
+      color: #16a34a; letter-spacing: -2px; margin: 12px 0 6px;
+    }
+
+    /* Live Queue Stat Boxes */
+    .status-grid {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 20px 0;
+      text-align: left;
+    }
+    .stat-pill {
+      background: #f1f5f9; border-radius: 14px; padding: 12px 14px;
+      border: 1px solid var(--line);
+    }
+    .stat-val { font-size: 1.3rem; font-weight: 900; color: var(--ink); margin-top: 2px; }
+    .stat-lbl { font-size: 0.74rem; font-weight: 700; color: var(--slate-500); text-transform: uppercase; letter-spacing: 0.5px; }
+
+    /* Arrival Instructions Banner */
+    .arrival-banner {
+      border-radius: 16px; padding: 16px; font-size: 0.88rem; font-weight: 700;
+      line-height: 1.45; text-align: left; display: flex; gap: 12px; align-items: center;
+    }
+    .banner-wait { background: #fef3c7; color: #92400e; border: 1px solid #fde68a; }
+    .banner-ready { background: #dcfce7; color: #166534; border: 1px solid #bbf7d0; animation: pulseReady 2s infinite; }
+    .banner-called { background: #16a34a; color: #ffffff; animation: pulseReady 1.2s infinite; }
+
+    @keyframes pulseReady {
+      0% { transform: scale(1); }
+      50% { transform: scale(1.02); }
+      100% { transform: scale(1); }
+    }
+
+    body.dark { background: #060b16; }
+    body.dark .token-ticket { background: #121a2b; border-color: #24314a; }
+    body.dark .stat-pill { background: #0f172a; border-color: #24314a; }
+    body.dark .stat-val { color: #f1f5f9; }
+    body.dark .token-big-num { color: #22c55e; }
+  </style>
+</head>
+<body>
+
+  <div class="topbar">
+    <a class="brand" href="index.html">
+      <span class="logomark"><img src="logo.png" alt="TokSpot" /></span>TokSpot Pass
+    </a>
+    <span class="spacer"></span>
+    <button class="icn-btn" onclick="location.href='index.html'" title="Home"><i class="fa-solid fa-house"></i></button>
+    <button class="icn-btn" onclick="hk.toggleDark()"><i class="fa-solid fa-moon"></i></button>
+  </div>
+
+  <div class="pass-container">
+
+    <!-- Loading State -->
+    <div id="loaderCard" class="card" style="text-align:center;padding:40px 16px;">
+      <i class="fa-solid fa-circle-notch fa-spin" style="font-size:2rem;color:var(--green);"></i>
+      <div class="muted mt-12" style="font-weight:600;">Retrieving token details...</div>
+    </div>
+
+    <!-- Error State -->
+    <div id="errorCard" class="card hidden" style="text-align:center;padding:30px 16px;">
+      <i class="fa-solid fa-circle-exclamation" style="font-size:2.4rem;color:#ef4444;margin-bottom:12px;"></i>
+      <div style="font-weight:800;font-size:1.1rem;color:var(--ink);" id="errorMsg">Token Not Found</div>
+      <p class="muted" style="font-size:0.86rem;margin-top:6px;">Please check your token ID or re-enter from home.</p>
+      <a href="index.html" class="btn btn-green mt-16" style="text-decoration:none;"><i class="fa-solid fa-arrow-left"></i> Return Home</a>
+    </div>
+
+    <!-- Live Ticket View -->
+    <div id="ticketCard" class="token-ticket hidden">
+      
+      <!-- Hospital & Doctor Header -->
+      <div class="ticket-header">
+        <div style="font-size:0.82rem;font-weight:700;letter-spacing:1px;text-transform:uppercase;opacity:0.9;" id="tHospitalCode">HOSPITAL TOKEN</div>
+        <div style="font-size:1.3rem;font-weight:900;margin-top:4px;" id="tHospitalName">—</div>
+        <div style="font-size:0.88rem;opacity:0.95;margin-top:2px;" id="tDoctorName">Doctor Station</div>
+      </div>
+
+      <div class="ticket-body">
+        <div class="muted" style="font-size:0.75rem;font-weight:800;text-transform:uppercase;letter-spacing:1px;">Your Token Number</div>
+        <div class="token-big-num" id="tNumber">--</div>
+        <div style="font-weight:700;font-size:1rem;color:var(--ink);" id="tPatientName">—</div>
+
+        <!-- Live Queue Metrics -->
+        <div class="status-grid">
+          <div class="stat-pill">
+            <div class="stat-lbl">Now Serving</div>
+            <div class="stat-val" id="tServing">#--</div>
+          </div>
+          <div class="stat-pill">
+            <div class="stat-lbl">People Ahead</div>
+            <div class="stat-val" id="tAhead">--</div>
+          </div>
+        </div>
+
+        <!-- Smart Crowd Control Status Message -->
+        <div id="statusInstruction" class="arrival-banner banner-wait">
+          <i class="fa-solid fa-hourglass-half" style="font-size:1.3rem;"></i>
+          <span id="instructionText">Calculating queue pace...</span>
+        </div>
+
+        <!-- Booking Date & ID Info -->
+        <div style="margin-top:24px;border-top:1px dashed var(--line);padding-top:16px;display:flex;justify-content:space-between;font-size:0.78rem;" class="muted">
+          <span>Date: <b id="tDate">--</b></span>
+          <span>Status: <b id="tStatusTag" style="text-transform:uppercase;color:var(--green);">WAITING</b></span>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Action links -->
+    <div id="subActions" class="hidden" style="text-align:center;margin-top:20px;">
+      <a href="book.html" style="font-size:0.85rem;color:var(--slate-500);text-decoration:none;font-weight:700;">
+        <i class="fa-solid fa-plus"></i> Book Another Token
+      </a>
+    </div>
+
+  </div>
+
+  <audio id="callChime" preload="auto">
+    <source src="https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3" type="audio/mpeg">
+  </audio>
+
+  <script src="js/firebase-config.js"></script>
+  <script src="js/app.js"></script>
+  <script src="js/firebase.js"></script>
+  <script>
+    if (window.hk && hk.applyDark) hk.applyDark();
+
+    let unsubscribeToken = null;
+    let unsubscribeQueue = null;
+    let prevStatus = null;
+
+    window.addEventListener('load', async () => {
+      await initFirebase();
+      await waitForFB();
+
+      const params = new URLSearchParams(window.location.search);
+      const tokenId = params.get('id');
+      const tokenNumberQuery = params.get('t');
+      const hospitalSlug = params.get('h');
+
+      if (tokenId && hospitalSlug) {
+        initTokenListener(hospitalSlug, tokenId);
+      } else if (tokenNumberQuery) {
+        findTokenByNumber(tokenNumberQuery);
+      } else {
+        showError('No valid token ID or number provided in URL.');
+      }
+    });
+
+    // Query by token number if patient typed it on home page
+    async function findTokenByNumber(num) {
+      const today = window.todayStr ? window.todayStr() : new Date().toISOString().slice(0,10);
+      try {
+        const hospitalsSnap = await window._fs.getDocs(window._fs.collection(window._db, 'hospitals'));
+        let found = null;
+
+        for (const hDoc of hospitalsSnap.docs) {
+          const tSnap = await window._fs.getDocs(
+            window._fs.query(
+              window._fs.collection(window._db, 'hospitals', hDoc.id, 'tokens'),
+              window._fs.where('number', '==', isNaN(num) ? num : Number(num)),
+              window._fs.where('date', '==', today)
+            )
+          );
+          if (!tSnap.empty) {
+            found = { slug: hDoc.id, id: tSnap.docs[0].id };
+            break;
+          }
+        }
+
+        if (found) {
+          initTokenListener(found.slug, found.id);
+        } else {
+          showError(`No active token found matching "${num}" for today.`);
+        }
+      } catch (e) {
+        showError('Search failed: ' + e.message);
+      }
+    }
+
+    function initTokenListener(hospitalSlug, tokenId) {
+      const docRef = window._fs.doc(window._db, 'hospitals', hospitalSlug, 'tokens', tokenId);
+
+      // Realtime listener for this individual token
+      unsubscribeToken = window._fs.onSnapshot(docRef, async (snap) => {
+        if (!snap.exists()) {
+          showError('Token record not found or expired.');
+          return;
+        }
+
+        const data = snap.data();
+        renderToken(data, hospitalSlug);
+        listenToServingDoctor(hospitalSlug, data.doctorId, data.number);
+      }, (err) => {
+        showError('Live tracking disconnected: ' + err.message);
+      });
+    }
+
+    // Monitor queue ahead and current called number
+    function listenToServingDoctor(hospitalSlug, doctorId, myTokenNum) {
+      if (unsubscribeQueue) unsubscribeQueue();
+
+      const today = window.todayStr ? window.todayStr() : new Date().toISOString().slice(0,10);
+      const qTokens = window._fs.query(
+        window._fs.collection(window._db, 'hospitals', hospitalSlug, 'tokens'),
+        window._fs.where('doctorId', '==', doctorId),
+        window._fs.where('date', '==', today)
+      );
+
+      unsubscribeQueue = window._fs.onSnapshot(qTokens, (snap) => {
+        let currentServing = 0;
+        let aheadCount = 0;
+
+        snap.docs.forEach(d => {
+          const t = d.data();
+          if (t.status === 'called' || t.status === 'serving') {
+            if (t.number > currentServing) currentServing = t.number;
+          }
+          if (t.status === 'waiting' && t.number < myTokenNum) {
+            aheadCount++;
+          }
+        });
+
+        document.getElementById('tServing').textContent = currentServing > 0 ? `#${currentServing}` : 'Ready';
+        document.getElementById('tAhead').textContent = aheadCount;
+
+        updateArrivalInstruction(aheadCount, myTokenNum, currentServing);
+      });
+    }
+
+    function updateArrivalInstruction(ahead, myNum, serving) {
+      const banner = document.getElementById('statusInstruction');
+      const text = document.getElementById('instructionText');
+
+      if (serving === myNum) {
+        banner.className = 'arrival-banner banner-called';
+        text.innerHTML = '<i class="fa-solid fa-bell"></i> <b>It is your turn now!</b> Please enter the doctor room immediately.';
+        playAlert();
+      } else if (ahead === 0 && serving < myNum) {
+        banner.className = 'arrival-banner banner-ready';
+        text.innerHTML = '<i class="fa-solid fa-person-walking"></i> <b>You are NEXT!</b> Please wait right outside the doctor door.';
+        playAlert();
+      } else if (ahead <= 2) {
+        banner.className = 'arrival-banner banner-ready';
+        text.innerHTML = '<i class="fa-solid fa-car-side"></i> <b>Please arrive now.</b> You are almost next in line (2 people ahead).';
+      } else {
+        const estMinutes = ahead * 6;
+        banner.className = 'arrival-banner banner-wait';
+        text.innerHTML = `<i class="fa-solid fa-couch"></i> <b>Relax at home.</b> ${ahead} people ahead of you (~${estMinutes} mins wait).`;
+      }
+    }
+
+    async function renderToken(t, hospitalSlug) {
+      document.getElementById('loaderCard').classList.add('hidden');
+      document.getElementById('errorCard').classList.add('hidden');
+      document.getElementById('ticketCard').classList.remove('hidden');
+      document.getElementById('subActions').classList.remove('hidden');
+
+      document.getElementById('tNumber').textContent = `#${t.number}`;
+      document.getElementById('tPatientName').textContent = t.patientName || 'Patient';
+      document.getElementById('tDate').textContent = t.date || '--';
+      document.getElementById('tStatusTag').textContent = t.status || 'waiting';
+
+      // Load Hospital & Doctor Names
+      try {
+        const hSnap = await window._fs.getDoc(window._fs.doc(window._db, 'hospitals', hospitalSlug));
+        if (hSnap.exists()) {
+          const h = hSnap.data();
+          document.getElementById('tHospitalName').textContent = h.name || hospitalSlug;
+          document.getElementById('tHospitalCode').textContent = h.hospitalCode || 'HOSPITAL PASS';
+        }
+        if (t.doctorId) {
+          const dSnap = await window._fs.getDoc(window._fs.doc(window._db, 'hospitals', hospitalSlug, 'doctors', t.doctorId));
+          if (dSnap.exists()) {
+            const d = dSnap.data();
+            document.getElementById('tDoctorName').textContent = `${d.name || 'Doctor'} · ${d.department || 'Consultation'}`;
+          }
+        }
+      } catch(e) { console.error(e); }
+    }
+
+    function playAlert() {
+      try {
+        const a = document.getElementById('callChime');
+        if (a) a.play().catch(()=>{});
+        if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
+      } catch(e){}
+    }
+
+    function showError(msg) {
+      document.getElementById('loaderCard').classList.add('hidden');
+      document.getElementById('ticketCard').classList.add('hidden');
+      document.getElementById('errorCard').classList.remove('hidden');
+      document.getElementById('errorMsg').textContent = msg;
+    }
+  </script>
+</body>
+</html>
