@@ -10,7 +10,6 @@
   <link rel="icon" type="image/png" href="logo.png" />
   <link rel="apple-touch-icon" href="logo.png" />
   <style>
-    /* 58mm Thermal Print Slip Styles */
     #printSlip { display: none; }
 
     @media print {
@@ -38,7 +37,6 @@
       @page { size: 58mm auto; margin: 0; }
     }
 
-    /* Hotkeys Help Bar */
     .hotkey-bar {
       display: flex;
       gap: 10px;
@@ -70,7 +68,14 @@
       padding: 4px 10px;
       border-radius: 8px;
       font-size: 0.85rem;
-      letter-spacing: 0.5px;
+    }
+
+    .active-actions {
+      display: flex;
+      gap: 8px;
+      justify-content: center;
+      flex-wrap: wrap;
+      margin-top: 14px;
     }
   </style>
 </head>
@@ -79,21 +84,21 @@
     <a class="brand" href="index.html"><span class="logomark"><img src="logo.png" alt="TokSpot" /></span>TokSpot Front Desk</a>
     <span class="spacer"></span>
     <button class="icn-btn" onclick="location.href='staff.html'" title="Staff Workspace"><i class="fa-solid fa-hospital-user"></i></button>
-    <button class="icn-btn" onclick="location.href='display.html'" title="Waiting Board"><i class="fa-solid fa-tv"></i></button>
+    <button class="icn-btn" onclick="launchTvFromDesk()" title="Open Display Board"><i class="fa-solid fa-tv"></i></button>
     <button class="icn-btn" onclick="hk.toggleDark()"><i class="fa-solid fa-moon"></i></button>
   </div>
 
   <div class="page wide">
-    <div class="hsub mt-12">Front Desk — Secure token issuance and queue desk.</div>
+    <div class="hsub mt-12">Front Desk — Issue tokens, call queue &amp; manage absentees.</div>
 
-    <!-- 1. Station Gate: Lock into Hospital using Code (No multi-hospital dropdown) -->
+    <!-- 1. Station Gate: Lock into Hospital using Code -->
     <section class="card mt-12" id="stationGate">
       <div style="max-width:420px;margin:20px auto;text-align:center;">
         <div style="width:56px;height:56px;border-radius:18px;background:var(--green-050);color:var(--green);display:flex;align-items:center;justify-content:center;font-size:1.6rem;margin:0 auto 14px;">
           <i class="fa-solid fa-hospital"></i>
         </div>
         <div style="font-weight:800;font-size:1.25rem;">Front Desk Station Setup</div>
-        <p class="muted" style="font-size:0.86rem;margin:6px 0 18px;">Enter your Hospital Code to authorize and initialize this reception station.</p>
+        <p class="muted" style="font-size:0.86rem;margin:6px 0 18px;">Enter your Hospital Code to initialize this desk.</p>
         
         <div style="display:flex;gap:8px;">
           <input class="input" id="gateCodeInput" placeholder="e.g. HOSP-1234" style="text-transform:uppercase;font-weight:800;letter-spacing:1px;" />
@@ -102,7 +107,7 @@
       </div>
     </section>
 
-    <!-- 2. Doctor Selector Section (Shown once hospital is authorized) -->
+    <!-- 2. Doctor Selector Section -->
     <section class="card mt-12 hidden" id="selectors">
       <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:16px;border-bottom:1px dashed var(--line);padding-bottom:12px;">
         <div>
@@ -162,7 +167,6 @@
           </div>
         </div>
 
-        <!-- 58mm Slip Toggle -->
         <div style="display:flex;align-items:center;gap:8px;margin-top:10px;padding:4px;">
           <input type="checkbox" id="autoPrintSlip" checked style="width:16px;height:16px;accent-color:var(--green);" />
           <label for="autoPrintSlip" style="font-size:0.85rem;font-weight:600;color:var(--ink);cursor:pointer;">
@@ -175,7 +179,6 @@
           <button class="btn btn-slate" onclick="resetDoctorSelection()"><i class="fa-solid fa-user-doctor"></i> Switch Doctor</button>
         </div>
 
-        <!-- Keyboard Shortcuts Legend -->
         <div class="hotkey-bar">
           <span><kbd>F2</kbd> Focus Name</span>
           <span><kbd>Enter</kbd> Issue Token</span>
@@ -187,11 +190,18 @@
         </div>
       </div>
 
-      <!-- Now Serving -->
+      <!-- Now Serving Card (With Direct Recall, Skip & Done Buttons) -->
       <div class="token-hero mt-16" style="padding:26px 16px;">
         <div class="t-label"><i class="fa-solid fa-bullhorn"></i> Now Serving</div>
         <div class="t-num" id="currentToken" style="font-size:4.6rem;">—</div>
         <div class="t-name" id="currentPatient" style="font-size:1rem;">Waiting for next token…</div>
+
+        <!-- Quick Actions for Currently Called Patient -->
+        <div class="active-actions" id="activeTokenActions" style="display:none;">
+          <button class="btn btn-green btn-sm" onclick="recallActiveToken()" title="Recall with voice"><i class="fa-solid fa-volume-high"></i> Recall (F8)</button>
+          <button class="btn btn-mint btn-sm" onclick="completeActiveToken()" title="Mark consultation done"><i class="fa-solid fa-check"></i> Done (F10)</button>
+          <button class="btn btn-slate btn-sm" onclick="skipActiveToken()" style="color:#b91c1c;" title="Move to absent list"><i class="fa-solid fa-user-xmark"></i> Absent / Skip (F9)</button>
+        </div>
       </div>
 
       <!-- Overview Stats -->
@@ -208,7 +218,7 @@
       <div id="queueList"></div>
       <div class="empty hidden" id="queueEmpty"><div class="e-ic"><i class="fa-regular fa-clock"></i></div><div class="e-t">No tokens waiting</div><div class="e-s">Issue a token to get started.</div></div>
 
-      <!-- Skipped Patients Recovery Section -->
+      <!-- Absent / Skipped Patients Recovery Section -->
       <div id="skippedSection" class="hidden mt-24">
         <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;">
           <span style="color:#dc2626;font-size:1.1rem;"><i class="fa-solid fa-user-clock"></i></span>
@@ -225,7 +235,7 @@
     </section>
   </div>
 
-  <!-- Hidden 58mm Thermal Receipt Element -->
+  <!-- Thermal Receipt Structure -->
   <div id="printSlip">
     <div class="slip-title" id="slpHospital">HOSPITAL NAME</div>
     <div class="slip-sub" id="slpDoctor">Doctor Name</div>
@@ -247,30 +257,36 @@
 
   <button class="theme-toggle" onclick="hk.toggleDark()"><i class="fa-solid fa-moon"></i></button>
 
-  <script>
-    if ('serviceWorker' in navigator) { window.addEventListener('load', () => navigator.serviceWorker.register('/sw.js').catch(()=>{})); }
-  </script>
   <script src="js/firebase-config.js"></script>
   <script src="js/app.js"></script>
   <script src="js/firebase.js"></script>
   <script>
     let currentHospital = null;
+    let currentHospitalCode = null;
     let currentHospitalName = 'Hospital';
     let currentDoctor = null;
     let currentDoctorName = 'Doctor';
     let unsubQueue = null;
     let lastIssuedTokenId = null;
+    let currentlyServingToken = null;
 
     function getAppBaseUrl() {
       return window.location.origin;
     }
 
+    function launchTvFromDesk() {
+      if (currentHospitalCode) {
+        window.open(`display.html?code=${encodeURIComponent(currentHospitalCode)}`, '_blank');
+      } else {
+        window.open('display.html', '_blank');
+      }
+    }
+
     window.addEventListener('load', async () => {
-      hk.applyDark();
+      if (window.hk && hk.applyDark) hk.applyDark();
       await initFirebase();
       await waitForFB();
 
-      // Check URL parameters or stored session
       const params = new URLSearchParams(window.location.search);
       const urlCode = params.get('code') || params.get('h');
       const savedCode = sessionStorage.getItem('tokspot_frontdesk_hospital');
@@ -284,7 +300,6 @@
       }
     });
 
-    // Authorize this front desk station to ONE isolated hospital
     async function authStation() {
       const rawCode = document.getElementById('gateCodeInput').value.trim();
       const codeInput = rawCode.toUpperCase();
@@ -298,7 +313,6 @@
         await waitForFB();
         let targetDoc = null;
 
-        // 1. Query by field 'hospitalCode'
         const qHospitalCode = await window._fs.getDocs(
           window._fs.query(
             window._fs.collection(window._db, 'hospitals'),
@@ -307,7 +321,6 @@
         );
         if (!qHospitalCode.empty) targetDoc = qHospitalCode.docs[0];
 
-        // 2. Fallback query by field 'code'
         if (!targetDoc) {
           const qCode = await window._fs.getDocs(
             window._fs.query(
@@ -318,7 +331,6 @@
           if (!qCode.empty) targetDoc = qCode.docs[0];
         }
 
-        // 3. Fallback direct document ID
         if (!targetDoc) {
           const directSnap = await window._fs.getDoc(window._fs.doc(window._db, 'hospitals', rawCode.toLowerCase()));
           if (directSnap.exists()) targetDoc = directSnap;
@@ -332,13 +344,13 @@
         currentHospital = targetDoc.id;
         const hData = targetDoc.data();
         currentHospitalName = hData.name || currentHospital;
+        currentHospitalCode = hData.hospitalCode || codeInput;
 
         sessionStorage.setItem('tokspot_frontdesk_hospital', codeInput);
 
-        // Populate station header
         document.getElementById('stationHospitalTitle').textContent = currentHospitalName;
-        document.getElementById('stationCitySubtitle').textContent = hData.city ? `Station Location: ${hData.city}` : 'Reception Station';
-        document.getElementById('stationHospitalCode').textContent = hData.hospitalCode || codeInput;
+        document.getElementById('stationCitySubtitle').textContent = hData.city ? `Station: ${hData.city}` : 'Reception Station';
+        document.getElementById('stationHospitalCode').textContent = currentHospitalCode;
 
         await loadHospitalDoctors(currentHospital);
 
@@ -358,6 +370,7 @@
       if (!confirm('Disconnect this station from this hospital?')) return;
       sessionStorage.removeItem('tokspot_frontdesk_hospital');
       currentHospital = null;
+      currentHospitalCode = null;
       currentDoctor = null;
       if (unsubQueue) { unsubQueue(); unsubQueue = null; }
       document.getElementById('desk').classList.add('hidden');
@@ -382,7 +395,7 @@
         });
       } catch (e) {
         console.error(e);
-        showToast('Error loading doctors list: ' + e.message, true);
+        showToast('Error loading doctors: ' + e.message, true);
       }
     }
 
@@ -412,7 +425,7 @@
 
     function setupQueueListener() {
       if (unsubQueue) unsubQueue();
-      const today = window.todayStr();
+      const today = window.todayStr ? window.todayStr() : new Date().toISOString().slice(0,10);
       unsubQueue = window._fs.onSnapshot(
         window._fs.query(
           window._fs.collection(window._db, 'hospitals', currentHospital, 'tokens'),
@@ -440,16 +453,23 @@
       document.getElementById('stCalled').textContent = called.length;
       document.getElementById('stSkipped').textContent = skipped.length;
 
-      const activeCurrent = called.length ? called[called.length - 1] : (waiting.length ? waiting[0] : null);
+      // Active Called Token
+      const activeCurrent = called.length ? called[called.length - 1] : null;
+      const actionsBar = document.getElementById('activeTokenActions');
+
       if (activeCurrent) {
+        currentlyServingToken = activeCurrent;
         document.getElementById('currentToken').textContent = activeCurrent.number;
         document.getElementById('currentPatient').textContent = (activeCurrent.priority ? '[EMERGENCY] ' : '') + (activeCurrent.patientName || 'Patient') + (activeCurrent.counter ? ' · Counter ' + activeCurrent.counter : '');
+        actionsBar.style.display = 'flex';
       } else {
+        currentlyServingToken = null;
         document.getElementById('currentToken').textContent = '—';
         document.getElementById('currentPatient').textContent = 'Waiting for next token…';
+        actionsBar.style.display = 'none';
       }
 
-      // Render Active Waiting
+      // 1. Waiting Queue List with Skip and Call actions
       const empty = document.getElementById('queueEmpty');
       const list = document.getElementById('queueList');
       if (waiting.length === 0) {
@@ -470,7 +490,7 @@
               <div class="btn-row mt-12" style="flex-wrap:wrap;">
                 <button class="btn btn-green btn-sm" onclick="setStatus('${t.id}','called')"><i class="fa-solid fa-bullhorn"></i> Call</button>
                 <button class="btn btn-mint btn-sm" onclick="setStatus('${t.id}','completed')"><i class="fa-solid fa-check"></i> Done</button>
-                <button class="btn btn-slate btn-sm" onclick="setStatus('${t.id}','skipped')"><i class="fa-solid fa-user-xmark"></i> Skip</button>
+                <button class="btn btn-slate btn-sm" onclick="setStatus('${t.id}','skipped')" style="color:#b91c1c;"><i class="fa-solid fa-user-xmark"></i> Skip / Absent</button>
                 <button class="btn btn-slate btn-sm" onclick="printSingleSlip('${t.id}')"><i class="fa-solid fa-print"></i> Print</button>
                 <button class="btn btn-slate btn-sm" onclick="notifyPatient('${t.id}','sms')"><i class="fa-solid fa-message"></i> SMS</button>
                 <button class="btn btn-slate btn-sm" onclick="notifyPatient('${t.id}','wa')"><i class="fa-brands fa-whatsapp"></i> WA</button>
@@ -481,7 +501,7 @@
         }).join('');
       }
 
-      // Render Skipped List (Recovery Box)
+      // 2. Skipped / Absent List (Recovery Drawer)
       const skipSec = document.getElementById('skippedSection');
       const skipList = document.getElementById('skippedList');
       if (skipped.length > 0) {
@@ -505,6 +525,26 @@
       }
     }
 
+    // Direct Action Helpers for Active Called Token
+    function recallActiveToken() {
+      if (!currentlyServingToken) return showToast('No active token to recall.', true);
+      playBeep(2);
+      if (window.announceToken) {
+        window.announceToken(currentlyServingToken.number, currentlyServingToken.patientName, currentlyServingToken.counter || 'A');
+      }
+      showToast(`Recalled Token #${currentlyServingToken.number}`);
+    }
+
+    function completeActiveToken() {
+      if (!currentlyServingToken) return;
+      setStatus(currentlyServingToken.id, 'completed');
+    }
+
+    function skipActiveToken() {
+      if (!currentlyServingToken) return;
+      setStatus(currentlyServingToken.id, 'skipped');
+    }
+
     async function recoverPatient(id) {
       try {
         await window._fs.updateDoc(window._fs.doc(window._db, 'hospitals', currentHospital, 'tokens', id), {
@@ -525,7 +565,7 @@
       if (!window._FB_READY) return showToast('Firebase not configured.', true);
       if (phone && phone.length !== 10) return showToast('Enter a valid 10-digit mobile.', true);
 
-      const today = window.todayStr();
+      const today = window.todayStr ? window.todayStr() : new Date().toISOString().slice(0,10);
       const isPriority = document.getElementById('newPriority').checked;
       const counter = document.getElementById('newCounter').value;
       const counterRef = window._fs.doc(window._db, 'hospitals', currentHospital, 'counters', today);
@@ -574,7 +614,6 @@
       } catch (e) { showToast('Failed: ' + e.message, true); }
     }
 
-    /* Print Helpers */
     function triggerPrintSlip(tokenNum, patientName, counter, tokenId) {
       document.getElementById('slpHospital').textContent = currentHospitalName;
       document.getElementById('slpDoctor').textContent = currentDoctorName;
@@ -623,7 +662,7 @@
       try {
         const snap = await window._fs.getDoc(window._fs.doc(window._db, 'hospitals', currentHospital, 'tokens', id));
         const t = snap.data();
-        window.announceToken(t.number, t.patientName, t.counter);
+        if (window.announceToken) window.announceToken(t.number, t.patientName, t.counter);
       } catch (e) {}
     }
 
@@ -668,7 +707,7 @@
 
     async function loadHistory() {
       if (!currentHospital || !currentDoctor || !window._FB_READY) return;
-      const today = window.todayStr();
+      const today = window.todayStr ? window.todayStr() : new Date().toISOString().slice(0,10);
       try {
         const snap = await window._fs.getDocs(window._fs.query(
           window._fs.collection(window._db, 'hospitals', currentHospital, 'tokens'),
@@ -702,30 +741,24 @@
           status: 'pending',
           createdAt: window._fs.serverTimestamp()
         });
-        console.log('Queued to Android Gateway');
       } catch (err) {
         console.error('Queue error:', err);
       }
     }
 
-    /* Receptionist Keyboard Shortcuts / Hotkeys */
+    /* Receptionist Keyboard Shortcuts */
     window.addEventListener('keydown', (e) => {
       const activeEl = document.activeElement;
       const activeTag = activeEl ? activeEl.tagName.toLowerCase() : '';
       const isInputFocused = activeTag === 'input' || activeTag === 'textarea' || activeTag === 'select';
 
-      // 1. F2 or Alt+N: Jump to Patient Name Input
       if (e.key === 'F2' || (e.altKey && (e.key === 'n' || e.key === 'N'))) {
         e.preventDefault();
         const nInput = document.getElementById('newName');
-        if (nInput) {
-          nInput.focus();
-          nInput.select();
-        }
+        if (nInput) { nInput.focus(); nInput.select(); }
         return;
       }
 
-      // Enter inside Name or Phone triggers token generation
       if (e.key === 'Enter' && isInputFocused) {
         if (activeEl.id === 'newName' || activeEl.id === 'newPhone') {
           e.preventDefault();
@@ -736,63 +769,31 @@
 
       if (isInputFocused && !e.altKey && !e.key.startsWith('F')) return;
 
-      // 2. F4: Call Next Patient
       if (e.key === 'F4') {
         e.preventDefault();
         const callBtn = document.querySelector('#queueList .btn-green');
-        if (callBtn) {
-          callBtn.click();
-          showToast('Calling next token (F4)...');
-        } else {
-          showToast('No waiting patients in queue.', true);
-        }
+        if (callBtn) { callBtn.click(); showToast('Calling next token (F4)...'); }
+        else { showToast('No waiting patients in queue.', true); }
       }
 
-      // 3. F8: Recall Current Token
       if (e.key === 'F8') {
         e.preventDefault();
-        const activeNum = document.getElementById('currentToken')?.textContent?.trim();
-        if (activeNum && activeNum !== '—') {
-          const activeName = document.getElementById('currentPatient')?.textContent || '';
-          const counterVal = document.getElementById('newCounter')?.value || 'A';
-          playBeep(2);
-          if (window.announceToken) window.announceToken(activeNum, activeName, counterVal);
-          showToast(`Recalled Token ${activeNum} (F8)`);
-        } else {
-          showToast('No active token being served.', true);
-        }
+        recallActiveToken();
       }
 
-      // 4. F9: Skip Current Token
       if (e.key === 'F9') {
         e.preventDefault();
-        const skipBtn = document.querySelector('#queueList .btn-slate[onclick*="skipped"]');
-        if (skipBtn) {
-          skipBtn.click();
-          showToast('Token skipped (F9)');
-        }
+        skipActiveToken();
       }
 
-      // 5. F10: Mark Served / Done
       if (e.key === 'F10') {
         e.preventDefault();
-        const doneBtn = document.querySelector('#queueList .btn-mint');
-        if (doneBtn) {
-          doneBtn.click();
-          showToast('Token served (F10)');
-        }
+        completeActiveToken();
       }
 
-      // 6. Alt + P: Reprint Slip
       if (e.altKey && (e.key === 'p' || e.key === 'P')) {
         e.preventDefault();
-        if (lastIssuedTokenId) {
-          printSingleSlip(lastIssuedTokenId);
-        } else {
-          const firstPrintBtn = document.querySelector('#queueList .btn-slate[onclick*="printSingleSlip"]');
-          if (firstPrintBtn) firstPrintBtn.click();
-          else window.print();
-        }
+        if (lastIssuedTokenId) printSingleSlip(lastIssuedTokenId);
       }
     });
   </script>
