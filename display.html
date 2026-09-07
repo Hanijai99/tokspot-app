@@ -3,559 +3,318 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
-  <title>Display Board & Nurse Control — TokSpot</title>
+  <title>Waiting Room Display — TokSpot</title>
   <link rel="stylesheet" href="css/style.css" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
   <link rel="manifest" href="manifest.json" />
   <link rel="icon" type="image/png" href="logo.png" />
-  <link rel="apple-touch-icon" href="logo.png" />
   <style>
-    body { padding:0; background:#eef2f7; }
-    .board-tools {
-      max-width:1100px; margin:0 auto; padding:16px 20px;
-      display:flex; gap:10px; align-items:center; flex-wrap:wrap;
-    }
-    .board-tools select.input { max-width:200px; }
-    .board-wrap { max-width:1100px; margin:0 auto; padding:10px 20px 30px; }
+    body { background: #060b16; color: #f8fafc; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; margin: 0; padding: 0; overflow-x: hidden; }
     
-    /* Nurse Control Bar */
-    .nurse-controls {
-      background:#ffffff; border-radius:18px; padding:14px 18px;
-      margin-bottom:18px; box-shadow:var(--shadow); display:flex;
-      align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px;
-      border:1px solid var(--line);
+    /* Setup Gate Card */
+    .gate-container {
+      max-width: 440px; margin: 80px auto; padding: 24px;
+      background: #121a2b; border: 1px solid #24314a; border-radius: 24px;
+      text-align: center; box-shadow: 0 20px 50px rgba(0,0,0,0.5);
     }
-    .nurse-actions { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
 
-    /* Single Doctor Hero Board */
-    .board-hero {
-      background:linear-gradient(160deg,#14532d,#15803d 55%,#0d9488);
-      border-radius:28px; color:#fff; text-align:center; padding:40px 24px;
-      box-shadow:0 20px 50px rgba(22,163,74,.3); position:relative; overflow:hidden;
-      transition:outline .3s; outline:4px solid transparent;
+    /* TV Display Layout */
+    .tv-screen { display: flex; flex-direction: column; min-height: 100vh; }
+    .tv-header {
+      padding: 20px 32px; background: #0b1120; border-bottom: 2px solid #1e293b;
+      display: flex; justify-content: space-between; align-items: center;
     }
-    .board-hero.emergency { background:linear-gradient(160deg,#7f1d1d,#dc2626 55%,#ea580c); box-shadow:0 20px 50px rgba(220,38,38,.35); outline-color:#fecaca; }
-    .board-hero::before { content:''; position:absolute; top:-55%; right:-12%; width:460px; height:460px; background:radial-gradient(circle,rgba(255,255,255,.12),transparent 62%); border-radius:50%; }
-    .bh-hos { font-size:1.3rem; font-weight:800; }
-    .bh-doc { font-size:.95rem; opacity:.85; margin-top:2px; }
-    .bh-label { font-size:.95rem; font-weight:700; letter-spacing:4px; text-transform:uppercase; opacity:.9; margin-top:14px; }
-    .bh-num { font-size:8.4rem; font-weight:900; line-height:.95; letter-spacing:10px; animation:pulse 2s infinite ease-in-out; }
-    .bh-name { font-size:1.6rem; font-weight:600; margin-top:6px; }
-    @keyframes pulse { 0%,100%{transform:scale(1);} 50%{transform:scale(1.03);} }
+    .tv-hospital-name { font-size: 1.8rem; font-weight: 900; letter-spacing: -0.5px; color: #22c55e; }
+    .tv-clock { font-size: 1.5rem; font-weight: 800; font-family: monospace; color: #94a3b8; }
 
-    .board-side { display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-top:20px; }
-    @media(max-width:560px){ .board-side { grid-template-columns:1fr; } }
-    .side-card { background:#fff; border-radius:20px; padding:22px; box-shadow:var(--shadow); }
-    .side-card h4 { color:var(--slate-500); font-size:.78rem; letter-spacing:1.5px; text-transform:uppercase; margin-bottom:4px; }
-    .side-card .n { font-size:3.4rem; font-weight:900; color:var(--ink); line-height:1; }
-    .side-card.next .n { color:#ea580c; }
-    .side-card.last .n { color:var(--green); }
-
-    .stats-row { display:flex; justify-content:center; gap:12px; margin:20px 0 0; flex-wrap:wrap; }
-    .st-pill { background:#fff; border-radius:999px; padding:10px 20px; font-weight:700; color:var(--ink); box-shadow:var(--shadow); font-size:.9rem; }
-
-    /* Multi-Doctor Split Grid */
-    .multi-grid {
-      display:grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
-      gap: 16px; margin-top: 10px;
+    .tv-body {
+      display: grid; grid-template-columns: 1.1fr 1fr; gap: 24px;
+      padding: 24px 32px; flex: 1;
     }
-    .doc-grid-card {
-      background:#ffffff; border-radius:22px; padding:22px; box-shadow:var(--shadow);
-      border:2px solid #e2e8f0; display:flex; flex-direction:column; justify-content:space-between;
-      position:relative; overflow:hidden;
-    }
-    .doc-grid-card.active { border-color:#16a34a; }
-    .doc-grid-card.emergency { border-color:#dc2626; background:#fff5f5; }
-    .dgc-top { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:12px; }
-    .dgc-title { font-size:1.15rem; font-weight:800; color:var(--ink); }
-    .dgc-dept { font-size:0.8rem; color:var(--slate-500); font-weight:600; margin-top:2px; }
-    .dgc-badge { background:#e0f2fe; color:#0369a1; padding:4px 10px; border-radius:99px; font-size:0.75rem; font-weight:800; }
-    .dgc-num { font-size:4.8rem; font-weight:900; line-height:1; color:#0f172a; text-align:center; margin:14px 0 6px; letter-spacing:2px; }
-    .dgc-name { text-align:center; font-size:1rem; font-weight:700; color:#334155; min-height:24px; }
-    .dgc-footer { display:flex; justify-content:space-between; align-items:center; margin-top:16px; padding-top:12px; border-top:1px dashed #e2e8f0; font-size:0.85rem; font-weight:600; color:#64748b; }
 
-    /* Smart TV Audio Unlock Overlay */
-    #audioUnlockBanner {
-      position: fixed; inset: 0; background: rgba(15, 23, 42, 0.88);
-      backdrop-filter: blur(6px); display: flex; flex-direction: column;
-      align-items: center; justify-content: center; z-index: 99999; cursor: pointer;
+    /* Big Hero: Currently Called Token */
+    .hero-box {
+      background: #121a2b; border: 2px solid #16a34a; border-radius: 28px;
+      padding: 32px; text-align: center; display: flex; flex-direction: column;
+      justify-content: center; align-items: center; box-shadow: 0 0 50px rgba(34, 197, 94, 0.15);
     }
-    .unlock-btn {
-      background: #16a34a; color: #fff; font-size: 1.5rem; font-weight: 800;
-      border: none; padding: 18px 36px; border-radius: 999px;
-      box-shadow: 0 0 40px rgba(22,163,74,.6); animation: bounceBtn 1.2s infinite alternate;
-      cursor: pointer;
+    .hero-badge {
+      background: #16a34a; color: #ffffff; font-weight: 900; font-size: 1.1rem;
+      padding: 6px 18px; border-radius: 50px; text-transform: uppercase; letter-spacing: 1.5px;
     }
-    @keyframes bounceBtn { from { transform: translateY(0); } to { transform: translateY(-8px); } }
+    .hero-token {
+      font-size: 8rem; font-weight: 900; line-height: 1; margin: 20px 0 10px;
+      color: #ffffff; letter-spacing: -4px;
+    }
+    .hero-patient { font-size: 1.8rem; font-weight: 800; color: #cbd5e1; }
+    .hero-meta { font-size: 1.25rem; font-weight: 700; color: #22c55e; margin-top: 8px; }
 
-    body.dark { background:#060b16; }
-    body.dark .board-tools select.input { background:#0f172a; }
-    body.dark .nurse-controls { background:#121a2b; border-color:#24314a; }
-    body.dark .side-card, body.dark .doc-grid-card { background:#121a2b; border-color:#24314a; }
-    body.dark .st-pill { background:#121a2b; color:#e2e8f0; }
-    body.dark .side-card .n, body.dark .doc-grid-card .dgc-num { color:#f1f5f9; }
-    body.dark .dgc-title { color:#f8fafc; }
-    body.dark .dgc-name { color:#cbd5e1; }
+    /* Upcoming / Waiting Grid */
+    .queue-box {
+      background: #0f172a; border: 1px solid #1e293b; border-radius: 28px;
+      padding: 24px; display: flex; flex-direction: column;
+    }
+    .queue-title {
+      font-size: 1.1rem; font-weight: 800; text-transform: uppercase; letter-spacing: 1px;
+      color: #94a3b8; margin-bottom: 16px; border-bottom: 1px dashed #334155; padding-bottom: 10px;
+    }
+    .waiting-list {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 12px;
+      overflow-y: auto; max-height: 480px;
+    }
+    .tv-token-chip {
+      background: #1e293b; border: 1px solid #334155; border-radius: 16px;
+      padding: 14px 18px; display: flex; justify-content: space-between; align-items: center;
+    }
+    .tv-token-chip.priority { border-color: #ef4444; background: #2a1215; }
+    .tv-chip-num { font-size: 1.8rem; font-weight: 900; color: #f8fafc; }
+    .tv-chip-doc { font-size: 0.82rem; font-weight: 700; color: #94a3b8; }
+
+    /* Fullscreen Exit Button */
+    .tv-ctrls { position: fixed; bottom: 16px; right: 16px; opacity: 0.2; transition: opacity 0.2s; }
+    .tv-ctrls:hover { opacity: 1; }
+
+    @media (max-width: 900px) {
+      .tv-body { grid-template-columns: 1fr; }
+      .hero-token { font-size: 5rem; }
+    }
   </style>
 </head>
 <body>
 
-  <!-- Audio Unlock Banner -->
-  <div id="audioUnlockBanner" onclick="unlockAudio()">
-    <button class="unlock-btn"><i class="fa-solid fa-volume-high"></i> Click Screen to Enable Sound</button>
-    <div style="color:#94a3b8;margin-top:14px;font-size:1rem;font-weight:600;">
-      TV / Browser voice announcement & chime sound activate panna screen-la touch pannunga
+  <!-- STEP 1: Hospital Gate (Prevents loading random hospital) -->
+  <div id="displayGate" class="gate-container">
+    <div style="width:60px;height:60px;border-radius:20px;background:rgba(34,197,94,0.15);color:#22c55e;display:flex;align-items:center;justify-content:center;font-size:1.8rem;margin:0 auto 16px;">
+      <i class="fa-solid fa-tv"></i>
+    </div>
+    <h2 style="margin:0;font-size:1.4rem;font-weight:900;">Waiting Hall TV Screen</h2>
+    <p class="muted" style="font-size:0.86rem;margin:8px 0 20px;color:#94a3b8;">
+      Enter your Hospital Code to link and launch this TV display screen.
+    </p>
+
+    <div style="display:flex;gap:8px;">
+      <input class="input" id="tvCodeInput" type="text" placeholder="e.g. HOSP-1234" style="background:#0b1120;border-color:#24314a;color:#fff;font-weight:800;letter-spacing:1px;text-transform:uppercase;" />
+      <button class="btn btn-green" id="btnLaunchTv" onclick="launchDisplay()"><i class="fa-solid fa-play"></i> Launch</button>
     </div>
   </div>
 
-  <div class="board-tools">
-    <a class="brand" style="display:inline-flex;align-items:center;gap:8px;font-weight:800;color:var(--green-deep);text-decoration:none;" href="index.html">
-      <span class="logomark" style="width:34px;height:34px;border-radius:9px;display:inline-flex;align-items:center;justify-content:center;overflow:hidden;">
-        <img src="logo.png" alt="TokSpot" style="width:100%;height:100%;object-fit:cover;display:block;" />
-      </span>Home
-    </a>
-    <span class="spacer"></span>
-    <select class="input hidden" id="hospitalSelect"><option value="">Hospital…</option></select>
-    <select class="input hidden" id="doctorSelect"><option value="">All Doctors (Split View)</option></select>
-    <select class="input hidden" id="chimeSelect" style="max-width:140px;" title="Chime Tone">
-      <option value="airport">Airport Chime</option>
-      <option value="hospital">Hospital Bell</option>
-      <option value="none">No Chime</option>
-    </select>
-    <button class="btn btn-slate btn-sm" onclick="toggleNursePanel()" title="Toggle Controls"><i class="fa-solid fa-user-nurse"></i> Controls</button>
-    <button class="icn-btn" onclick="hk.toggleDark()" title="Theme"><i class="fa-solid fa-moon"></i></button>
-  </div>
-
-  <div class="board-wrap">
-
-    <!-- Nurse Control Bar -->
-    <section class="nurse-controls hidden" id="nurseBar">
-      <div style="display:flex;align-items:center;gap:10px;">
-        <span style="font-weight:800;color:var(--green-deep);"><i class="fa-solid fa-bolt"></i> Desk Control:</span>
-        <select class="input" id="nurseCounter" style="width:auto;padding:6px 12px;font-weight:700;">
-          <option value="A">Counter A</option>
-          <option value="B">Counter B</option>
-          <option value="C">Counter C</option>
-          <option value="1">Room 1</option>
-          <option value="2">Room 2</option>
-        </select>
+  <!-- STEP 2: The TV Dashboard Screen -->
+  <div id="tvDashboard" class="tv-screen hidden">
+    
+    <div class="tv-header">
+      <div>
+        <span class="tv-hospital-name" id="tvHospName">Hospital Name</span>
+        <span style="background:rgba(34,197,94,0.15);color:#22c55e;font-size:0.78rem;font-weight:800;padding:3px 8px;border-radius:6px;margin-left:10px;" id="tvHospCode">HOSP-CODE</span>
       </div>
-      <div class="nurse-actions">
-        <button class="btn btn-green btn-sm" onclick="callNextToken()"><i class="fa-solid fa-forward"></i> Call Next</button>
-        <button class="btn btn-mint btn-sm" onclick="recallCurrent()"><i class="fa-solid fa-bullhorn"></i> Recall</button>
-        <button class="btn btn-slate btn-sm" onclick="skipCurrentToken()"><i class="fa-solid fa-angles-right"></i> Skip (Absent)</button>
-        <button class="btn btn-slate btn-sm" onclick="markCurrentDone()"><i class="fa-solid fa-check"></i> Served</button>
-      </div>
-    </section>
+      <div class="tv-clock" id="tvLiveClock">--:--:--</div>
+    </div>
 
-    <!-- Multi-Doctor Grid Container -->
-    <div id="multiGridWrap" class="multi-grid hidden"></div>
-
-    <!-- Single Doctor View Elements -->
-    <div id="singleDoctorWrap">
-      <div class="stats-row hidden" id="statsRow">
-        <span class="st-pill">👥 <b id="cntWaiting">0</b> Waiting</span>
-        <span class="st-pill">📣 <b id="cntCalled">0</b> Called</span>
-        <span class="st-pill">✅ <b id="cntDone">0</b> Served</span>
+    <div class="tv-body">
+      <!-- Currently Called Hero Card -->
+      <div class="hero-box">
+        <span class="hero-badge"><i class="fa-solid fa-bullhorn"></i> Now Calling</span>
+        <div class="hero-token" id="tvActiveNum">—</div>
+        <div class="hero-patient" id="tvActivePatient">Waiting for next token…</div>
+        <div class="hero-meta" id="tvActiveDoctor">Doctor Consultation</div>
       </div>
 
-      <div class="board-hero hidden mt-16" id="hero">
-        <div class="bh-hos" id="bHospital">Select Hospital</div>
-        <div class="bh-doc" id="bDoctor">—</div>
-        <div class="bh-label">Now Serving</div>
-        <div class="bh-num" id="bCurrent">—</div>
-        <div class="bh-name" id="bPatient"></div>
-      </div>
-
-      <div class="board-side hidden" id="side">
-        <div class="side-card next"><h4>Next Up</h4><div class="n" id="bNext">—</div></div>
-        <div class="side-card last"><h4>Last Served</h4><div class="n" id="bLast">—</div></div>
+      <!-- Upcoming Queue List -->
+      <div class="queue-box">
+        <div class="queue-title"><i class="fa-solid fa-hourglass-half"></i> Next in Line (Waiting)</div>
+        <div class="waiting-list" id="tvWaitingList">
+          <div style="color:#64748b;font-weight:600;padding:20px;">No patients waiting.</div>
+        </div>
       </div>
     </div>
 
+    <!-- Small exit button for receptionists -->
+    <div class="tv-ctrls">
+      <button class="btn btn-slate btn-sm" onclick="exitTvSession()"><i class="fa-solid fa-power-off"></i> Disconnect TV</button>
+    </div>
   </div>
 
-  <script>
-    if ('serviceWorker' in navigator) { window.addEventListener('load', () => navigator.serviceWorker.register('/sw.js').catch(()=>{})); }
-  </script>
+  <audio id="tvAudio" preload="auto">
+    <source src="https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3" type="audio/mpeg">
+  </audio>
+
   <script src="js/firebase-config.js"></script>
   <script src="js/app.js"></script>
   <script src="js/firebase.js"></script>
   <script>
-    let dispHospital = null;
-    let dispDoctor = null;
-    let unsubs = [];
-    let prevCurrent = null;
-    let currentServingDoc = null;
-    let nextWaitingDoc = null;
-    let isAudioUnlocked = false;
-    let cachedVoices = [];
-    let hospitalDoctorsList = [];
-    let latestLoadedTokens = [];
-    let audioCtx = null;
+    let activeHospitalSlug = null;
+    let unsubTvTokens = null;
+    let lastCalledTokenNum = null;
 
-    function loadVoices() {
-      if ('speechSynthesis' in window) {
-        cachedVoices = window.speechSynthesis.getVoices();
-      }
-    }
-    if ('speechSynthesis' in window) {
-      window.speechSynthesis.onvoiceschanged = loadVoices;
-      loadVoices();
-    }
-
-    function getAudioContext() {
-      if (!audioCtx) {
-        const AudioClass = window.AudioContext || window.webkitAudioContext;
-        if (AudioClass) audioCtx = new AudioClass();
-      }
-      return audioCtx;
-    }
-
-    function playTone(freq, startTime, duration) {
-      const ctx = getAudioContext();
-      if (!ctx) return;
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.type = 'sine';
-      osc.frequency.setValueAtTime(freq, ctx.currentTime + startTime);
-
-      gain.gain.setValueAtTime(0.25, ctx.currentTime + startTime);
-      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + startTime + duration);
-
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-      osc.start(ctx.currentTime + startTime);
-      osc.stop(ctx.currentTime + startTime + duration);
-    }
-
-    function playCustomChime() {
-      const chimeMode = document.getElementById('chimeSelect')?.value || 'airport';
-      if (chimeMode === 'none') return;
-      const ctx = getAudioContext();
-      if (!ctx) return;
-      if (ctx.state === 'suspended') ctx.resume();
-
-      if (chimeMode === 'airport') {
-        playTone(349.23, 0.0, 0.45);
-        playTone(523.25, 0.32, 0.65);
-      } else if (chimeMode === 'hospital') {
-        playTone(440.00, 0.0, 0.55);
-      }
-    }
-
-    function unlockAudio() {
-      isAudioUnlocked = true;
-      const ctx = getAudioContext();
-      if (ctx) ctx.resume();
-
-      if ('speechSynthesis' in window) {
-        const silentUtter = new SpeechSynthesisUtterance('');
-        window.speechSynthesis.speak(silentUtter);
-      }
-
-      document.getElementById('audioUnlockBanner').style.display = 'none';
-      playCustomChime();
-    }
-
-    window.announceToken = function(num, name, counter) {
-      if (!('speechSynthesis' in window)) return;
-      window.speechSynthesis.cancel();
-
-      playCustomChime();
-
-      setTimeout(() => {
-        const splitNum = String(num).split('').join(' ');
-        const ctrVal = counter || 'A';
-
-        const engText = `Token number ${splitNum}, please proceed to Counter ${ctrVal}.`;
-        const uEng = new SpeechSynthesisUtterance(engText);
-        uEng.lang = 'en-IN';
-        uEng.rate = 0.88;
-        uEng.pitch = 1.0;
-
-        const inVoice = cachedVoices.find(v => v.lang === 'en-IN');
-        if (inVoice) uEng.voice = inVoice;
-
-        const tamText = `டோக்கன் எண் ${num}, கவுண்டர் ${ctrVal}-க்கு வரவும்.`;
-        const uTam = new SpeechSynthesisUtterance(tamText);
-        uTam.lang = 'ta-IN';
-        uTam.rate = 0.85;
-        uTam.pitch = 1.0;
-
-        const taVoice = cachedVoices.find(v => v.lang.includes('ta') || v.name.toLowerCase().includes('tamil'));
-        if (taVoice) uTam.voice = taVoice;
-
-        window.speechSynthesis.speak(uEng);
-        window.speechSynthesis.speak(uTam);
-      }, 700);
-    };
+    // Clock
+    setInterval(() => {
+      const now = new Date();
+      document.getElementById('tvLiveClock').textContent = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    }, 1000);
 
     window.addEventListener('load', async () => {
-      hk.applyDark();
       await initFirebase();
-      await loadHospitals();
+      await waitForFB();
+
+      // Check URL query param (?code=HOSP-XXXX or ?h=slug)
+      const params = new URLSearchParams(window.location.search);
+      const urlCode = params.get('code') || params.get('h');
+      const savedTvCode = localStorage.getItem('tokspot_tv_hospital_code');
+
+      if (urlCode) {
+        document.getElementById('tvCodeInput').value = urlCode;
+        launchDisplay();
+      } else if (savedTvCode) {
+        document.getElementById('tvCodeInput').value = savedTvCode;
+        launchDisplay();
+      }
     });
 
-    function toggleNursePanel() {
-      document.getElementById('nurseBar').classList.toggle('hidden');
+    async function launchDisplay() {
+      const rawCode = document.getElementById('tvCodeInput').value.trim();
+      const codeInput = rawCode.toUpperCase();
+      if (!codeInput) return showToast('Please enter Hospital Code.', true);
+
+      const btn = document.getElementById('btnLaunchTv');
+      btn.disabled = true;
+      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Checking...';
+
+      try {
+        await waitForFB();
+        let targetDoc = null;
+
+        // Check by hospitalCode field
+        const qCode = await window._fs.getDocs(
+          window._fs.query(
+            window._fs.collection(window._db, 'hospitals'),
+            window._fs.where('hospitalCode', '==', codeInput)
+          )
+        );
+        if (!qCode.empty) targetDoc = qCode.docs[0];
+
+        // Fallback check by legacy code field
+        if (!targetDoc) {
+          const qLegacy = await window._fs.getDocs(
+            window._fs.query(
+              window._fs.collection(window._db, 'hospitals'),
+              window._fs.where('code', '==', codeInput)
+            )
+          );
+          if (!qLegacy.empty) targetDoc = qLegacy.docs[0];
+        }
+
+        // Fallback by direct slug
+        if (!targetDoc) {
+          const directSnap = await window._fs.getDoc(window._fs.doc(window._db, 'hospitals', rawCode.toLowerCase()));
+          if (directSnap.exists()) targetDoc = directSnap;
+        }
+
+        if (!targetDoc) {
+          showToast('Invalid Hospital Code. Please check the code.', true);
+          return;
+        }
+
+        activeHospitalSlug = targetDoc.id;
+        const hData = targetDoc.data();
+
+        // Remember code on this TV so it auto-resumes after power cycle
+        localStorage.setItem('tokspot_tv_hospital_code', codeInput);
+
+        document.getElementById('tvHospName').textContent = hData.name || activeHospitalSlug;
+        document.getElementById('tvHospCode').textContent = hData.hospitalCode || codeInput;
+
+        document.getElementById('displayGate').classList.add('hidden');
+        document.getElementById('tvDashboard').classList.remove('hidden');
+
+        startTvRealtimeSync(activeHospitalSlug);
+
+      } catch (err) {
+        console.error(err);
+        showToast('Error launching TV: ' + err.message, true);
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fa-solid fa-play"></i> Launch';
+      }
     }
 
-    async function loadHospitals() {
-      await waitForFB();
-      if (!window._FB_READY) return;
-      try {
-        const snap = await window._fs.getDocs(window._fs.collection(window._db, 'hospitals'));
-        const sel = document.getElementById('hospitalSelect');
-        sel.classList.remove('hidden');
-        document.getElementById('chimeSelect').classList.remove('hidden');
+    function exitTvSession() {
+      if (!confirm('Disconnect this TV display from this hospital?')) return;
+      localStorage.removeItem('tokspot_tv_hospital_code');
+      if (unsubTvTokens) { unsubTvTokens(); unsubTvTokens = null; }
+      activeHospitalSlug = null;
+      document.getElementById('tvDashboard').classList.add('hidden');
+      document.getElementById('displayGate').classList.remove('hidden');
+      document.getElementById('tvCodeInput').value = '';
+    }
+
+    function startTvRealtimeSync(slug) {
+      if (unsubTvTokens) unsubTvTokens();
+      const today = window.todayStr ? window.todayStr() : new Date().toISOString().slice(0,10);
+
+      const q = window._fs.query(
+        window._fs.collection(window._db, 'hospitals', slug, 'tokens'),
+        window._fs.where('date', '==', today),
+        window._fs.where('status', 'in', ['waiting', 'called'])
+      );
+
+      unsubTvTokens = window._fs.onSnapshot(q, (snap) => {
+        let called = [];
+        let waiting = [];
 
         snap.docs.forEach(d => {
-          const h = d.data();
-          const o = document.createElement('option');
-          o.value = d.id;
-          o.textContent = (h.name || d.id) + (h.city ? ' — ' + h.city : '');
-          sel.appendChild(o);
+          const t = d.data();
+          t.id = d.id;
+          if (t.status === 'called') called.push(t);
+          else if (t.status === 'waiting') waiting.push(t);
         });
-        sel.addEventListener('change', initBoard);
-        if (snap.docs.length) {
-          sel.value = snap.docs[0].id;
-          initBoard();
+
+        // Sort called to get latest active
+        called.sort((a, b) => (b.updatedAt?.toMillis() || 0) - (a.updatedAt?.toMillis() || 0));
+        waiting.sort((a, b) => (b.priority ? 1 : 0) - (a.priority ? 1 : 0) || String(a.number).localeCompare(String(b.number)));
+
+        // Update Active Serving Hero
+        const active = called[0] || null;
+        if (active) {
+          document.getElementById('tvActiveNum').textContent = `#${active.number}`;
+          // Display privacy: only first name or masked name
+          document.getElementById('tvActivePatient').textContent = active.patientName || 'Patient';
+          document.getElementById('tvActiveDoctor').textContent = active.counter ? `Proceed to Counter ${active.counter}` : 'Proceed to Consultation Room';
+
+          // Chime if new token called
+          if (lastCalledTokenNum !== active.number) {
+            lastCalledTokenNum = active.number;
+            playTvChime();
+          }
+        } else {
+          document.getElementById('tvActiveNum').textContent = '—';
+          document.getElementById('tvActivePatient').textContent = 'Waiting for next call…';
+          document.getElementById('tvActiveDoctor').textContent = '';
         }
-      } catch (e) { console.error(e); }
-    }
 
-    function initBoard() {
-      const slug = document.getElementById('hospitalSelect').value;
-      if (!slug) return;
-      dispHospital = slug;
-      document.getElementById('nurseBar').classList.remove('hidden');
-      document.getElementById('bHospital').textContent = document.getElementById('hospitalSelect').options[document.getElementById('hospitalSelect').selectedIndex].textContent;
-      
-      if (!window._FB_READY) return;
-      window._fs.getDocs(window._fs.collection(window._db, 'hospitals', slug, 'doctors'))
-        .then(snap => {
-          hospitalDoctorsList = [];
-          const sel = document.getElementById('doctorSelect');
-          sel.classList.remove('hidden');
-          sel.innerHTML = '<option value="">All Doctors (Split View)</option>';
-          snap.docs.forEach(d => {
-            const doc = d.data();
-            doc.id = d.id;
-            if (doc.status === 'closed') return;
-            hospitalDoctorsList.push(doc);
-
-            const o = document.createElement('option');
-            o.value = d.id;
-            o.textContent = (doc.name || d.id) + (doc.department ? ' · ' + doc.department : '');
-            sel.appendChild(o);
-          });
-          sel.removeEventListener('change', onDoctorSel);
-          sel.addEventListener('change', onDoctorSel);
-          setupDoctor();
-        })
-        .catch(e => console.error(e));
-    }
-
-    function onDoctorSel() { setupDoctor(); }
-
-    function setupDoctor() {
-      const sel = document.getElementById('doctorSelect');
-      dispDoctor = sel.value || null;
-      const lbl = document.getElementById('bDoctor');
-
-      if (dispDoctor) {
-        document.getElementById('multiGridWrap').classList.add('hidden');
-        document.getElementById('singleDoctorWrap').classList.remove('hidden');
-        document.getElementById('hero').classList.remove('hidden');
-        document.getElementById('side').classList.remove('hidden');
-        document.getElementById('statsRow').classList.remove('hidden');
-        lbl.textContent = sel.options[sel.selectedIndex]?.textContent || 'Consultation';
-      } else {
-        document.getElementById('singleDoctorWrap').classList.add('hidden');
-        document.getElementById('multiGridWrap').classList.remove('hidden');
-      }
-      subscribe();
-    }
-
-    function subscribe() {
-      unsubs.forEach(u => u()); unsubs = [];
-      const base = window._fs.collection(window._db, 'hospitals', dispHospital, 'tokens');
-      let q;
-      if (dispDoctor) {
-        q = window._fs.query(base, window._fs.where('doctorId','==',dispDoctor));
-      } else {
-        q = window._fs.query(base, window._fs.limit(150));
-      }
-      unsubs.push(window._fs.onSnapshot(q, renderBoard, (e) => console.error("Snapshot error:", e)));
-    }
-
-    function renderBoard(snap) {
-      const allTokens = [];
-      snap.docs.forEach(d => {
-        const t = d.data();
-        t.docId = d.id;
-        allTokens.push(t);
-      });
-      latestLoadedTokens = allTokens;
-
-      if (!dispDoctor) {
-        renderMultiDoctorGrid(allTokens);
-        return;
-      }
-
-      // Single Doctor Hero Mode
-      const waiting = [], called = [], done = [];
-      allTokens.forEach(t => { 
-        const st = (t.status || '').toLowerCase();
-        if (st === 'waiting') waiting.push(t); 
-        else if (st === 'called' || st === 'calling' || st === 'serving') called.push(t); 
-        else if (st === 'completed' || st === 'served') done.push(t); 
-      });
-
-      waiting.sort((a,b) => (b.priority ? 1 : 0) - (a.priority ? 1 : 0) || String(a.number).localeCompare(String(b.number)));
-
-      document.getElementById('cntWaiting').textContent = waiting.length;
-      document.getElementById('cntCalled').textContent = called.length;
-      document.getElementById('cntDone').textContent = done.length;
-
-      currentServingDoc = called.length ? called[called.length - 1] : null;
-      nextWaitingDoc = waiting.length ? waiting[0] : null;
-
-      const curNum = currentServingDoc ? currentServingDoc.number : null;
-      const hero = document.getElementById('hero');
-      if (hero) hero.classList.toggle('emergency', !!(currentServingDoc && currentServingDoc.priority));
-
-      if (curNum && curNum !== prevCurrent) { 
-        prevCurrent = curNum; 
-        window.announceToken(curNum, currentServingDoc.patientName, currentServingDoc.counter); 
-      }
-
-      document.getElementById('bCurrent').textContent = curNum || '—';
-      document.getElementById('bPatient').textContent = currentServingDoc 
-        ? (currentServingDoc.priority ? '[EMERGENCY] ' : '') + (currentServingDoc.patientName || '') + (currentServingDoc.counter ? ' · Counter ' + currentServingDoc.counter : '') 
-        : (waiting.length ? waiting.length + ' patient(s) waiting' : 'No tokens waiting');
-
-      document.getElementById('bNext').textContent = nextWaitingDoc ? nextWaitingDoc.number : '—';
-      document.getElementById('bLast').textContent = done.length ? done[done.length - 1].number : '—';
-    }
-
-    // Render Multi-Doctor Room Grid with Quick Call Action
-    function renderMultiDoctorGrid(allTokens) {
-      const grid = document.getElementById('multiGridWrap');
-      if (!hospitalDoctorsList.length) {
-        grid.innerHTML = '<div class="empty" style="grid-column:1/-1;">No doctors configured.</div>';
-        return;
-      }
-
-      grid.innerHTML = hospitalDoctorsList.map(doc => {
-        // Matches doctor either by document id or doctor name
-        const docTokens = allTokens.filter(t => t.doctorId === doc.id || t.doctorId === doc.name);
-        const called = docTokens.filter(t => ['called', 'calling', 'serving'].includes((t.status || '').toLowerCase())).pop();
-        const waitingList = docTokens.filter(t => (t.status || '').toLowerCase() === 'waiting');
-        const isEmergency = called && called.priority;
-
-        return `
-          <div class="doc-grid-card ${called ? 'active' : ''} ${isEmergency ? 'emergency' : ''}">
-            <div class="dgc-top">
+        // Render Waiting list
+        const wList = document.getElementById('tvWaitingList');
+        if (waiting.length === 0) {
+          wList.innerHTML = '<div style="color:#64748b;font-weight:600;padding:20px;">No patients waiting in line.</div>';
+        } else {
+          wList.innerHTML = waiting.slice(0, 10).map(t => `
+            <div class="tv-token-chip ${t.priority ? 'priority' : ''}">
               <div>
-                <div class="dgc-title">${escHtml(doc.name || 'Doctor')}</div>
-                <div class="dgc-dept">${escHtml(doc.department || 'Consultation')}</div>
+                <div class="tv-chip-num">#${escHtml(t.number)}</div>
+                <div class="tv-chip-doc">${escHtml(t.patientName ? t.patientName.slice(0, 10) + '...' : 'Patient')}</div>
               </div>
-              <span class="dgc-badge"><i class="fa-solid fa-door-open"></i> Counter ${escHtml(doc.counter || 'A')}</span>
+              <span style="font-size:0.8rem;font-weight:800;color:${t.priority ? '#ef4444' : '#22c55e'};">
+                ${t.priority ? 'PRIORITY' : 'WAITING'}
+              </span>
             </div>
-            <div>
-              <div style="font-size:0.75rem;text-transform:uppercase;color:#64748b;text-align:center;font-weight:800;letter-spacing:1px;">Now Calling</div>
-              <div class="dgc-num" style="${isEmergency ? 'color:#dc2626;' : ''}">${called ? escHtml(called.number) : '—'}</div>
-              <div class="dgc-name">${called ? (isEmergency ? '[EMERGENCY] ' : '') + escHtml(called.patientName) : '<span style="color:#94a3b8;font-weight:400;">No active patient</span>'}</div>
-            </div>
-            <div class="dgc-footer">
-              <span><i class="fa-solid fa-users"></i> ${waitingList.length} in queue</span>
-              <button class="btn btn-green btn-sm" onclick="callDoctorSpecific('${doc.id}')" style="padding:4px 10px;font-size:0.8rem;">
-                <i class="fa-solid fa-forward"></i> Call Next
-              </button>
-            </div>
-          </div>
-        `;
-      }).join('');
+          `).join('');
+        }
+      });
     }
 
-    // Call Next Token specifically for a Doctor in Multi-Doctor Grid
-    async function callDoctorSpecific(docId) {
-      const waiting = latestLoadedTokens.filter(t => (t.doctorId === docId || t.doctorId === (hospitalDoctorsList.find(d=>d.id===docId)?.name)) && (t.status || '').toLowerCase() === 'waiting');
-      if (!waiting.length) return showToast('No waiting patients for this doctor.', true);
-
-      waiting.sort((a,b) => (b.priority ? 1 : 0) - (a.priority ? 1 : 0) || String(a.number).localeCompare(String(b.number)));
-      const nextToken = waiting[0];
-      const counterVal = document.getElementById('nurseCounter').value;
-
+    function playTvChime() {
       try {
-        await window._fs.updateDoc(window._fs.doc(window._db, 'hospitals', dispHospital, 'tokens', nextToken.docId), {
-          status: 'called',
-          counter: counterVal,
-          calledAt: window._fs.serverTimestamp()
-        });
-        showToast('Called Token ' + nextToken.number);
-        window.announceToken(nextToken.number, nextToken.patientName, counterVal);
-      } catch(e) {
-        showToast('Call failed: ' + e.message, true);
-      }
-    }
-
-    /* Top Nurse Desk Actions */
-    async function callNextToken() {
-      let target = null;
-      if (dispDoctor) {
-        const waiting = latestLoadedTokens.filter(t => t.doctorId === dispDoctor && (t.status || '').toLowerCase() === 'waiting');
-        if (waiting.length) target = waiting[0];
-      } else {
-        const waiting = latestLoadedTokens.filter(t => (t.status || '').toLowerCase() === 'waiting');
-        if (waiting.length) target = waiting[0];
-      }
-
-      if (!target) return showToast('No waiting patients found in queue.', true);
-
-      const counterVal = document.getElementById('nurseCounter').value;
-      try {
-        await window._fs.updateDoc(window._fs.doc(window._db, 'hospitals', dispHospital, 'tokens', target.docId), {
-          status: 'called',
-          counter: counterVal,
-          calledAt: window._fs.serverTimestamp()
-        });
-        showToast('Called Token ' + target.number);
-        window.announceToken(target.number, target.patientName, counterVal);
-      } catch (e) { showToast('Action failed: ' + e.message, true); }
-    }
-
-    function recallCurrent() {
-      if (!currentServingDoc) return showToast('No active token being served.', true);
-      const counterVal = document.getElementById('nurseCounter').value;
-      window.announceToken(currentServingDoc.number, currentServingDoc.patientName, counterVal);
-      showToast('Re-announced Token ' + currentServingDoc.number);
-    }
-
-    async function skipCurrentToken() {
-      if (!currentServingDoc) return showToast('No active token to skip.', true);
-      const tokenNum = currentServingDoc.number;
-      try {
-        await window._fs.updateDoc(window._fs.doc(window._db, 'hospitals', dispHospital, 'tokens', currentServingDoc.docId), {
-          status: 'skipped',
-          skippedAt: window._fs.serverTimestamp()
-        });
-        showToast('Token ' + tokenNum + ' skipped.');
-        setTimeout(callNextToken, 400);
-      } catch (e) { showToast('Skip failed: ' + e.message, true); }
-    }
-
-    async function markCurrentDone() {
-      if (!currentServingDoc) return showToast('No active token.', true);
-      try {
-        await window._fs.updateDoc(window._fs.doc(window._db, 'hospitals', dispHospital, 'tokens', currentServingDoc.docId), {
-          status: 'completed',
-          completedAt: window._fs.serverTimestamp()
-        });
-        showToast('Token ' + currentServingDoc.number + ' served.');
-      } catch (e) { showToast('Error: ' + e.message, true); }
+        const audio = document.getElementById('tvAudio');
+        if (audio) audio.play().catch(()=>{});
+      } catch(e){}
     }
   </script>
 </body>
