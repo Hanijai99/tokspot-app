@@ -27,11 +27,28 @@
     }
     .doc-radio.selected { border-color: var(--green); background: #f0fdf4; }
     .doc-radio input { display: none; }
+
+    /* Smart Search Dropdown Styles */
+    .search-wrapper { position: relative; }
+    .search-dropdown {
+      position: absolute; top: 100%; left: 0; right: 0; background: #ffffff;
+      border: 1px solid var(--line); border-radius: 12px; margin-top: 8px;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.1); max-height: 220px; overflow-y: auto; z-index: 50;
+    }
+    .search-item {
+      padding: 14px 16px; border-bottom: 1px solid var(--line); cursor: pointer;
+      transition: background 0.2s;
+    }
+    .search-item:hover { background: #f1f5f9; }
+    .search-item:last-child { border-bottom: none; }
     
     body.dark { background: #060b16; }
     body.dark .step-card { background: #121a2b; border-color: #24314a; }
     body.dark .doc-radio { border-color: #24314a; background: #0f172a; }
     body.dark .doc-radio.selected { border-color: var(--green); background: #052e16; }
+    body.dark .search-dropdown { background: #1e293b; border-color: #334155; }
+    body.dark .search-item { border-color: #334155; }
+    body.dark .search-item:hover { background: #0f172a; }
   </style>
 </head>
 <body>
@@ -46,21 +63,23 @@
 
   <div class="book-container">
 
-    <!-- STEP 1: Enter Hospital Code -->
+    <!-- STEP 1: Search Hospital Name or Enter Code -->
     <div class="step-card" id="stepCode">
       <div style="font-weight: 800; font-size: 1.2rem; margin-bottom: 6px;">
-        <i class="fa-solid fa-hospital" style="color:var(--green);margin-right:8px;"></i>Hospital Code
+        <i class="fa-solid fa-hospital" style="color:var(--green);margin-right:8px;"></i>Find Your Hospital
       </div>
       <div class="muted" style="font-size: 0.88rem; margin-bottom: 16px;">
-        Enter your 4 or 6-character Hospital Code provided by reception or your appointment slip.
+        Search by Hospital Name, City, or enter your 4-digit booking code.
       </div>
-      <div style="display: flex; gap: 8px;">
-        <input class="input" id="hospitalCodeInput" type="text" placeholder="e.g. HOSP-1234" style="font-weight:800; letter-spacing:1px; text-transform:uppercase;" />
-        <button class="btn btn-green" id="btnVerifyCode" onclick="verifyHospitalCode()"><i class="fa-solid fa-arrow-right"></i> Verify</button>
+      
+      <div class="search-wrapper">
+        <input class="input" id="hospitalSearchInput" type="text" placeholder="e.g. City Care or HOSP-1234" autocomplete="off" oninput="handleSearch()" style="font-weight:700; padding:14px 16px;" />
+        
+        <div id="searchResults" class="search-dropdown hidden"></div>
       </div>
     </div>
 
-    <!-- STEP 2: Choose Doctor & Enter Patient Details (Locked until verified) -->
+    <!-- STEP 2: Choose Doctor & Enter Patient Details -->
     <div class="step-card hidden" id="stepDetails">
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; border-bottom:1px dashed var(--line); padding-bottom:12px;">
         <div>
@@ -83,7 +102,7 @@
       </div>
 
       <div class="field">
-        <label class="label">Phone Number <span class="req">*</span> <span class="muted">(for SMS arrival alerts)</span></label>
+        <label class="label">Phone Number <span class="req">*</span> <span class="muted">(for arrival alerts)</span></label>
         <input class="input" id="patPhone" type="tel" maxlength="10" placeholder="10-digit mobile number" />
       </div>
 
@@ -92,7 +111,7 @@
       </button>
 
       <button class="btn btn-slate btn-block mt-10" onclick="resetHospitalSelection()" style="background:transparent;border:none;">
-        <i class="fa-solid fa-arrow-rotate-left"></i> Change Hospital Code
+        <i class="fa-solid fa-arrow-rotate-left"></i> Change Hospital
       </button>
     </div>
 
@@ -106,89 +125,99 @@
 
     let targetHospitalSlug = null;
     let selectedDoctorId = null;
+    let hospitalDirectory = [];
 
     window.addEventListener('load', async () => {
       await initFirebase();
       await waitForFB();
 
-      // Check if URL has ?code=XYZ (from QR scan or direct link)
+      // Load all hospitals quietly in background for fast searching
+      loadHospitalDirectory();
+
+      // Direct URL Booking Check (?code=XYZ)
       const params = new URLSearchParams(window.location.search);
       const urlCode = params.get('code') || params.get('h');
       if (urlCode) {
-        document.getElementById('hospitalCodeInput').value = urlCode;
-        verifyHospitalCode();
+        document.getElementById('hospitalSearchInput').value = urlCode;
+        setTimeout(() => handleSearch(true), 500); // Trigger search auto-select
       }
     });
 
-    async function verifyHospitalCode() {
-      const rawCode = document.getElementById('hospitalCodeInput').value.trim();
-      const codeInput = rawCode.toUpperCase();
-      if (!codeInput) return showToast('Please enter a Hospital Code.', true);
-
-      const btn = document.getElementById('btnVerifyCode');
-      btn.disabled = true;
-      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
-
+    async function loadHospitalDirectory() {
       try {
-        await waitForFB();
-        let targetDoc = null;
-
-        // 1. Check by field 'hospitalCode' (Standard from admin.html)
-        const qHospitalCode = await window._fs.getDocs(
-          window._fs.query(
-            window._fs.collection(window._db, 'hospitals'),
-            window._fs.where('hospitalCode', '==', codeInput)
-          )
-        );
-        if (!qHospitalCode.empty) {
-          targetDoc = qHospitalCode.docs[0];
-        }
-
-        // 2. Fallback: Check by field 'code'
-        if (!targetDoc) {
-          const qCode = await window._fs.getDocs(
-            window._fs.query(
-              window._fs.collection(window._db, 'hospitals'),
-              window._fs.where('code', '==', codeInput)
-            )
-          );
-          if (!qCode.empty) targetDoc = qCode.docs[0];
-        }
-
-        // 3. Fallback: Direct Document ID / Slug check
-        if (!targetDoc) {
-          const directSnap = await window._fs.getDoc(window._fs.doc(window._db, 'hospitals', rawCode.toLowerCase()));
-          if (directSnap.exists()) {
-            targetDoc = directSnap;
-          }
-        }
-
-        if (!targetDoc) {
-          showToast('Invalid Hospital Code. Please check the code in Admin Console.', true);
-          return;
-        }
-
-        targetHospitalSlug = targetDoc.id;
-        const hData = targetDoc.data();
-
-        // Render hospital header
-        document.getElementById('dispHospitalName').textContent = hData.name || targetHospitalSlug;
-        document.getElementById('dispHospitalCity').textContent = hData.city || 'Consultation Station';
-        document.getElementById('dispCodeTag').textContent = hData.hospitalCode || codeInput;
-
-        await loadDoctors(targetHospitalSlug);
-
-        // Switch Steps
-        document.getElementById('stepCode').classList.add('hidden');
-        document.getElementById('stepDetails').classList.remove('hidden');
-
+        const snap = await window._fs.getDocs(window._fs.collection(window._db, 'hospitals'));
+        hospitalDirectory = snap.docs.map(doc => {
+          const data = doc.data();
+          return {
+            id: doc.id,
+            name: data.name || doc.id,
+            city: data.city || '',
+            code: data.hospitalCode || data.code || ''
+          };
+        });
       } catch (err) {
-        console.error("Verification Error:", err);
-        showToast('Error validating code: ' + err.message, true);
-      } finally {
-        btn.disabled = false;
-        btn.innerHTML = '<i class="fa-solid fa-arrow-right"></i> Verify';
+        console.error("Directory load failed:", err);
       }
+    }
+
+    function handleSearch(autoSelectExact = false) {
+      const query = document.getElementById('hospitalSearchInput').value.trim().toLowerCase();
+      const resultsBox = document.getElementById('searchResults');
+      
+      if (query.length < 2) {
+        resultsBox.classList.add('hidden');
+        return;
+      }
+
+      const filtered = hospitalDirectory.filter(h => 
+        h.name.toLowerCase().includes(query) || 
+        h.city.toLowerCase().includes(query) || 
+        h.code.toLowerCase().includes(query)
+      );
+
+      if (filtered.length === 0) {
+        resultsBox.innerHTML = '<div class="search-item muted">No hospitals found matching your search.</div>';
+        resultsBox.classList.remove('hidden');
+        return;
+      }
+
+      // If came from QR code and exact match is found, auto-select it
+      if (autoSelectExact && filtered.length === 1 && filtered[0].code.toLowerCase() === query) {
+        selectHospital(filtered[0].id);
+        return;
+      }
+
+      resultsBox.innerHTML = filtered.map(h => `
+        <div class="search-item" onclick="selectHospital('${h.id}')">
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <div style="font-weight:700; color:var(--ink);">${escHtml(h.name)}</div>
+            <div style="font-size:0.75rem; font-weight:800; color:var(--green); background:var(--green-050); padding:2px 6px; border-radius:6px;">${escHtml(h.code)}</div>
+          </div>
+          <div class="muted" style="font-size:0.8rem; margin-top:2px;"><i class="fa-solid fa-location-dot"></i> ${escHtml(h.city || 'Consultation Clinic')}</div>
+        </div>
+      `).join('');
+      
+      resultsBox.classList.remove('hidden');
+    }
+
+    async function selectHospital(slug) {
+      document.getElementById('searchResults').classList.add('hidden');
+      
+      const hData = hospitalDirectory.find(h => h.id === slug);
+      if (!hData) return;
+
+      targetHospitalSlug = hData.id;
+
+      // Render header
+      document.getElementById('dispHospitalName').textContent = hData.name;
+      document.getElementById('dispHospitalCity').textContent = hData.city || 'Consultation Station';
+      document.getElementById('dispCodeTag').textContent = hData.code;
+
+      await loadDoctors(targetHospitalSlug);
+
+      // Switch Steps
+      document.getElementById('stepCode').classList.add('hidden');
+      document.getElementById('stepDetails').classList.remove('hidden');
     }
 
     async function loadDoctors(slug) {
@@ -229,7 +258,6 @@
           }
         });
       } catch (e) {
-        console.error(e);
         list.innerHTML = '<div class="muted">Could not load doctors list.</div>';
       }
     }
@@ -243,8 +271,10 @@
     function resetHospitalSelection() {
       targetHospitalSlug = null;
       selectedDoctorId = null;
+      document.getElementById('hospitalSearchInput').value = '';
       document.getElementById('stepDetails').classList.add('hidden');
       document.getElementById('stepCode').classList.remove('hidden');
+      document.getElementById('hospitalSearchInput').focus();
     }
 
     async function generatePatientToken() {
@@ -262,7 +292,6 @@
       try {
         const today = window.todayStr ? window.todayStr() : new Date().toISOString().slice(0,10);
         
-        // Count active tokens today for this doctor to assign next number
         const tokensColl = window._fs.collection(window._db, 'hospitals', targetHospitalSlug, 'tokens');
         const qToday = window._fs.query(
           tokensColl,
@@ -284,11 +313,9 @@
           createdAt: window._fs.serverTimestamp()
         });
 
-        // Instant redirect to isolated Digital Token Pass
         window.location.href = `token.html?id=${newTokenDoc.id}&h=${targetHospitalSlug}`;
 
       } catch (err) {
-        console.error(err);
         showToast('Token booking failed: ' + err.message, true);
         btn.disabled = false;
         btn.innerHTML = '<i class="fa-solid fa-ticket"></i> Confirm &amp; Get Live Token';
