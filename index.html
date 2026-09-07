@@ -53,7 +53,6 @@
       max-width: 480px;
     }
 
-    /* Primary Action Cards for Patients */
     .patient-actions {
       display: grid;
       grid-template-columns: 1fr;
@@ -116,7 +115,6 @@
     }
     .track-input-row button { border-radius: 12px; padding: 0 20px; }
 
-    /* Feature Highlights */
     .how-it-works {
       margin: 38px 0 20px;
       background: #ffffff;
@@ -139,56 +137,6 @@
     .hiw-step i { font-size: 1.4rem; color: var(--primary); display: block; margin-bottom: 8px; }
     .hiw-step b { display: block; color: var(--ink); margin-bottom: 2px; }
 
-    /* Protected Staff Section (Discreet at bottom) */
-    .staff-footer {
-      max-width: 520px;
-      margin: 34px auto 0;
-      text-align: center;
-      border-top: 1px dashed var(--line);
-      padding-top: 24px;
-    }
-    .staff-toggle-btn {
-      background: none;
-      border: none;
-      color: var(--slate-500);
-      font-size: 0.88rem;
-      font-weight: 700;
-      cursor: pointer;
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      padding: 6px 12px;
-      border-radius: 8px;
-      transition: color 0.2s, background 0.2s;
-    }
-    .staff-toggle-btn:hover { color: var(--ink); background: rgba(0,0,0,0.04); }
-
-    .staff-portal-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr 1fr;
-      gap: 10px;
-      margin-top: 16px;
-    }
-    .staff-link {
-      background: #ffffff;
-      border: 1px solid var(--line);
-      border-radius: 14px;
-      padding: 14px 10px;
-      text-decoration: none;
-      color: var(--ink);
-      font-size: 0.82rem;
-      font-weight: 700;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 6px;
-      box-shadow: var(--shadow);
-      transition: border-color 0.2s, transform 0.2s;
-    }
-    .staff-link:hover { border-color: var(--primary); transform: translateY(-2px); }
-    .staff-link i { font-size: 1.15rem; }
-
-    /* Dark Mode Styling */
     body.dark { background: #060b16; }
     body.dark .main-title { color: #f1f5f9; }
     body.dark .action-card { background: #121a2b; border-color: #24314a; }
@@ -197,7 +145,6 @@
     body.dark .how-it-works { background: #121a2b; border-color: #24314a; }
     body.dark .hiw-step b { color: #f1f5f9; }
     body.dark .hiw-step { color: #94a3b8; }
-    body.dark .staff-link { background: #121a2b; border-color: #24314a; color: #e2e8f0; }
     body.dark .track-input-row input { background: #0b1120; border-color: #24314a; }
 
     @media (max-width: 480px) {
@@ -205,7 +152,6 @@
       .hiw-grid { grid-template-columns: 1fr; gap: 16px; text-align: left; }
       .hiw-step { display: flex; align-items: center; gap: 14px; }
       .hiw-step i { margin-bottom: 0; }
-      .staff-portal-grid { grid-template-columns: 1fr; }
     }
   </style>
 </head>
@@ -264,7 +210,7 @@
 
     </div>
 
-    <!-- How it works explanation to guide crowd control -->
+    <!-- How it works explanation -->
     <div class="how-it-works">
       <div class="hiw-title">How TokSpot Saves Your Time</div>
       <div class="hiw-grid">
@@ -292,26 +238,11 @@
       </div>
     </div>
 
-    <!-- Discreet Hospital Operations / Staff Portals -->
-    <div class="staff-footer">
-      <button class="staff-toggle-btn" onclick="toggleStaffMenu()">
-        <i class="fa-solid fa-user-shield"></i> Hospital Staff &amp; Reception Portals <i class="fa-solid fa-angle-down"></i>
-      </button>
-
-      <div class="staff-portal-grid hidden" id="staffPortalMenu">
-        <a class="staff-link" href="doctor-login.html">
-          <i class="fa-solid fa-user-doctor" style="color:#16a34a;"></i>
-          <span>Doctor Desk</span>
-        </a>
-        <a class="staff-link" href="frontdesk.html">
-          <i class="fa-solid fa-clipboard-user" style="color:#0284c7;"></i>
-          <span>Front Desk</span>
-        </a>
-        <a class="staff-link" href="admin.html">
-          <i class="fa-solid fa-lock" style="color:#64748b;"></i>
-          <span>Admin Console</span>
-        </a>
-      </div>
+    <!-- Clean Staff Gate Link -->
+    <div style="text-align: center; margin-top: 36px; padding-top: 20px; border-top: 1px dashed var(--line);">
+      <a href="staff.html" style="font-size: 0.86rem; color: var(--slate-500); text-decoration: none; font-weight: 700; display: inline-flex; align-items: center; gap: 8px;">
+        <i class="fa-solid fa-hospital-user" style="color: var(--primary);"></i> Hospital Staff &amp; Doctor Workspace <i class="fa-solid fa-chevron-right" style="font-size: 0.75rem;"></i>
+      </a>
     </div>
 
   </div>
@@ -326,16 +257,10 @@
     }
     if (window.hk && hk.applyDark) hk.applyDark();
 
-    function toggleStaffMenu() {
-      const menu = document.getElementById('staffPortalMenu');
-      menu.classList.toggle('hidden');
-    }
-
     function trackToken(e) {
       e.preventDefault();
       const num = document.getElementById('tokenInput').value.trim();
       if (!num) return showToast('Please enter your token number', true);
-      // Redirects to private token pass status screen
       window.location.href = `token.html?t=${encodeURIComponent(num)}`;
     }
   </script>
