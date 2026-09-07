@@ -55,7 +55,7 @@
         Enter your 4 or 6-character Hospital Code provided by reception or your appointment slip.
       </div>
       <div style="display: flex; gap: 8px;">
-        <input class="input" id="hospitalCodeInput" type="text" placeholder="e.g. APL101" style="font-weight:800; letter-spacing:1px; text-transform:uppercase;" />
+        <input class="input" id="hospitalCodeInput" type="text" placeholder="e.g. HOSP-1234" style="font-weight:800; letter-spacing:1px; text-transform:uppercase;" />
         <button class="btn btn-green" id="btnVerifyCode" onclick="verifyHospitalCode()"><i class="fa-solid fa-arrow-right"></i> Verify</button>
       </div>
     </div>
@@ -111,7 +111,7 @@
       await initFirebase();
       await waitForFB();
 
-      // Check if URL has ?code=XYZ (e.g. from QR scan or direct link)
+      // Check if URL has ?code=XYZ (from QR scan or direct link)
       const params = new URLSearchParams(window.location.search);
       const urlCode = params.get('code') || params.get('h');
       if (urlCode) {
@@ -121,7 +121,8 @@
     });
 
     async function verifyHospitalCode() {
-      const codeInput = document.getElementById('hospitalCodeInput').value.trim().toUpperCase();
+      const rawCode = document.getElementById('hospitalCodeInput').value.trim();
+      const codeInput = rawCode.toUpperCase();
       if (!codeInput) return showToast('Please enter a Hospital Code.', true);
 
       const btn = document.getElementById('btnVerifyCode');
@@ -132,20 +133,38 @@
         await waitForFB();
         let targetDoc = null;
 
-        // Try checking if document ID matches the code
-        const directSnap = await window._fs.getDoc(window._fs.doc(window._db, 'hospitals', codeInput.toLowerCase()));
-        if (directSnap.exists()) {
-          targetDoc = directSnap;
-        } else {
-          // Query if hospital has custom field `hospitalCode`
-          const qSnap = await window._fs.getDocs(
-            window._fs.query(window._fs.collection(window._db, 'hospitals'), window._fs.where('code', '==', codeInput))
+        // 1. Check by field 'hospitalCode' (Standard from admin.html)
+        const qHospitalCode = await window._fs.getDocs(
+          window._fs.query(
+            window._fs.collection(window._db, 'hospitals'),
+            window._fs.where('hospitalCode', '==', codeInput)
+          )
+        );
+        if (!qHospitalCode.empty) {
+          targetDoc = qHospitalCode.docs[0];
+        }
+
+        // 2. Fallback: Check by field 'code'
+        if (!targetDoc) {
+          const qCode = await window._fs.getDocs(
+            window._fs.query(
+              window._fs.collection(window._db, 'hospitals'),
+              window._fs.where('code', '==', codeInput)
+            )
           );
-          if (!qSnap.empty) targetDoc = qSnap.docs[0];
+          if (!qCode.empty) targetDoc = qCode.docs[0];
+        }
+
+        // 3. Fallback: Direct Document ID / Slug check
+        if (!targetDoc) {
+          const directSnap = await window._fs.getDoc(window._fs.doc(window._db, 'hospitals', rawCode.toLowerCase()));
+          if (directSnap.exists()) {
+            targetDoc = directSnap;
+          }
         }
 
         if (!targetDoc) {
-          showToast('Invalid Hospital Code. Please verify with the hospital.', true);
+          showToast('Invalid Hospital Code. Please check the code in Admin Console.', true);
           return;
         }
 
@@ -155,7 +174,7 @@
         // Render hospital header
         document.getElementById('dispHospitalName').textContent = hData.name || targetHospitalSlug;
         document.getElementById('dispHospitalCity').textContent = hData.city || 'Consultation Station';
-        document.getElementById('dispCodeTag').textContent = codeInput;
+        document.getElementById('dispCodeTag').textContent = hData.hospitalCode || codeInput;
 
         await loadDoctors(targetHospitalSlug);
 
@@ -164,7 +183,7 @@
         document.getElementById('stepDetails').classList.remove('hidden');
 
       } catch (err) {
-        console.error(err);
+        console.error("Verification Error:", err);
         showToast('Error validating code: ' + err.message, true);
       } finally {
         btn.disabled = false;
@@ -176,38 +195,43 @@
       const list = document.getElementById('doctorOptionsList');
       list.innerHTML = '<div class="muted">Loading doctors...</div>';
 
-      const snap = await window._fs.getDocs(window._fs.collection(window._db, 'hospitals', slug, 'doctors'));
-      list.innerHTML = '';
+      try {
+        const snap = await window._fs.getDocs(window._fs.collection(window._db, 'hospitals', slug, 'doctors'));
+        list.innerHTML = '';
 
-      if (snap.empty) {
-        list.innerHTML = '<div class="empty">No doctors currently available for booking.</div>';
-        return;
-      }
-
-      let isFirst = true;
-      snap.docs.forEach(d => {
-        const doc = d.data();
-        if (doc.status === 'closed') return;
-
-        const div = document.createElement('div');
-        div.className = `doc-radio ${isFirst ? 'selected' : ''}`;
-        div.onclick = () => selectDoctor(d.id, div);
-
-        div.innerHTML = `
-          <input type="radio" name="docSelection" value="${d.id}" ${isFirst ? 'checked' : ''} />
-          <div style="flex:1;">
-            <div style="font-weight:700;font-size:0.95rem;">${escHtml(doc.name || 'Doctor')}</div>
-            <div class="muted" style="font-size:0.8rem;">${escHtml(doc.department || 'Consultation')}</div>
-          </div>
-          <span style="font-size:0.8rem;font-weight:700;color:var(--green);">Available</span>
-        `;
-        list.appendChild(div);
-
-        if (isFirst) {
-          selectedDoctorId = d.id;
-          isFirst = false;
+        if (snap.empty) {
+          list.innerHTML = '<div class="empty">No doctors currently available for booking.</div>';
+          return;
         }
-      });
+
+        let isFirst = true;
+        snap.docs.forEach(d => {
+          const doc = d.data();
+          if (doc.status === 'closed') return;
+
+          const div = document.createElement('div');
+          div.className = `doc-radio ${isFirst ? 'selected' : ''}`;
+          div.onclick = () => selectDoctor(d.id, div);
+
+          div.innerHTML = `
+            <input type="radio" name="docSelection" value="${d.id}" ${isFirst ? 'checked' : ''} />
+            <div style="flex:1;">
+              <div style="font-weight:700;font-size:0.95rem;">${escHtml(doc.name || 'Doctor')}</div>
+              <div class="muted" style="font-size:0.8rem;">${escHtml(doc.department || 'Consultation')}</div>
+            </div>
+            <span style="font-size:0.8rem;font-weight:700;color:var(--green);">Available</span>
+          `;
+          list.appendChild(div);
+
+          if (isFirst) {
+            selectedDoctorId = d.id;
+            isFirst = false;
+          }
+        });
+      } catch (e) {
+        console.error(e);
+        list.innerHTML = '<div class="muted">Could not load doctors list.</div>';
+      }
     }
 
     function selectDoctor(docId, element) {
