@@ -70,12 +70,17 @@
       font-size: 0.85rem;
     }
 
-    .active-actions {
-      display: flex;
-      gap: 8px;
-      justify-content: center;
-      flex-wrap: wrap;
-      margin-top: 14px;
+    /* Permanent Command Action Bar */
+    .command-bar {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 10px;
+      margin-top: 18px;
+    }
+    @media (max-width: 600px) {
+      .command-bar {
+        grid-template-columns: 1fr 1fr;
+      }
     }
   </style>
 </head>
@@ -83,7 +88,7 @@
   <div class="topbar">
     <a class="brand" href="index.html"><span class="logomark"><img src="logo.png" alt="TokSpot" /></span>TokSpot Front Desk</a>
     <span class="spacer"></span>
-    <button class="icn-btn" onclick="location.href='staff.html'" title="Staff Workspace"><i class="fa-solid fa-hospital-user"></i></button>
+    <button class="icn-btn" onclick="location.href='staff.html'" title="Staff Portal"><i class="fa-solid fa-hospital-user"></i></button>
     <button class="icn-btn" onclick="launchTvFromDesk()" title="Open Display Board"><i class="fa-solid fa-tv"></i></button>
     <button class="icn-btn" onclick="hk.toggleDark()"><i class="fa-solid fa-moon"></i></button>
   </div>
@@ -190,17 +195,26 @@
         </div>
       </div>
 
-      <!-- Now Serving Card (With Direct Recall, Skip & Done Buttons) -->
-      <div class="token-hero mt-16" style="padding:26px 16px;">
+      <!-- Now Serving Card With PERMANENT Command Controls -->
+      <div class="token-hero mt-16" style="padding:24px 16px;">
         <div class="t-label"><i class="fa-solid fa-bullhorn"></i> Now Serving</div>
         <div class="t-num" id="currentToken" style="font-size:4.6rem;">—</div>
-        <div class="t-name" id="currentPatient" style="font-size:1rem;">Waiting for next token…</div>
+        <div class="t-name" id="currentPatient" style="font-size:1.05rem;">Waiting for next token…</div>
 
-        <!-- Quick Actions for Currently Called Patient -->
-        <div class="active-actions" id="activeTokenActions" style="display:none;">
-          <button class="btn btn-green btn-sm" onclick="recallActiveToken()" title="Recall with voice"><i class="fa-solid fa-volume-high"></i> Recall (F8)</button>
-          <button class="btn btn-mint btn-sm" onclick="completeActiveToken()" title="Mark consultation done"><i class="fa-solid fa-check"></i> Done (F10)</button>
-          <button class="btn btn-slate btn-sm" onclick="skipActiveToken()" style="color:#b91c1c;" title="Move to absent list"><i class="fa-solid fa-user-xmark"></i> Absent / Skip (F9)</button>
+        <!-- ALWAYS VISIBLE DESK COMMAND BUTTONS -->
+        <div class="command-bar">
+          <button class="btn btn-green btn-lg" onclick="callNextWaiting()" title="Call the next patient in line">
+            <i class="fa-solid fa-bullhorn"></i> Call Next (F4)
+          </button>
+          <button class="btn btn-green btn-lg" onclick="recallActiveToken()" title="Repeat announcement for current patient">
+            <i class="fa-solid fa-volume-high"></i> Recall (F8)
+          </button>
+          <button class="btn btn-slate btn-lg" onclick="skipActiveToken()" style="color:#dc2626;border-color:#fca5a5;" title="Mark current patient absent and move to skipped list">
+            <i class="fa-solid fa-user-xmark"></i> Skip / Absent (F9)
+          </button>
+          <button class="btn btn-mint btn-lg" onclick="completeActiveToken()" title="Mark consultation completed">
+            <i class="fa-solid fa-check"></i> Done (F10)
+          </button>
         </div>
       </div>
 
@@ -269,6 +283,7 @@
     let unsubQueue = null;
     let lastIssuedTokenId = null;
     let currentlyServingToken = null;
+    let firstWaitingToken = null;
 
     function getAppBaseUrl() {
       return window.location.origin;
@@ -455,21 +470,19 @@
 
       // Active Called Token
       const activeCurrent = called.length ? called[called.length - 1] : null;
-      const actionsBar = document.getElementById('activeTokenActions');
+      firstWaitingToken = waiting.length ? waiting[0] : null;
 
       if (activeCurrent) {
         currentlyServingToken = activeCurrent;
         document.getElementById('currentToken').textContent = activeCurrent.number;
         document.getElementById('currentPatient').textContent = (activeCurrent.priority ? '[EMERGENCY] ' : '') + (activeCurrent.patientName || 'Patient') + (activeCurrent.counter ? ' · Counter ' + activeCurrent.counter : '');
-        actionsBar.style.display = 'flex';
       } else {
         currentlyServingToken = null;
         document.getElementById('currentToken').textContent = '—';
         document.getElementById('currentPatient').textContent = 'Waiting for next token…';
-        actionsBar.style.display = 'none';
       }
 
-      // 1. Waiting Queue List with Skip and Call actions
+      // Waiting Queue List with Skip and Call actions
       const empty = document.getElementById('queueEmpty');
       const list = document.getElementById('queueList');
       if (waiting.length === 0) {
@@ -501,7 +514,7 @@
         }).join('');
       }
 
-      // 2. Skipped / Absent List (Recovery Drawer)
+      // Skipped / Absent List (Recovery Drawer)
       const skipSec = document.getElementById('skippedSection');
       const skipList = document.getElementById('skippedList');
       if (skipped.length > 0) {
@@ -525,24 +538,31 @@
       }
     }
 
-    // Direct Action Helpers for Active Called Token
+    // Command Bar Actions
+    function callNextWaiting() {
+      if (firstWaitingToken) {
+        setStatus(firstWaitingToken.id, 'called');
+      } else {
+        showToast('No waiting patients in queue.', true);
+      }
+    }
+
     function recallActiveToken() {
       if (!currentlyServingToken) return showToast('No active token to recall.', true);
       playBeep(2);
-      if (window.announceToken) {
-        window.announceToken(currentlyServingToken.number, currentlyServingToken.patientName, currentlyServingToken.counter || 'A');
-      }
+      maybeAnnounce(currentlyServingToken.id);
       showToast(`Recalled Token #${currentlyServingToken.number}`);
     }
 
     function completeActiveToken() {
-      if (!currentlyServingToken) return;
+      if (!currentlyServingToken) return showToast('No active token to complete.', true);
       setStatus(currentlyServingToken.id, 'completed');
     }
 
     function skipActiveToken() {
-      if (!currentlyServingToken) return;
+      if (!currentlyServingToken) return showToast('No active token to skip.', true);
       setStatus(currentlyServingToken.id, 'skipped');
+      showToast(`Token #${currentlyServingToken.number} marked Absent/Skipped`);
     }
 
     async function recoverPatient(id) {
@@ -746,7 +766,7 @@
       }
     }
 
-    /* Receptionist Keyboard Shortcuts */
+    /* Keyboard Shortcuts */
     window.addEventListener('keydown', (e) => {
       const activeEl = document.activeElement;
       const activeTag = activeEl ? activeEl.tagName.toLowerCase() : '';
@@ -771,9 +791,7 @@
 
       if (e.key === 'F4') {
         e.preventDefault();
-        const callBtn = document.querySelector('#queueList .btn-green');
-        if (callBtn) { callBtn.click(); showToast('Calling next token (F4)...'); }
-        else { showToast('No waiting patients in queue.', true); }
+        callNextWaiting();
       }
 
       if (e.key === 'F8') {
