@@ -62,50 +62,80 @@
       color: #f1f5f9;
       border-color: #334155;
     }
+
+    .badge-code {
+      background: #dcfce7;
+      color: #15803d;
+      font-weight: 800;
+      padding: 4px 10px;
+      border-radius: 8px;
+      font-size: 0.85rem;
+      letter-spacing: 0.5px;
+    }
   </style>
 </head>
 <body>
   <div class="topbar">
-    <a class="brand" href="index.html"><span class="logomark"><img src="logo.png" alt="TokSpot" /></span>TokSpot</a>
+    <a class="brand" href="index.html"><span class="logomark"><img src="logo.png" alt="TokSpot" /></span>TokSpot Front Desk</a>
     <span class="spacer"></span>
-    <button class="icn-btn" onclick="location.href='index.html'" title="Home"><i class="fa-solid fa-house"></i></button>
-    <button class="icn-btn" onclick="location.href='book.html'" title="Patient Booking"><i class="fa-solid fa-ticket"></i></button>
-    <button class="icn-btn" onclick="location.href='display.html'" title="Board"><i class="fa-solid fa-tv"></i></button>
-    <button class="icn-btn" onclick="location.href='qr.html'" title="QR"><i class="fa-solid fa-qrcode"></i></button>
-    <button class="icn-btn" onclick="location.href='analytics.html'" title="Analytics"><i class="fa-solid fa-chart-column"></i></button>
+    <button class="icn-btn" onclick="location.href='staff.html'" title="Staff Workspace"><i class="fa-solid fa-hospital-user"></i></button>
+    <button class="icn-btn" onclick="location.href='display.html'" title="Waiting Board"><i class="fa-solid fa-tv"></i></button>
     <button class="icn-btn" onclick="hk.toggleDark()"><i class="fa-solid fa-moon"></i></button>
   </div>
 
   <div class="page wide">
-    <div class="hsub mt-12">Front Desk — Issue & manage tokens.</div>
+    <div class="hsub mt-12">Front Desk — Secure token issuance and queue desk.</div>
 
-    <section class="card mt-12" id="selectors">
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
-        <div class="field" style="margin:0;">
-          <label class="label">Hospital</label>
-          <select class="input" id="hospitalSelect" onchange="onHospital()">
-            <option value="">Choose…</option>
-          </select>
+    <!-- 1. Station Gate: Lock into Hospital using Code (No multi-hospital dropdown) -->
+    <section class="card mt-12" id="stationGate">
+      <div style="max-width:420px;margin:20px auto;text-align:center;">
+        <div style="width:56px;height:56px;border-radius:18px;background:var(--green-050);color:var(--green);display:flex;align-items:center;justify-content:center;font-size:1.6rem;margin:0 auto 14px;">
+          <i class="fa-solid fa-hospital"></i>
         </div>
-        <div class="field" style="margin:0;">
-          <label class="label">Doctor</label>
-          <select class="input" id="doctorSelect" onchange="onDoctor()" disabled>
-            <option value="">Choose…</option>
-          </select>
+        <div style="font-weight:800;font-size:1.25rem;">Front Desk Station Setup</div>
+        <p class="muted" style="font-size:0.86rem;margin:6px 0 18px;">Enter your Hospital Code to authorize and initialize this reception station.</p>
+        
+        <div style="display:flex;gap:8px;">
+          <input class="input" id="gateCodeInput" placeholder="e.g. HOSP-1234" style="text-transform:uppercase;font-weight:800;letter-spacing:1px;" />
+          <button class="btn btn-green" id="btnAuthStation" onclick="authStation()"><i class="fa-solid fa-check"></i> Authorize</button>
         </div>
       </div>
-      <div class="mt-16 center" id="pickMsg"><span class="muted">Pick a hospital to continue.</span></div>
     </section>
 
+    <!-- 2. Doctor Selector Section (Shown once hospital is authorized) -->
+    <section class="card mt-12 hidden" id="selectors">
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:16px;border-bottom:1px dashed var(--line);padding-bottom:12px;">
+        <div>
+          <div style="font-weight:800;font-size:1.15rem;color:var(--ink);" id="stationHospitalTitle">Hospital Station</div>
+          <div class="muted" style="font-size:0.82rem;" id="stationCitySubtitle">—</div>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <span class="badge-code" id="stationHospitalCode">HOSP-CODE</span>
+          <button class="btn btn-slate btn-sm" onclick="disconnectStation()"><i class="fa-solid fa-arrow-right-from-bracket"></i> Exit Station</button>
+        </div>
+      </div>
+
+      <div class="field" style="margin:0;">
+        <label class="label"><i class="fa-solid fa-user-doctor"></i> Active Consultation Doctor</label>
+        <select class="input" id="doctorSelect" onchange="onDoctor()">
+          <option value="">Select Doctor for this station…</option>
+        </select>
+      </div>
+      <div class="mt-14 center" id="pickMsg"><span class="muted">Select a doctor above to manage queue tokens.</span></div>
+    </section>
+
+    <!-- 3. Active Desk Panel -->
     <section class="hidden" id="desk">
       <!-- Issue New Token -->
       <div class="card">
         <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;">
-          <span style="width:38px;height:38px;border-radius:12px;background:var(--green-050);display:flex;align-items:center;justify-content:center;font-size:1.2rem;"><i class="fa-solid fa-ticket"></i></span>
-          <h2 style="font-size:1.05rem;font-weight:800;">Issue New Token</h2>
+          <span style="width:38px;height:38px;border-radius:12px;background:var(--green-050);color:var(--green);display:flex;align-items:center;justify-content:center;font-size:1.2rem;"><i class="fa-solid fa-ticket"></i></span>
+          <h2 style="font-size:1.05rem;font-weight:800;margin:0;">Issue New Token</h2>
+          <span class="spacer"></span>
+          <span class="chip gray" id="deskActiveDoctorLabel">Dr. Name</span>
         </div>
         <div class="field"><label class="label">Patient Name <span class="req">*</span></label><input class="input" id="newName" placeholder="Patient name" /></div>
-        <div class="field"><label class="label">Mobile <span class="muted">(for SMS/WhatsApp)</span></label><input class="input" id="newPhone" placeholder="10-digit mobile" maxlength="10" inputmode="numeric" /></div>
+        <div class="field"><label class="label">Mobile <span class="muted">(for arrival alerts)</span></label><input class="input" id="newPhone" placeholder="10-digit mobile" maxlength="10" inputmode="numeric" /></div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
           <div class="field" style="margin-bottom:0;">
             <label class="label">Type</label>
@@ -142,7 +172,7 @@
 
         <div class="btn-row mt-16">
           <button class="btn btn-green" id="btnIssue" onclick="issueToken()" style="flex:1;"><i class="fa-solid fa-ticket"></i> Issue Token</button>
-          <button class="btn btn-slate" onclick="location.href='qr.html'" title="QR Check-in"><i class="fa-solid fa-qrcode"></i></button>
+          <button class="btn btn-slate" onclick="resetDoctorSelection()"><i class="fa-solid fa-user-doctor"></i> Switch Doctor</button>
         </div>
 
         <!-- Keyboard Shortcuts Legend -->
@@ -191,7 +221,7 @@
       <h2 style="font-size:1.05rem;font-weight:800;margin:24px 0 12px;">Served Recently</h2>
       <div id="historyList"></div>
 
-      <button class="btn btn-ghost btn-block mt-24" onclick="resetDesk()"><i class="fa-solid fa-rotate-left"></i> Change Hospital / Doctor</button>
+      <button class="btn btn-ghost btn-block mt-24" onclick="resetDoctorSelection()"><i class="fa-solid fa-rotate-left"></i> Change Doctor</button>
     </section>
   </div>
 
@@ -231,7 +261,6 @@
     let unsubQueue = null;
     let lastIssuedTokenId = null;
 
-    // Helper: Dynamic Base URL for Live Tracking
     function getAppBaseUrl() {
       return window.location.origin;
     }
@@ -239,42 +268,109 @@
     window.addEventListener('load', async () => {
       hk.applyDark();
       await initFirebase();
-      await loadHospitals();
+      await waitForFB();
+
+      // Check URL parameters or stored session
+      const params = new URLSearchParams(window.location.search);
+      const urlCode = params.get('code') || params.get('h');
+      const savedCode = sessionStorage.getItem('tokspot_frontdesk_hospital');
+
+      if (urlCode) {
+        document.getElementById('gateCodeInput').value = urlCode;
+        authStation();
+      } else if (savedCode) {
+        document.getElementById('gateCodeInput').value = savedCode;
+        authStation();
+      }
     });
 
-    async function loadHospitals() {
-      await waitForFB();
-      if (!window._FB_READY) return;
+    // Authorize this front desk station to ONE isolated hospital
+    async function authStation() {
+      const rawCode = document.getElementById('gateCodeInput').value.trim();
+      const codeInput = rawCode.toUpperCase();
+      if (!codeInput) return showToast('Enter hospital code to authorize station.', true);
+
+      const btn = document.getElementById('btnAuthStation');
+      btn.disabled = true;
+      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Authorizing...';
+
       try {
-        const snap = await window._fs.getDocs(window._fs.collection(window._db, 'hospitals'));
-        const sel = document.getElementById('hospitalSelect');
-        sel.innerHTML = '<option value="">Choose…</option>';
-        snap.docs.forEach(d => {
-          const h = d.data();
-          const o = document.createElement('option');
-          o.value = d.id;
-          o.dataset.name = h.name || d.id;
-          o.textContent = (h.name || d.id) + (h.city ? ' — ' + h.city : '');
-          sel.appendChild(o);
-        });
-      } catch (e) { showToast('Failed to load: ' + e.message, true); }
+        await waitForFB();
+        let targetDoc = null;
+
+        // 1. Query by field 'hospitalCode'
+        const qHospitalCode = await window._fs.getDocs(
+          window._fs.query(
+            window._fs.collection(window._db, 'hospitals'),
+            window._fs.where('hospitalCode', '==', codeInput)
+          )
+        );
+        if (!qHospitalCode.empty) targetDoc = qHospitalCode.docs[0];
+
+        // 2. Fallback query by field 'code'
+        if (!targetDoc) {
+          const qCode = await window._fs.getDocs(
+            window._fs.query(
+              window._fs.collection(window._db, 'hospitals'),
+              window._fs.where('code', '==', codeInput)
+            )
+          );
+          if (!qCode.empty) targetDoc = qCode.docs[0];
+        }
+
+        // 3. Fallback direct document ID
+        if (!targetDoc) {
+          const directSnap = await window._fs.getDoc(window._fs.doc(window._db, 'hospitals', rawCode.toLowerCase()));
+          if (directSnap.exists()) targetDoc = directSnap;
+        }
+
+        if (!targetDoc) {
+          showToast('Invalid Hospital Code. Access denied.', true);
+          return;
+        }
+
+        currentHospital = targetDoc.id;
+        const hData = targetDoc.data();
+        currentHospitalName = hData.name || currentHospital;
+
+        sessionStorage.setItem('tokspot_frontdesk_hospital', codeInput);
+
+        // Populate station header
+        document.getElementById('stationHospitalTitle').textContent = currentHospitalName;
+        document.getElementById('stationCitySubtitle').textContent = hData.city ? `Station Location: ${hData.city}` : 'Reception Station';
+        document.getElementById('stationHospitalCode').textContent = hData.hospitalCode || codeInput;
+
+        await loadHospitalDoctors(currentHospital);
+
+        document.getElementById('stationGate').classList.add('hidden');
+        document.getElementById('selectors').classList.remove('hidden');
+
+      } catch (err) {
+        console.error(err);
+        showToast('Authorization error: ' + err.message, true);
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fa-solid fa-check"></i> Authorize';
+      }
     }
 
-    async function onHospital() {
-      const sel = document.getElementById('hospitalSelect');
-      currentHospital = sel.value;
-      currentHospitalName = sel.options[sel.selectedIndex]?.dataset?.name || 'TokSpot Hospital';
+    function disconnectStation() {
+      if (!confirm('Disconnect this station from this hospital?')) return;
+      sessionStorage.removeItem('tokspot_frontdesk_hospital');
+      currentHospital = null;
       currentDoctor = null;
-      document.getElementById('doctorSelect').innerHTML = '<option value="">Choose…</option>';
-      document.getElementById('doctorSelect').disabled = true;
+      if (unsubQueue) { unsubQueue(); unsubQueue = null; }
       document.getElementById('desk').classList.add('hidden');
-      if (!currentHospital) return;
-      document.getElementById('doctorSelect').disabled = false;
-      document.getElementById('pickMsg').innerHTML = '<span class="muted">Now choose a doctor.</span>';
-      if (!window._FB_READY) return;
+      document.getElementById('selectors').classList.add('hidden');
+      document.getElementById('stationGate').classList.remove('hidden');
+      document.getElementById('gateCodeInput').value = '';
+    }
+
+    async function loadHospitalDoctors(hospitalSlug) {
+      const ds = document.getElementById('doctorSelect');
+      ds.innerHTML = '<option value="">Select Doctor for this station…</option>';
       try {
-        const snap = await window._fs.getDocs(window._fs.collection(window._db, 'hospitals', currentHospital, 'doctors'));
-        const ds = document.getElementById('doctorSelect');
+        const snap = await window._fs.getDocs(window._fs.collection(window._db, 'hospitals', hospitalSlug, 'doctors'));
         snap.docs.forEach(d => {
           const doc = d.data();
           if (doc.status === 'closed') return;
@@ -284,14 +380,21 @@
           o.textContent = (doc.name || d.id) + (doc.department ? ' · ' + doc.department : '');
           ds.appendChild(o);
         });
-      } catch (e) { console.error(e); }
+      } catch (e) {
+        console.error(e);
+        showToast('Error loading doctors list: ' + e.message, true);
+      }
     }
 
     function onDoctor() {
       const ds = document.getElementById('doctorSelect');
       currentDoctor = ds.value;
       currentDoctorName = ds.options[ds.selectedIndex]?.dataset?.name || 'Doctor';
-      if (!currentDoctor) { document.getElementById('desk').classList.add('hidden'); return; }
+      if (!currentDoctor) {
+        document.getElementById('desk').classList.add('hidden');
+        return;
+      }
+      document.getElementById('deskActiveDoctorLabel').textContent = currentDoctorName;
       document.getElementById('selectors').classList.add('hidden');
       document.getElementById('desk').classList.remove('hidden');
       setupQueueListener();
@@ -299,7 +402,7 @@
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
 
-    function resetDesk() {
+    function resetDoctorSelection() {
       currentDoctor = null;
       document.getElementById('desk').classList.add('hidden');
       document.getElementById('selectors').classList.remove('hidden');
@@ -460,15 +563,13 @@
         playBeep(1);
         showToast('Token ' + tokenNum + ' issued');
 
-        // Optional 58mm Auto-Print Trigger
         if (document.getElementById('autoPrintSlip').checked) {
           triggerPrintSlip(tokenNum, name, counter, createdTokenId);
         }
 
-        // WhatsApp / SMS Live Tracker Trigger
         if (phone) {
-          const trackLink = `${getAppBaseUrl()}/track.html?h=${currentHospital}&t=${createdTokenId}`;
-          queueFreeSMS(phone, `TokSpot Alert: Hello ${name}, your Token #${tokenNum} is booked. Live status: ${trackLink}`);
+          const trackLink = `${getAppBaseUrl()}/token.html?id=${createdTokenId}&h=${currentHospital}`;
+          queueFreeSMS(phone, `TokSpot Alert: Hello ${name}, your Token #${tokenNum} is booked. Live pass: ${trackLink}`);
         }
       } catch (e) { showToast('Failed: ' + e.message, true); }
     }
@@ -484,7 +585,7 @@
       const now = new Date();
       document.getElementById('slpDate').textContent = now.toLocaleDateString();
       document.getElementById('slpTime').textContent = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-      document.getElementById('slpTrackUrl').textContent = `${getAppBaseUrl()}/track.html?h=${currentHospital}&t=${tokenId}`;
+      document.getElementById('slpTrackUrl').textContent = `${getAppBaseUrl()}/token.html?id=${tokenId}&h=${currentHospital}`;
 
       setTimeout(() => { window.print(); }, 200);
     }
@@ -509,8 +610,8 @@
           window._fs.getDoc(window._fs.doc(window._db, 'hospitals', currentHospital, 'tokens', id)).then(snap => {
             const t = snap.data();
             if (t && t.phone) {
-              const trackLink = `${getAppBaseUrl()}/track.html?h=${currentHospital}&t=${id}`;
-              queueFreeSMS(t.phone, `TokSpot Alert: Token #${t.number}, please proceed to Counter ${t.counter || 'A'}. Status: ${trackLink}`);
+              const trackLink = `${getAppBaseUrl()}/token.html?id=${id}&h=${currentHospital}`;
+              queueFreeSMS(t.phone, `TokSpot Alert: Token #${t.number}, please proceed to Counter ${t.counter || 'A'}. Track: ${trackLink}`);
             }
           });
         }
@@ -540,8 +641,8 @@
         let cleanPhone = String(t.phone).replace(/\D/g, '');
         if (cleanPhone.length === 10) cleanPhone = '91' + cleanPhone;
 
-        const trackUrl = `${getAppBaseUrl()}/track.html?h=${currentHospital}&t=${id}`;
-        const msg = `TokSpot Alert: Hello ${t.patientName}, your token ${t.number} is ready. Please proceed to Counter ${t.counter || 'A'}.\n\nLive Tracker: ${trackUrl}`;
+        const trackUrl = `${getAppBaseUrl()}/token.html?id=${id}&h=${currentHospital}`;
+        const msg = `TokSpot Alert: Hello ${t.patientName}, your token ${t.number} is ready. Please proceed to Counter ${t.counter || 'A'}.\n\nLive Pass: ${trackUrl}`;
         const text = encodeURIComponent(msg);
 
         const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
@@ -633,7 +734,6 @@
         }
       }
 
-      // Avoid shortcut conflicts while receptionist is typing text
       if (isInputFocused && !e.altKey && !e.key.startsWith('F')) return;
 
       // 2. F4: Call Next Patient
