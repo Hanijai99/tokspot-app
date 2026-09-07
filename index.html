@@ -73,37 +73,51 @@
     </div>
 
     <div class="role-cards">
+      <!-- Patient Portal -->
       <a class="role" href="book.html">
-        <div class="rt"><i class="fa-solid fa-user-doctor"></i></div>
+        <div class="rt"><i class="fa-solid fa-hospital-user"></i></div>
         <div class="rm">
           <div class="rt-tt">I'm a Patient</div>
           <div class="rt-sb">Book a token and track your position live.</div>
         </div>
         <span class="arrow"><i class="fa-solid fa-chevron-right"></i></span>
       </a>
+
+      <!-- Doctor Consultation Portal -->
+      <a class="role" href="doctor-login.html">
+        <div class="rt"><i class="fa-solid fa-user-doctor"></i></div>
+        <div class="rm">
+          <div class="rt-tt">Doctor Portal</div>
+          <div class="rt-sb">Sign in with Doctor Email or 4-digit Station PIN.</div>
+        </div>
+        <span class="arrow"><i class="fa-solid fa-chevron-right"></i></span>
+      </a>
+
+      <!-- Front Desk & Reception -->
       <a class="role" href="frontdesk.html">
         <div class="rt"><i class="fa-solid fa-building-columns"></i></div>
         <div class="rm">
           <div class="rt-tt">Front Desk</div>
-          <div class="rt-sb">Issue, call & manage queue tokens.</div>
+          <div class="rt-sb">Issue, call &amp; manage queue tokens.</div>
         </div>
         <span class="arrow"><i class="fa-solid fa-chevron-right"></i></span>
       </a>
+
+      <!-- Waiting Room Display Board -->
       <a class="role" href="display.html">
         <div class="rt"><i class="fa-solid fa-tv"></i></div>
         <div class="rm">
           <div class="rt-tt">Display Board</div>
-          <div class="rt-sb">Big-screen waiting room board.</div>
+          <div class="rt-sb">Big-screen waiting room board with voice calling.</div>
         </div>
         <span class="arrow"><i class="fa-solid fa-chevron-right"></i></span>
       </a>
-      <a class="role" href="admin.html">
-        <div class="rt"><i class="fa-solid fa-gear"></i></div>
-        <div class="rm">
-          <div class="rt-tt">Admin</div>
-          <div class="rt-sb">Manage hospitals, doctors & timings.</div>
-        </div>
-        <span class="arrow"><i class="fa-solid fa-chevron-right"></i></span>
+    </div>
+
+    <!-- Admin Link Relocated Out of Main Doctor Flow -->
+    <div style="text-align:center; margin-top:20px;">
+      <a href="admin.html" style="font-size:0.86rem; color:var(--slate-500); text-decoration:none; font-weight:700; display:inline-flex; align-items:center; gap:6px;">
+        <i class="fa-solid fa-shield-halved"></i> Hospital Admin Console
       </a>
     </div>
 
@@ -133,7 +147,6 @@
   <script>
     if ('serviceWorker' in navigator) { window.addEventListener('load', () => navigator.serviceWorker.register('/sw.js').catch(()=>{})); }
   </script>
-  <!-- Fixed Script Loading Order -->
   <script src="js/firebase-config.js"></script>
   <script src="js/app.js"></script>
   <script src="js/firebase.js"></script>
