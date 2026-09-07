@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
+  <title>Staff Portal — TokSpot</title>
+  <link rel="stylesheet" href="css/style.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+  <link rel="manifest" href="manifest.json" />
+  <link rel="icon" type="image/png" href="logo.png" />
+  <style>
+    body { background: #f8fafc; color: var(--ink); }
+    .portal-box { max-width: 440px; margin: 50px auto; padding: 0 16px; }
+    .role-grid { display: flex; flex-direction: column; gap: 12px; margin-top: 20px; }
+    .role-btn {
+      display: flex; align-items: center; gap: 14px; padding: 18px;
+      background: #ffffff; border: 1px solid var(--line); border-radius: 16px;
+      text-decoration: none; color: var(--ink); box-shadow: var(--shadow);
+      transition: border-color .2s, transform .2s;
+    }
+    .role-btn:hover { border-color: var(--green); transform: translateY(-2px); }
+    .role-icon {
+      width: 46px; height: 46px; border-radius: 12px; display: flex;
+      align-items: center; justify-content: center; font-size: 1.35rem; flex-shrink: 0;
+    }
+    body.dark { background: #060b16; }
+    body.dark .role-btn { background: #121a2b; border-color: #24314a; color: #f1f5f9; }
+  </style>
+</head>
+<body>
+
+  <div class="topbar">
+    <a class="brand" href="index.html">
+      <span class="logomark"><img src="logo.png" alt="TokSpot" /></span>TokSpot Staff
+    </a>
+    <span class="spacer"></span>
+    <button class="icn-btn" onclick="location.href='index.html'" title="Patient Home"><i class="fa-solid fa-house"></i></button>
+    <button class="icn-btn" onclick="hk.toggleDark()"><i class="fa-solid fa-moon"></i></button>
+  </div>
+
+  <div class="portal-box">
+    <div style="text-align:center;">
+      <div style="width:60px;height:60px;border-radius:18px;background:var(--green-050);color:var(--green);display:flex;align-items:center;justify-content:center;font-size:1.8rem;margin:0 auto 14px;">
+        <i class="fa-solid fa-hospital-user"></i>
+      </div>
+      <h1 style="font-size:1.6rem;font-weight:900;margin:0;">Hospital Workspace</h1>
+      <p class="muted" style="font-size:0.9rem;margin-top:6px;">Select your role to access your station.</p>
+    </div>
+
+    <div class="role-grid">
+      <!-- 1. Doctor Desk -->
+      <a class="role-btn" href="doctor-login.html">
+        <div class="role-icon" style="background:#dcfce7;color:#16a34a;"><i class="fa-solid fa-user-doctor"></i></div>
+        <div style="flex:1;">
+          <div style="font-weight:800;font-size:1rem;">Doctor Console</div>
+          <div class="muted" style="font-size:0.8rem;">PIN or email login to call patients</div>
+        </div>
+        <i class="fa-solid fa-chevron-right" style="color:var(--slate-400);"></i>
+      </a>
+
+      <!-- 2. Front Desk / Reception -->
+      <a class="role-btn" href="frontdesk.html">
+        <div class="role-icon" style="background:#e0f2fe;color:#0284c7;"><i class="fa-solid fa-building-columns"></i></div>
+        <div style="flex:1;">
+          <div style="font-weight:800;font-size:1rem;">Front Desk Reception</div>
+          <div class="muted" style="font-size:0.8rem;">Manual walk-in tokens &amp; desk call</div>
+        </div>
+        <i class="fa-solid fa-chevron-right" style="color:var(--slate-400);"></i>
+      </a>
+
+      <!-- 3. Waiting Room TV Display -->
+      <a class="role-btn" href="display.html">
+        <div class="role-icon" style="background:#fef3c7;color:#d97706;"><i class="fa-solid fa-tv"></i></div>
+        <div style="flex:1;">
+          <div style="font-weight:800;font-size:1rem;">Live Display Board</div>
+          <div class="muted" style="font-size:0.8rem;">Launch waiting hall screen &amp; voice calls</div>
+        </div>
+        <i class="fa-solid fa-chevron-right" style="color:var(--slate-400);"></i>
+      </a>
+
+      <!-- 4. Hospital Admin Console -->
+      <a class="role-btn" href="admin.html">
+        <div class="role-icon" style="background:#f1f5f9;color:#475569;"><i class="fa-solid fa-shield-halved"></i></div>
+        <div style="flex:1;">
+          <div style="font-weight:800;font-size:1rem;">Hospital Admin</div>
+          <div class="muted" style="font-size:0.8rem;">Doctors setup, Hospital Code &amp; Recovery</div>
+        </div>
+        <i class="fa-solid fa-chevron-right" style="color:var(--slate-400);"></i>
+      </a>
+    </div>
+  </div>
+
+  <script src="js/firebase-config.js"></script>
+  <script src="js/app.js"></script>
+  <script>
+    if (window.hk && hk.applyDark) hk.applyDark();
+  </script>
+</body>
+</html>
