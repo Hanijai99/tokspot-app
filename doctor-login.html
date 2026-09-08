@@ -76,7 +76,7 @@
     </div>
   </div>
 
-  <script src="js/firebase-config.js"></script>
+ <script src="js/firebase-config.js"></script>
   <script src="js/app.js"></script>
   <script src="js/firebase.js"></script>
   <script>
@@ -87,151 +87,172 @@
         if (typeof waitForFB === 'function') await waitForFB();
       } catch(e) {}
 
-      // Auto-populate hospital code from URL param or Session Storage
+      // Auto-populate hospital code from URL param or storage
       const urlCode = new URLSearchParams(window.location.search).get('code');
       const savedHosp = urlCode || sessionStorage.getItem('tokspot_frontdesk_hospital') || localStorage.getItem('tokspot_tv_hospital_code');
       if (savedHosp) document.getElementById('hospCode').value = savedHosp.toUpperCase();
     });
 
-    // Helper: Resolves Hospital cleanly across Codes, Slugs, or ID
-    async function resolveHospital(code) {
-      const cleanCode = code.toUpperCase().trim();
-      const codeNumOnly = cleanCode.replace(/^HOSP-?/i, '');
-
-      // 1. Check direct code match
-      let qHosp = await window._fs.getDocs(
-        window._fs.query(window._fs.collection(window._db, 'hospitals'), window._fs.where('hospitalCode', '==', cleanCode))
-      );
-      if (!qHosp.empty) return { slug: qHosp.docs[0].id, data: qHosp.docs[0].data() };
-
-      // 2. Check fallback code field
-      qHosp = await window._fs.getDocs(
-        window._fs.query(window._fs.collection(window._db, 'hospitals'), window._fs.where('code', '==', cleanCode))
-      );
-      if (!qHosp.empty) return { slug: qHosp.docs[0].id, data: qHosp.docs[0].data() };
-
-      // 3. Check partial number match (e.g. HOSP-1234 vs 1234)
-      const allHosp = await window._fs.getDocs(window._fs.collection(window._db, 'hospitals'));
-      const found = allHosp.docs.find(d => {
-        const data = d.data();
-        const c = (data.hospitalCode || data.code || '').toUpperCase();
-        return c === cleanCode || c.replace(/^HOSP-?/i, '') === codeNumOnly || d.id.toLowerCase() === cleanCode.toLowerCase();
-      });
-
-      if (found) return { slug: found.id, data: found.data() };
-      return null;
-    }
-
-    // Ensure client has read permissions
     async function ensureAuth() {
       if (!window._auth.currentUser) {
         try { await window._useAuth.signInAnonymously(window._auth); } catch(e){}
       }
     }
 
-    // 1. PIN Login with strict Hospital Isolation
+    // 1. PIN Login
     async function doctorPinLogin() {
-      const rawCode = document.getElementById('hospCode').value.trim();
+      const hospInput = document.getElementById('hospCode').value.trim().toUpperCase();
       const pin = document.getElementById('stationPin').value.trim();
       const btn = document.getElementById('btnPinLogin');
 
-      if (!rawCode) return showToast('Please enter Hospital Code.', true);
-      if (pin.length !== 4) return showToast('Enter your 4-digit Room PIN.', true);
+      if (!hospInput) return showToast('Please enter Hospital Code.', true);
+      if (pin.length !== 4) return showToast('Enter 4-digit PIN.', true);
 
       btn.disabled = true;
-      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Verifying...';
+      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Checking...';
 
       try {
         await ensureAuth();
-        const hospital = await resolveHospital(rawCode);
-        if (!hospital) return showToast('Invalid Hospital Code.', true);
 
-        // Fetch doctors inside this hospital
-        const snap = await window._fs.getDocs(
-          window._fs.collection(window._db, 'hospitals', hospital.slug, 'doctors')
+        // 1. All hospitals fetch (Bypasses query index requirements)
+        const hospSnap = await window._fs.getDocs(window._fs.collection(window._db, 'hospitals'));
+        if (hospSnap.empty) {
+          alert('No hospitals found in database! Please check Admin dashboard.');
+          return;
+        }
+
+        // Match Hospital Code or Slug
+        const cleanInput = hospInput.replace(/^HOSP-?/i, '');
+        const targetHospDoc = hospSnap.docs.find(d => {
+          const data = d.data();
+          const c = (data.hospitalCode || data.code || '').toUpperCase();
+          return c === hospInput || c.replace(/^HOSP-?/i, '') === cleanInput || d.id.toUpperCase() === hospInput;
+        });
+
+        if (!targetHospDoc) {
+          alert(`Hospital Code "${hospInput}" not found! Check your code in Admin page.`);
+          return;
+        }
+
+        const hospSlug = targetHospDoc.id;
+        const hospData = targetHospDoc.data();
+
+        // 2. Fetch doctors in subcollection
+        const docSnap = await window._fs.getDocs(
+          window._fs.collection(window._db, 'hospitals', hospSlug, 'doctors')
         );
 
-        if (snap.empty) {
-          return showToast('No doctors registered in this hospital.', true);
+        let matchedDoc = null;
+
+        if (!docSnap.empty) {
+          matchedDoc = docSnap.docs.find(d => String(d.data().pin).trim() === pin);
         }
 
-        // Match PIN (string safe comparison)
-        const doctorDoc = snap.docs.find(d => String(d.data().pin).trim() === pin);
-
-        if (!doctorDoc) {
-          return showToast('Invalid PIN for this hospital.', true);
+        // Fallback: Check root 'doctors' collection if admin saved there
+        if (!matchedDoc) {
+          try {
+            const rootDocSnap = await window._fs.getDocs(window._fs.collection(window._db, 'doctors'));
+            matchedDoc = rootDocSnap.docs.find(d => {
+              const dData = d.data();
+              return String(dData.pin).trim() === pin && (dData.hospitalSlug === hospSlug || !dData.hospitalSlug);
+            });
+          } catch(e) {}
         }
 
-        completeDoctorLogin(doctorDoc.id, doctorDoc.data(), hospital);
+        if (!matchedDoc) {
+          alert(`Wrong PIN! No doctor found with PIN "${pin}" in ${hospData.name || hospSlug}.`);
+          return;
+        }
+
+        completeDoctorLogin(matchedDoc.id, matchedDoc.data(), hospSlug, hospData);
+
       } catch (err) {
-        showToast('Login error: ' + err.message, true);
+        console.error('Login error details:', err);
+        alert('Firebase Error: ' + err.message + '\n\nIf this says permission-denied, check Firestore Security Rules.');
       } finally {
         btn.disabled = false;
         btn.innerHTML = '<i class="fa-solid fa-door-open"></i> Open Doctor Station';
       }
     }
 
-    // 2. Email & PIN Login (Matches doctor email and assigned PIN)
+    // 2. Email & PIN Login
     async function doctorEmailPinLogin() {
-      const rawCode = document.getElementById('hospCode').value.trim();
+      const hospInput = document.getElementById('hospCode').value.trim().toUpperCase();
       const emailOrName = document.getElementById('loginEmail').value.trim().toLowerCase();
       const pin = document.getElementById('loginPinAlt').value.trim();
       const btn = document.getElementById('btnEmailLogin');
 
-      if (!rawCode) return showToast('Please enter Hospital Code.', true);
+      if (!hospInput) return showToast('Please enter Hospital Code.', true);
       if (!emailOrName) return showToast('Enter doctor email or name.', true);
       if (pin.length !== 4) return showToast('Enter 4-digit PIN.', true);
 
       btn.disabled = true;
-      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Signing in...';
+      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Checking...';
 
       try {
         await ensureAuth();
-        const hospital = await resolveHospital(rawCode);
-        if (!hospital) return showToast('Invalid Hospital Code.', true);
 
-        const snap = await window._fs.getDocs(
-          window._fs.collection(window._db, 'hospitals', hospital.slug, 'doctors')
-        );
-
-        if (snap.empty) return showToast('No doctors found.', true);
-
-        const doctorDoc = snap.docs.find(d => {
-          const doc = d.data();
-          const dEmail = (doc.email || '').toLowerCase().trim();
-          const dName = (doc.name || '').toLowerCase().trim();
-          const dPin = String(doc.pin).trim();
-          return (dEmail === emailOrName || dName.includes(emailOrName)) && dPin === pin;
+        const hospSnap = await window._fs.getDocs(window._fs.collection(window._db, 'hospitals'));
+        const cleanInput = hospInput.replace(/^HOSP-?/i, '');
+        const targetHospDoc = hospSnap.docs.find(d => {
+          const data = d.data();
+          const c = (data.hospitalCode || data.code || '').toUpperCase();
+          return c === hospInput || c.replace(/^HOSP-?/i, '') === cleanInput || d.id.toUpperCase() === hospInput;
         });
 
-        if (!doctorDoc) {
-          return showToast('Doctor record or PIN does not match.', true);
+        if (!targetHospDoc) {
+          alert(`Hospital Code "${hospInput}" not found!`);
+          return;
         }
 
-        completeDoctorLogin(doctorDoc.id, doctorDoc.data(), hospital);
+        const hospSlug = targetHospDoc.id;
+        const hospData = targetHospDoc.data();
+
+        const docSnap = await window._fs.getDocs(
+          window._fs.collection(window._db, 'hospitals', hospSlug, 'doctors')
+        );
+
+        let matchedDoc = null;
+        if (!docSnap.empty) {
+          matchedDoc = docSnap.docs.find(d => {
+            const doc = d.data();
+            const dEmail = (doc.email || '').toLowerCase().trim();
+            const dName = (doc.name || '').toLowerCase().trim();
+            return (dEmail === emailOrName || dName.includes(emailOrName)) && String(doc.pin).trim() === pin;
+          });
+        }
+
+        if (!matchedDoc) {
+          alert('Doctor Email/Name or PIN does not match any record.');
+          return;
+        }
+
+        completeDoctorLogin(matchedDoc.id, matchedDoc.data(), hospSlug, hospData);
+
       } catch (err) {
-        showToast('Login error: ' + err.message, true);
+        console.error('Email Login Error:', err);
+        alert('Error: ' + err.message);
       } finally {
         btn.disabled = false;
         btn.innerHTML = '<i class="fa-solid fa-id-badge"></i> Sign In with Email & PIN';
       }
     }
 
-    function completeDoctorLogin(docId, docData, hospital) {
+    function completeDoctorLogin(docId, docData, hospSlug, hospData) {
       const activeDoctor = {
         id: docId,
         ...docData,
-        hospitalSlug: hospital.slug,
-        hospitalName: hospital.data.name || hospital.slug,
-        hospitalCode: hospital.data.hospitalCode || hospital.data.code
+        hospitalSlug: hospSlug,
+        hospitalName: hospData.name || hospSlug,
+        hospitalCode: hospData.hospitalCode || hospData.code || hospSlug
       };
 
       sessionStorage.setItem('activeDoctor', JSON.stringify(activeDoctor));
-      sessionStorage.setItem('tokspot_frontdesk_hospital', hospital.data.hospitalCode || hospital.slug);
+      sessionStorage.setItem('tokspot_frontdesk_hospital', activeDoctor.hospitalCode);
 
       showToast(`Welcome Dr. ${docData.name || ''}!`);
       setTimeout(() => {
-        window.location.href = `doctor.html?code=${encodeURIComponent(hospital.data.hospitalCode || hospital.slug)}`;
+        window.location.href = `doctor.html?code=${encodeURIComponent(activeDoctor.hospitalCode)}`;
       }, 400);
     }
   </script>
