@@ -9,7 +9,7 @@
   <link rel="manifest" href="manifest.json" />
   <link rel="icon" type="image/png" href="logo.png" />
   <style>
-    body { background: #060b16; color: #f8fafc; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; margin: 0; padding: 0; overflow-x: hidden; }
+    body { background: #060b16; color: #f8fafc; font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; margin: 0; padding: 0; overflow-x: hidden; }
     
     /* Setup Gate Card */
     .gate-container {
@@ -21,7 +21,7 @@
     /* TV Display Layout */
     .tv-screen { display: flex; flex-direction: column; min-height: 100vh; }
     .tv-header {
-      padding: 20px 32px; background: #0b1120; border-bottom: 2px solid #1e293b;
+      padding: 18px 32px; background: #0b1120; border-bottom: 2px solid #1e293b;
       display: flex; justify-content: space-between; align-items: center;
     }
     .tv-hospital-name { font-size: 1.8rem; font-weight: 900; letter-spacing: -0.5px; color: #22c55e; }
@@ -37,6 +37,7 @@
       background: #121a2b; border: 2px solid #16a34a; border-radius: 28px;
       padding: 32px; text-align: center; display: flex; flex-direction: column;
       justify-content: center; align-items: center; box-shadow: 0 0 50px rgba(34, 197, 94, 0.15);
+      position: relative;
     }
     .hero-badge {
       background: #16a34a; color: #ffffff; font-weight: 900; font-size: 1.1rem;
@@ -46,8 +47,8 @@
       font-size: 8rem; font-weight: 900; line-height: 1; margin: 20px 0 10px;
       color: #ffffff; letter-spacing: -4px;
     }
-    .hero-patient { font-size: 1.8rem; font-weight: 800; color: #cbd5e1; }
-    .hero-meta { font-size: 1.25rem; font-weight: 700; color: #22c55e; margin-top: 8px; }
+    .hero-patient { font-size: 2rem; font-weight: 800; color: #cbd5e1; }
+    .hero-meta { font-size: 1.4rem; font-weight: 800; color: #38bdf8; margin-top: 10px; }
 
     /* Upcoming / Waiting Grid */
     .queue-box {
@@ -60,7 +61,7 @@
     }
     .waiting-list {
       display: grid; grid-template-columns: 1fr 1fr; gap: 12px;
-      overflow-y: auto; max-height: 480px;
+      overflow-y: auto; max-height: 520px;
     }
     .tv-token-chip {
       background: #1e293b; border: 1px solid #334155; border-radius: 16px;
@@ -68,28 +69,41 @@
     }
     .tv-token-chip.priority { border-color: #ef4444; background: #2a1215; }
     .tv-chip-num { font-size: 1.8rem; font-weight: 900; color: #f8fafc; }
-    .tv-chip-doc { font-size: 0.82rem; font-weight: 700; color: #94a3b8; }
+    .tv-chip-doc { font-size: 0.88rem; font-weight: 700; color: #94a3b8; }
 
-    /* Fullscreen Exit Button */
-    .tv-ctrls { position: fixed; bottom: 16px; right: 16px; opacity: 0.2; transition: opacity 0.2s; }
+    /* Audio Enable Banner (Fixes Autoplay Restrictions) */
+    .audio-banner {
+      position: fixed; top: 12px; left: 50%; transform: translateX(-50%);
+      background: #f59e0b; color: #000; font-weight: 800; font-size: 0.88rem;
+      padding: 8px 18px; border-radius: 30px; cursor: pointer; z-index: 9999;
+      display: flex; align-items: center; gap: 8px; box-shadow: 0 4px 16px rgba(245,158,11,0.4);
+    }
+
+    /* Controls for Desk / Fullscreen */
+    .tv-ctrls { position: fixed; bottom: 16px; right: 16px; display: flex; gap: 8px; opacity: 0.25; transition: opacity 0.2s; }
     .tv-ctrls:hover { opacity: 1; }
 
     @media (max-width: 900px) {
       .tv-body { grid-template-columns: 1fr; }
-      .hero-token { font-size: 5rem; }
+      .hero-token { font-size: 5.5rem; }
     }
   </style>
 </head>
 <body>
 
-  <!-- STEP 1: Hospital Gate (Prevents loading random hospital) -->
+  <!-- Audio Unlock Banner for Browser Autoplay Compliance -->
+  <div id="audioUnlockPrompt" class="audio-banner hidden" onclick="unlockAudio()">
+    <i class="fa-solid fa-volume-high"></i> Click once to enable TV Audio & Voice Announcements
+  </div>
+
+  <!-- STEP 1: Hospital Gate (Auto-bypasses if code is in URL) -->
   <div id="displayGate" class="gate-container">
     <div style="width:60px;height:60px;border-radius:20px;background:rgba(34,197,94,0.15);color:#22c55e;display:flex;align-items:center;justify-content:center;font-size:1.8rem;margin:0 auto 16px;">
       <i class="fa-solid fa-tv"></i>
     </div>
     <h2 style="margin:0;font-size:1.4rem;font-weight:900;">Waiting Hall TV Screen</h2>
     <p class="muted" style="font-size:0.86rem;margin:8px 0 20px;color:#94a3b8;">
-      Enter your Hospital Code to link and launch this TV display screen.
+      Enter Hospital Code to display real-time waiting tokens and voice calls.
     </p>
 
     <div style="display:flex;gap:8px;">
@@ -100,11 +114,10 @@
 
   <!-- STEP 2: The TV Dashboard Screen -->
   <div id="tvDashboard" class="tv-screen hidden">
-    
     <div class="tv-header">
-      <div>
+      <div style="display:flex;align-items:center;gap:12px;">
         <span class="tv-hospital-name" id="tvHospName">Hospital Name</span>
-        <span style="background:rgba(34,197,94,0.15);color:#22c55e;font-size:0.78rem;font-weight:800;padding:3px 8px;border-radius:6px;margin-left:10px;" id="tvHospCode">HOSP-CODE</span>
+        <span style="background:rgba(34,197,94,0.15);color:#22c55e;font-size:0.82rem;font-weight:800;padding:4px 10px;border-radius:8px;" id="tvHospCode">HOSP-CODE</span>
       </div>
       <div class="tv-clock" id="tvLiveClock">--:--:--</div>
     </div>
@@ -122,14 +135,15 @@
       <div class="queue-box">
         <div class="queue-title"><i class="fa-solid fa-hourglass-half"></i> Next in Line (Waiting)</div>
         <div class="waiting-list" id="tvWaitingList">
-          <div style="color:#64748b;font-weight:600;padding:20px;">No patients waiting.</div>
+          <div style="color:#64748b;font-weight:600;padding:20px;">No patients waiting in line.</div>
         </div>
       </div>
     </div>
 
-    <!-- Small exit button for receptionists -->
+    <!-- Screen utilities -->
     <div class="tv-ctrls">
-      <button class="btn btn-slate btn-sm" onclick="exitTvSession()"><i class="fa-solid fa-power-off"></i> Disconnect TV</button>
+      <button class="btn btn-slate btn-sm" onclick="toggleFullscreen()"><i class="fa-solid fa-expand"></i> Fullscreen</button>
+      <button class="btn btn-slate btn-sm" onclick="exitTvSession()"><i class="fa-solid fa-power-off"></i> Disconnect</button>
     </div>
   </div>
 
@@ -141,33 +155,98 @@
   <script src="js/app.js"></script>
   <script src="js/firebase.js"></script>
   <script>
+    // Inline failsafes to guarantee zero ReferenceError crashes
+    window.escHtml = window.escHtml || function(s) {
+      return String(s == null ? '' : s)
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+    };
+
+    window.showToast = window.showToast || function(msg, isErr, ms) {
+      let w = document.getElementById('hkToastWrap');
+      if (!w) {
+        w = document.createElement('div');
+        w.id = 'hkToastWrap';
+        w.style.cssText = 'position:fixed;bottom:24px;left:50%;transform:translateX(-50%);z-index:99999;display:flex;flex-direction:column;gap:8px;align-items:center;pointer-events:none;';
+        document.body.appendChild(w);
+      }
+      const t = document.createElement('div');
+      t.style.cssText = `background:${isErr ? '#ef4444' : '#16a34a'};color:#fff;padding:12px 20px;border-radius:12px;font-weight:700;font-size:0.9rem;box-shadow:0 10px 25px rgba(0,0,0,0.2);transition:opacity 0.3s;`;
+      t.textContent = msg;
+      w.appendChild(t);
+      setTimeout(() => { t.style.opacity = '0'; setTimeout(() => t.remove(), 300); }, ms || 2500);
+    };
+
     let activeHospitalSlug = null;
     let unsubTvTokens = null;
-    let lastCalledTokenNum = null;
+    let lastCalledTokenKey = null;
+    let isAudioUnlocked = false;
 
-    // Clock
+    // Realtime Clock
     setInterval(() => {
       const now = new Date();
       document.getElementById('tvLiveClock').textContent = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
     }, 1000);
 
     window.addEventListener('load', async () => {
-      await initFirebase();
-      await waitForFB();
+      try {
+        if (typeof initFirebase === 'function') await initFirebase();
+        if (typeof waitForFB === 'function') await waitForFB();
+      } catch (e) {}
 
-      // Check URL query param (?code=HOSP-XXXX or ?h=slug)
+      // Check audio playback policy
+      checkAudioPolicy();
+
       const params = new URLSearchParams(window.location.search);
       const urlCode = params.get('code') || params.get('h');
       const savedTvCode = localStorage.getItem('tokspot_tv_hospital_code');
 
       if (urlCode) {
-        document.getElementById('tvCodeInput').value = urlCode;
+        document.getElementById('tvCodeInput').value = urlCode.toUpperCase();
         launchDisplay();
       } else if (savedTvCode) {
-        document.getElementById('tvCodeInput').value = savedTvCode;
+        document.getElementById('tvCodeInput').value = savedTvCode.toUpperCase();
         launchDisplay();
       }
     });
+
+    function checkAudioPolicy() {
+      const audio = document.getElementById('tvAudio');
+      if (!audio) return;
+      const promise = audio.play();
+      if (promise !== undefined) {
+        promise.then(() => {
+          audio.pause();
+          audio.currentTime = 0;
+          isAudioUnlocked = true;
+        }).catch(() => {
+          // Autoplay blocked by browser; show unlock banner
+          document.getElementById('audioUnlockPrompt').classList.remove('hidden');
+        });
+      }
+    }
+
+    function unlockAudio() {
+      const audio = document.getElementById('tvAudio');
+      if (audio) {
+        audio.play().then(() => {
+          audio.pause();
+          audio.currentTime = 0;
+        }).catch(() => {});
+      }
+      if ('speechSynthesis' in window) {
+        window.speechSynthesis.resume();
+      }
+      isAudioUnlocked = true;
+      document.getElementById('audioUnlockPrompt').classList.add('hidden');
+      showToast('Audio & Voice enabled for this screen');
+    }
+
+    async function ensureAuth() {
+      if (!window._auth.currentUser) {
+        try { await window._useAuth.signInAnonymously(window._auth); } catch (e) {}
+      }
+    }
 
     async function launchDisplay() {
       const rawCode = document.getElementById('tvCodeInput').value.trim();
@@ -176,47 +255,28 @@
 
       const btn = document.getElementById('btnLaunchTv');
       btn.disabled = true;
-      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Checking...';
+      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Initializing...';
 
       try {
-        await waitForFB();
-        let targetDoc = null;
+        await ensureAuth();
 
-        // Check by hospitalCode field
-        const qCode = await window._fs.getDocs(
-          window._fs.query(
-            window._fs.collection(window._db, 'hospitals'),
-            window._fs.where('hospitalCode', '==', codeInput)
-          )
-        );
-        if (!qCode.empty) targetDoc = qCode.docs[0];
+        const hospSnap = await window._fs.getDocs(window._fs.collection(window._db, 'hospitals'));
+        const cleanInput = codeInput.replace(/^HOSP-?/i, '');
 
-        // Fallback check by legacy code field
-        if (!targetDoc) {
-          const qLegacy = await window._fs.getDocs(
-            window._fs.query(
-              window._fs.collection(window._db, 'hospitals'),
-              window._fs.where('code', '==', codeInput)
-            )
-          );
-          if (!qLegacy.empty) targetDoc = qLegacy.docs[0];
-        }
-
-        // Fallback by direct slug
-        if (!targetDoc) {
-          const directSnap = await window._fs.getDoc(window._fs.doc(window._db, 'hospitals', rawCode.toLowerCase()));
-          if (directSnap.exists()) targetDoc = directSnap;
-        }
+        const targetDoc = hospSnap.docs.find(d => {
+          const data = d.data();
+          const c = (data.hospitalCode || data.code || '').toUpperCase();
+          return c === codeInput || c.replace(/^HOSP-?/i, '') === cleanInput || d.id.toUpperCase() === codeInput;
+        });
 
         if (!targetDoc) {
-          showToast('Invalid Hospital Code. Please check the code.', true);
+          showToast(`Hospital Code "${codeInput}" not found.`, true);
           return;
         }
 
         activeHospitalSlug = targetDoc.id;
         const hData = targetDoc.data();
 
-        // Remember code on this TV so it auto-resumes after power cycle
         localStorage.setItem('tokspot_tv_hospital_code', codeInput);
 
         document.getElementById('tvHospName').textContent = hData.name || activeHospitalSlug;
@@ -228,7 +288,7 @@
         startTvRealtimeSync(activeHospitalSlug);
 
       } catch (err) {
-        console.error(err);
+        console.error('Launch Error:', err);
         showToast('Error launching TV: ' + err.message, true);
       } finally {
         btn.disabled = false;
@@ -237,7 +297,7 @@
     }
 
     function exitTvSession() {
-      if (!confirm('Disconnect this TV display from this hospital?')) return;
+      if (!confirm('Disconnect this TV display from the current hospital?')) return;
       localStorage.removeItem('tokspot_tv_hospital_code');
       if (unsubTvTokens) { unsubTvTokens(); unsubTvTokens = null; }
       activeHospitalSlug = null;
@@ -246,14 +306,23 @@
       document.getElementById('tvCodeInput').value = '';
     }
 
+    function toggleFullscreen() {
+      if (!document.fullscreenElement) {
+        document.documentElement.requestFullscreen().catch(() => {});
+      } else {
+        if (document.exitFullscreen) document.exitFullscreen();
+      }
+    }
+
     function startTvRealtimeSync(slug) {
       if (unsubTvTokens) unsubTvTokens();
-      const today = window.todayStr ? window.todayStr() : new Date().toISOString().slice(0,10);
+      const today = window.todayStr ? window.todayStr() : new Date().toISOString().slice(0, 10);
 
+      const tokensRef = window._fs.collection(window._db, 'hospitals', slug, 'tokens');
       const q = window._fs.query(
-        window._fs.collection(window._db, 'hospitals', slug, 'tokens'),
+        tokensRef,
         window._fs.where('date', '==', today),
-        window._fs.where('status', 'in', ['waiting', 'called'])
+        window._fs.where('status', 'in', ['waiting', 'called', 'in-consultation'])
       );
 
       unsubTvTokens = window._fs.onSnapshot(q, (snap) => {
@@ -263,58 +332,98 @@
         snap.docs.forEach(d => {
           const t = d.data();
           t.id = d.id;
-          if (t.status === 'called') called.push(t);
-          else if (t.status === 'waiting') waiting.push(t);
+          if (t.status === 'called' || t.status === 'in-consultation') {
+            called.push(t);
+          } else if (t.status === 'waiting') {
+            waiting.push(t);
+          }
         });
 
-        // Sort called to get latest active
-        called.sort((a, b) => (b.updatedAt?.toMillis() || 0) - (a.updatedAt?.toMillis() || 0));
-        waiting.sort((a, b) => (b.priority ? 1 : 0) - (a.priority ? 1 : 0) || String(a.number).localeCompare(String(b.number)));
+        // Sort called tokens by calledAt timestamp (latest called takes Hero card)
+        called.sort((a, b) => {
+          const timeA = a.calledAt?.toMillis() || a.updatedAt?.toMillis() || 0;
+          const timeB = b.calledAt?.toMillis() || b.updatedAt?.toMillis() || 0;
+          return timeB - timeA;
+        });
 
-        // Update Active Serving Hero
+        // Numeric sort for waiting queue with priority override
+        waiting.sort((a, b) => {
+          if (b.priority && !a.priority) return 1;
+          if (!b.priority && a.priority) return -1;
+          return (Number(a.number) || 0) - (Number(b.number) || 0);
+        });
+
         const active = called[0] || null;
+
         if (active) {
           document.getElementById('tvActiveNum').textContent = `#${active.number}`;
-          // Display privacy: only first name or masked name
           document.getElementById('tvActivePatient').textContent = active.patientName || 'Patient';
-          document.getElementById('tvActiveDoctor').textContent = active.counter ? `Proceed to Counter ${active.counter}` : 'Proceed to Consultation Room';
+          
+          const counterLabel = active.counter || active.doctorName || 'Consultation Room';
+          document.getElementById('tvActiveDoctor').textContent = `Please proceed to: ${counterLabel}`;
 
-          // Chime if new token called
-          if (lastCalledTokenNum !== active.number) {
-            lastCalledTokenNum = active.number;
-            playTvChime();
+          // Unique identifier key to identify new calls or recalls
+          const currentCallKey = `${active.id}_${active.calledAt?.toMillis() || active.number}`;
+
+          if (lastCalledTokenKey !== currentCallKey) {
+            lastCalledTokenKey = currentCallKey;
+            handlePatientCallAudio(active.number, active.patientName, counterLabel);
           }
         } else {
           document.getElementById('tvActiveNum').textContent = '—';
-          document.getElementById('tvActivePatient').textContent = 'Waiting for next call…';
-          document.getElementById('tvActiveDoctor').textContent = '';
+          document.getElementById('tvActivePatient').textContent = 'Waiting for next token…';
+          document.getElementById('tvActiveDoctor').textContent = 'Consultation Desk Ready';
         }
 
-        // Render Waiting list
-        const wList = document.getElementById('tvWaitingList');
-        if (waiting.length === 0) {
-          wList.innerHTML = '<div style="color:#64748b;font-weight:600;padding:20px;">No patients waiting in line.</div>';
-        } else {
-          wList.innerHTML = waiting.slice(0, 10).map(t => `
-            <div class="tv-token-chip ${t.priority ? 'priority' : ''}">
-              <div>
-                <div class="tv-chip-num">#${escHtml(t.number)}</div>
-                <div class="tv-chip-doc">${escHtml(t.patientName ? t.patientName.slice(0, 10) + '...' : 'Patient')}</div>
-              </div>
-              <span style="font-size:0.8rem;font-weight:800;color:${t.priority ? '#ef4444' : '#22c55e'};">
-                ${t.priority ? 'PRIORITY' : 'WAITING'}
-              </span>
-            </div>
-          `).join('');
-        }
+        // Render upcoming queue list
+        renderWaitingList(waiting);
+      }, (err) => {
+        console.error('Realtime sync error:', err);
       });
     }
 
-    function playTvChime() {
-      try {
-        const audio = document.getElementById('tvAudio');
-        if (audio) audio.play().catch(()=>{});
-      } catch(e){}
+    function renderWaitingList(waiting) {
+      const wList = document.getElementById('tvWaitingList');
+      if (!waiting.length) {
+        wList.innerHTML = '<div style="color:#64748b;font-weight:600;padding:20px;">No patients waiting in line.</div>';
+        return;
+      }
+
+      wList.innerHTML = waiting.slice(0, 12).map(t => `
+        <div class="tv-token-chip ${t.priority ? 'priority' : ''}">
+          <div>
+            <div class="tv-chip-num">#${escHtml(t.number)}</div>
+            <div class="tv-chip-doc">${escHtml(t.patientName ? t.patientName.slice(0, 14) : 'Patient')}</div>
+          </div>
+          <span style="font-size:0.8rem;font-weight:800;color:${t.priority ? '#ef4444' : '#22c55e'};">
+            ${t.priority ? 'PRIORITY' : 'WAITING'}
+          </span>
+        </div>
+      `).join('');
+    }
+
+    function handlePatientCallAudio(tokenNum, patientName, counter) {
+      const audio = document.getElementById('tvAudio');
+      if (audio) {
+        audio.currentTime = 0;
+        audio.play().then(() => {
+          // Play chained bilingual voice announcement right after chime
+          setTimeout(() => {
+            if (window.announceToken) {
+              window.announceToken(tokenNum, patientName, counter);
+            }
+          }, 800);
+        }).catch(() => {
+          // Fallback directly to voice if browser blocks MP3 chime
+          if (window.announceToken) {
+            window.announceToken(tokenNum, patientName, counter);
+          }
+        });
+      } else {
+        if (window.announceToken) {
+          window.announceToken(tokenNum, patientName, counter);
+        }
+      }
     }
   </script>
 </body>
