@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>Register Hospital — TokSpot</title>
+  <link rel="stylesheet" href="css/style.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+  <link rel="icon" type="image/png" href="logo.png" />
+  <style>
+    body { background: #0b1120; color: #f8fafc; min-height: 100vh; font-family: system-ui, -apple-system, sans-serif; }
+    .signup-wrapper { max-width: 480px; margin: 40px auto; padding: 0 16px; }
+    .signup-card { background: #121a2b; border: 1px solid #24314a; border-radius: 24px; padding: 32px 26px; box-shadow: 0 20px 50px rgba(0,0,0,0.4); }
+    .signup-title { font-size: 1.6rem; font-weight: 900; text-align: center; color: #fff; margin-bottom: 6px; }
+    .signup-sub { font-size: 0.88rem; color: #94a3b8; text-align: center; margin-bottom: 24px; }
+    .form-group { margin-bottom: 16px; }
+    .form-group label { display: block; font-size: 0.84rem; font-weight: 700; color: #cbd5e1; margin-bottom: 6px; }
+    .form-control { width: 100%; padding: 13px 15px; border-radius: 12px; background: #060b16; border: 1px solid #24314a; color: #fff; box-sizing: border-box; font-size: 0.95rem; }
+    .form-control:focus { outline: none; border-color: #16a34a; }
+    .btn-submit { width: 100%; padding: 14px; border-radius: 12px; border: none; background: #16a34a; color: #fff; font-weight: 800; font-size: 1rem; cursor: pointer; display: flex; justify-content: center; align-items: center; gap: 8px; transition: transform 0.15s; }
+    .btn-submit:active { transform: scale(0.98); }
+    .success-box { text-align: center; padding: 10px 0; }
+    .code-badge { font-size: 2.2rem; font-weight: 900; letter-spacing: 2px; color: #22c55e; background: rgba(34,197,94,0.1); padding: 12px; border-radius: 14px; border: 1px dashed #16a34a; margin: 16px 0; }
+  </style>
+</head>
+<body>
+
+  <div class="topbar" style="background:#0b1120;border-bottom:1px solid #1e293b;">
+    <a class="brand" href="index.html" style="color:#22c55e;">
+      <span class="logomark"><img src="logo.png" alt="TokSpot" /></span>TokSpot Setup
+    </a>
+    <span class="spacer"></span>
+    <button class="icn-btn" onclick="location.href='admin.html'" title="Existing Admin Login" style="color:#cbd5e1;"><i class="fa-solid fa-right-to-bracket"></i> Login</button>
+  </div>
+
+  <div class="signup-wrapper">
+    <div class="signup-card" id="cardForm">
+      <div class="signup-title"><i class="fa-solid fa-hospital" style="color:#22c55e;"></i> Register Hospital</div>
+      <div class="signup-sub">Create your multi-room OPD queue management system</div>
+
+      <div class="form-group">
+        <label>Hospital or Clinic Name <span class="req">*</span></label>
+        <input type="text" id="hospName" class="form-control" placeholder="e.g. Apollo Speciality Clinic" required />
+      </div>
+
+      <div class="form-group">
+        <label>City / Branch <span class="req">*</span></label>
+        <input type="text" id="hospCity" class="form-control" placeholder="e.g. Chennai - T. Nagar" required />
+      </div>
+
+      <div class="form-group">
+        <label>Admin Email <span class="req">*</span></label>
+        <input type="email" id="adminEmail" class="form-control" placeholder="admin@hospital.com" required />
+      </div>
+
+      <div class="form-group">
+        <label>Set Admin Password <span class="req">*</span></label>
+        <input type="password" id="adminPassword" class="form-control" placeholder="Min. 6 characters" required />
+      </div>
+
+      <button id="btnRegister" class="btn-submit mt-16" onclick="registerHospital()">
+        <i class="fa-solid fa-bolt"></i> Create Hospital Station
+      </button>
+
+      <div style="text-align:center;margin-top:18px;font-size:0.85rem;color:#94a3b8;">
+        Already registered? <a href="admin.html" style="color:#22c55e;font-weight:700;text-decoration:none;">Go to Admin Dashboard</a>
+      </div>
+    </div>
+
+    <!-- Success Container (Shown after register) -->
+    <div class="signup-card hidden" id="cardSuccess">
+      <div class="success-box">
+        <div style="font-size:3rem;color:#22c55e;"><i class="fa-solid fa-circle-check"></i></div>
+        <h2 style="margin:10px 0 4px;font-size:1.4rem;">Hospital Registered!</h2>
+        <p style="color:#94a3b8;font-size:0.85rem;">Save your unique Hospital Code. Your staff and TV display will use this code to link.</p>
+
+        <div class="code-badge" id="displayHospCode">HOSP-XXXX</div>
+
+        <div style="display:flex;flex-direction:column;gap:10px;margin-top:20px;">
+          <button class="btn btn-green btn-block" onclick="goToAdminDashboard()">
+            <i class="fa-solid fa-gauge-high"></i> Go to Admin Dashboard & Add Doctors
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="js/firebase-config.js"></script>
+  <script src="js/app.js"></script>
+  <script src="js/firebase.js"></script>
+  <script>
+    window.showToast = window.showToast || function(msg, isErr) {
+      alert(msg);
+    };
+
+    let generatedCode = '';
+    let generatedSlug = '';
+
+    window.addEventListener('load', async () => {
+      try {
+        if (typeof initFirebase === 'function') await initFirebase();
+        if (typeof waitForFB === 'function') await waitForFB();
+      } catch(e){}
+    });
+
+    async function registerHospital() {
+      const name = document.getElementById('hospName').value.trim();
+      const city = document.getElementById('hospCity').value.trim();
+      const email = document.getElementById('adminEmail').value.trim().toLowerCase();
+      const password = document.getElementById('adminPassword').value.trim();
+      const btn = document.getElementById('btnRegister');
+
+      if (!name) return alert('Please enter Hospital Name');
+      if (!city) return alert('Please enter City or Branch');
+      if (!email) return alert('Please enter valid Admin Email');
+      if (!password || password.length < 6) return alert('Password must be at least 6 characters');
+
+      btn.disabled = true;
+      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Creating Station...';
+
+      try {
+        // 1. Create Firebase Auth Account for Admin
+        let userCred;
+        try {
+          userCred = await window._useAuth.createUserWithEmailAndPassword(window._auth, email, password);
+        } catch (authErr) {
+          if (authErr.code === 'auth/email-already-in-use') {
+            throw new Error('Email already registered! Please sign in at admin.html.');
+          }
+          throw authErr;
+        }
+
+        const adminUid = userCred.user.uid;
+
+        // 2. Generate Random 4-digit Hospital Code & URL Slug
+        const randomNum = Math.floor(1000 + Math.random() * 9000);
+        generatedCode = `HOSP-${randomNum}`;
+        generatedSlug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || `hosp-${randomNum}`;
+
+        // 3. Save Hospital in Firestore
+        const hospDocRef = window._fs.doc(window._db, 'hospitals', generatedSlug);
+        await window._fs.setDoc(hospDocRef, {
+          name: name,
+          city: city,
+          hospitalCode: generatedCode,
+          code: generatedCode,
+          adminEmail: email,
+          adminUid: adminUid,
+          createdAt: window._fs.serverTimestamp(),
+          status: 'active'
+        });
+
+        // 4. Show Success Screen
+        document.getElementById('displayHospCode').textContent = generatedCode;
+        document.getElementById('cardForm').classList.add('hidden');
+        document.getElementById('cardSuccess').classList.remove('hidden');
+
+        // Store active session
+        sessionStorage.setItem('tokspot_admin_hospital', generatedCode);
+        sessionStorage.setItem('tokspot_frontdesk_hospital', generatedCode);
+
+      } catch (err) {
+        console.error('Registration Error:', err);
+        alert('Error: ' + err.message);
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fa-solid fa-bolt"></i> Create Hospital Station';
+      }
+    }
+
+    function goToAdminDashboard() {
+      window.location.href = `admin.html?code=${encodeURIComponent(generatedCode)}`;
+    }
+  </script>
+</body>
+</html>
