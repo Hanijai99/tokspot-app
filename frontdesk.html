@@ -275,6 +275,51 @@
   <script src="js/app.js"></script>
   <script src="js/firebase.js"></script>
   <script>
+    // Failsafe escHtml helper
+    window.escHtml = window.escHtml || function(s) {
+      return String(s == null ? '' : s)
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+    };
+
+    // Failsafe toast
+    window.showToast = window.showToast || function(msg, isErr, ms) {
+      let w = document.getElementById('hkToastWrap');
+      if (!w) {
+        w = document.createElement('div');
+        w.id = 'hkToastWrap';
+        w.style.cssText = 'position:fixed;bottom:24px;left:50%;transform:translateX(-50%);z-index:99999;display:flex;flex-direction:column;gap:8px;align-items:center;pointer-events:none;';
+        document.body.appendChild(w);
+      }
+      const t = document.createElement('div');
+      t.style.cssText = `background:${isErr ? '#ef4444' : '#16a34a'};color:#fff;padding:12px 20px;border-radius:12px;font-weight:700;font-size:0.9rem;box-shadow:0 10px 25px rgba(0,0,0,0.2);transition:opacity 0.3s;`;
+      t.textContent = msg;
+      w.appendChild(t);
+      setTimeout(() => { t.style.opacity = '0'; setTimeout(() => t.remove(), 300); }, ms || 2500);
+    };
+
+    // Failsafe pad3 helper
+    window.pad3 = window.pad3 || function(n) {
+      return String(n).padStart(3, '0');
+    };
+
+    // Failsafe audio chime/beep helper
+    window.playBeep = window.playBeep || function() {
+      try {
+        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(587.33, ctx.currentTime);
+        gain.gain.setValueAtTime(0.1, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.3);
+        osc.start();
+        osc.stop(ctx.currentTime + 0.3);
+      } catch (e) {}
+    };
+
     let currentHospital = null;
     let currentHospitalCode = null;
     let currentHospitalName = 'Hospital';
@@ -297,20 +342,28 @@
       }
     }
 
+    async function ensureAuth() {
+      if (!window._auth.currentUser) {
+        try { await window._useAuth.signInAnonymously(window._auth); } catch (e) {}
+      }
+    }
+
     window.addEventListener('load', async () => {
       if (window.hk && hk.applyDark) hk.applyDark();
-      await initFirebase();
-      await waitForFB();
+      try {
+        if (typeof initFirebase === 'function') await initFirebase();
+        if (typeof waitForFB === 'function') await waitForFB();
+      } catch (e) {}
 
       const params = new URLSearchParams(window.location.search);
       const urlCode = params.get('code') || params.get('h');
       const savedCode = sessionStorage.getItem('tokspot_frontdesk_hospital');
 
       if (urlCode) {
-        document.getElementById('gateCodeInput').value = urlCode;
+        document.getElementById('gateCodeInput').value = urlCode.toUpperCase();
         authStation();
       } else if (savedCode) {
-        document.getElementById('gateCodeInput').value = savedCode;
+        document.getElementById('gateCodeInput').value = savedCode.toUpperCase();
         authStation();
       }
     });
@@ -325,31 +378,16 @@
       btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Authorizing...';
 
       try {
-        await waitForFB();
-        let targetDoc = null;
+        await ensureAuth();
 
-        const qHospitalCode = await window._fs.getDocs(
-          window._fs.query(
-            window._fs.collection(window._db, 'hospitals'),
-            window._fs.where('hospitalCode', '==', codeInput)
-          )
-        );
-        if (!qHospitalCode.empty) targetDoc = qHospitalCode.docs[0];
+        const hospSnap = await window._fs.getDocs(window._fs.collection(window._db, 'hospitals'));
+        const cleanInput = codeInput.replace(/^HOSP-?/i, '');
 
-        if (!targetDoc) {
-          const qCode = await window._fs.getDocs(
-            window._fs.query(
-              window._fs.collection(window._db, 'hospitals'),
-              window._fs.where('code', '==', codeInput)
-            )
-          );
-          if (!qCode.empty) targetDoc = qCode.docs[0];
-        }
-
-        if (!targetDoc) {
-          const directSnap = await window._fs.getDoc(window._fs.doc(window._db, 'hospitals', rawCode.toLowerCase()));
-          if (directSnap.exists()) targetDoc = directSnap;
-        }
+        const targetDoc = hospSnap.docs.find(d => {
+          const data = d.data();
+          const c = (data.hospitalCode || data.code || '').toUpperCase();
+          return c === codeInput || c.replace(/^HOSP-?/i, '') === cleanInput || d.id.toUpperCase() === codeInput;
+        });
 
         if (!targetDoc) {
           showToast('Invalid Hospital Code. Access denied.', true);
@@ -361,7 +399,7 @@
         currentHospitalName = hData.name || currentHospital;
         currentHospitalCode = hData.hospitalCode || codeInput;
 
-        sessionStorage.setItem('tokspot_frontdesk_hospital', codeInput);
+        sessionStorage.setItem('tokspot_frontdesk_hospital', currentHospitalCode);
 
         document.getElementById('stationHospitalTitle').textContent = currentHospitalName;
         document.getElementById('stationCitySubtitle').textContent = hData.city ? `Station: ${hData.city}` : 'Reception Station';
@@ -405,6 +443,7 @@
           const o = document.createElement('option');
           o.value = d.id;
           o.dataset.name = doc.name || d.id;
+          o.dataset.room = doc.department || doc.counter || doc.room || 'Counter A';
           o.textContent = (doc.name || d.id) + (doc.department ? ' · ' + doc.department : '');
           ds.appendChild(o);
         });
@@ -417,14 +456,18 @@
     function onDoctor() {
       const ds = document.getElementById('doctorSelect');
       currentDoctor = ds.value;
-      currentDoctorName = ds.options[ds.selectedIndex]?.dataset?.name || 'Doctor';
+      const selectedOption = ds.options[ds.selectedIndex];
+      currentDoctorName = selectedOption?.dataset?.name || 'Doctor';
+      
       if (!currentDoctor) {
         document.getElementById('desk').classList.add('hidden');
         return;
       }
+
       document.getElementById('deskActiveDoctorLabel').textContent = currentDoctorName;
       document.getElementById('selectors').classList.add('hidden');
       document.getElementById('desk').classList.remove('hidden');
+      
       setupQueueListener();
       loadHistory();
       window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -440,49 +483,66 @@
 
     function setupQueueListener() {
       if (unsubQueue) unsubQueue();
-      const today = window.todayStr ? window.todayStr() : new Date().toISOString().slice(0,10);
-      unsubQueue = window._fs.onSnapshot(
-        window._fs.query(
-          window._fs.collection(window._db, 'hospitals', currentHospital, 'tokens'),
-          window._fs.where('doctorId','==',currentDoctor),
-          window._fs.where('date','==',today),
-          window._fs.where('status','in',['waiting','called','skipped'])
-        ),
-        (snap) => renderQueue(snap),
-        (e) => console.error(e)
+      const today = window.todayStr ? window.todayStr() : new Date().toISOString().slice(0, 10);
+      
+      // Index-safe listener: Query date only, filter memory-side for maximum reliability
+      const q = window._fs.query(
+        window._fs.collection(window._db, 'hospitals', currentHospital, 'tokens'),
+        window._fs.where('date', '==', today)
       );
+
+      unsubQueue = window._fs.onSnapshot(q, (snap) => renderQueue(snap), (e) => {
+        console.error('Queue snapshot error:', e);
+      });
     }
 
     function renderQueue(snap) {
       const waiting = [], called = [], skipped = [];
+      
       snap.docs.forEach(d => {
-        const t = d.data(); t.id = d.id;
-        if (t.status === 'waiting') waiting.push(t);
-        else if (t.status === 'called') called.push(t);
-        else if (t.status === 'skipped') skipped.push(t);
+        const t = d.data();
+        t.id = d.id;
+
+        // Match current active doctor or unassigned tokens
+        if (String(t.doctorId) === String(currentDoctor) || !t.doctorId) {
+          if (t.status === 'waiting') waiting.push(t);
+          else if (t.status === 'called') called.push(t);
+          else if (t.status === 'skipped') skipped.push(t);
+        }
       });
 
-      waiting.sort((a, b) => (b.priority ? 1 : 0) - (a.priority ? 1 : 0) || String(a.number).localeCompare(String(b.number)));
+      // Strict numeric natural sort with emergency priority override
+      waiting.sort((a, b) => {
+        if (b.priority && !a.priority) return 1;
+        if (!b.priority && a.priority) return -1;
+        return (Number(a.number) || 0) - (Number(b.number) || 0);
+      });
       
       document.getElementById('stWaiting').textContent = waiting.length;
       document.getElementById('stCalled').textContent = called.length;
       document.getElementById('stSkipped').textContent = skipped.length;
 
-      // Active Called Token
-      const activeCurrent = called.length ? called[called.length - 1] : null;
+      // Active Serving Token
+      called.sort((a, b) => {
+        const timeA = a.calledAt?.toMillis() || a.updatedAt?.toMillis() || 0;
+        const timeB = b.calledAt?.toMillis() || b.updatedAt?.toMillis() || 0;
+        return timeB - timeA;
+      });
+
+      const activeCurrent = called[0] || null;
       firstWaitingToken = waiting.length ? waiting[0] : null;
 
       if (activeCurrent) {
         currentlyServingToken = activeCurrent;
-        document.getElementById('currentToken').textContent = activeCurrent.number;
-        document.getElementById('currentPatient').textContent = (activeCurrent.priority ? '[EMERGENCY] ' : '') + (activeCurrent.patientName || 'Patient') + (activeCurrent.counter ? ' · Counter ' + activeCurrent.counter : '');
+        document.getElementById('currentToken').textContent = `#${activeCurrent.number}`;
+        document.getElementById('currentPatient').textContent = (activeCurrent.priority ? '[EMERGENCY] ' : '') + (activeCurrent.patientName || 'Patient') + (activeCurrent.counter ? ' · ' + activeCurrent.counter : '');
       } else {
         currentlyServingToken = null;
         document.getElementById('currentToken').textContent = '—';
         document.getElementById('currentPatient').textContent = 'Waiting for next token…';
       }
 
-      // Waiting Queue List with Skip and Call actions
+      // Waiting Queue List
       const empty = document.getElementById('queueEmpty');
       const list = document.getElementById('queueList');
       if (waiting.length === 0) {
@@ -493,10 +553,10 @@
         list.innerHTML = waiting.map((t, i) => {
           const pos = i + 1;
           const pri = t.priority ? '<span class="badge red"><i class="fa-solid fa-truck-medical"></i> EMERGENCY</span>' : '';
-          const ctr = t.counter ? '<span class="badge blue">Counter ' + escHtml(t.counter) + '</span>' : '';
+          const ctr = t.counter ? '<span class="badge blue">' + escHtml(t.counter) + '</span>' : '';
           return `
           <div class="qrow" style="${t.priority ? 'border-color:var(--red);background:#fef2f2;' : ''}">
-            <div class="qnum" style="${t.priority ? 'background:#fee2e2;color:#b91c1c;' : ''}">${escHtml(t.number)}</div>
+            <div class="qnum" style="${t.priority ? 'background:#fee2e2;color:#b91c1c;' : ''}">#${escHtml(t.number)}</div>
             <div class="qbody">
               <div class="qname">${escHtml(t.patientName||'Patient')} <span class="qpos ${pos===1?'top':''}">${pos===1?'Next':'Pos '+pos}</span> ${pri} ${ctr}</div>
               <div class="qmeta">${t.phone?('<i class="fa-solid fa-phone"></i> '+escHtml(t.phone)):''}${t.source?' · '+t.source:''}</div>
@@ -514,14 +574,14 @@
         }).join('');
       }
 
-      // Skipped / Absent List (Recovery Drawer)
+      // Skipped / Absent List
       const skipSec = document.getElementById('skippedSection');
       const skipList = document.getElementById('skippedList');
       if (skipped.length > 0) {
         skipSec.classList.remove('hidden');
         skipList.innerHTML = skipped.map(t => `
           <div class="qrow" style="background:#fff;border-color:#fca5a5;margin-bottom:8px;">
-            <div class="qnum" style="background:#fee2e2;color:#b91c1c;">${escHtml(t.number)}</div>
+            <div class="qnum" style="background:#fee2e2;color:#b91c1c;">#${escHtml(t.number)}</div>
             <div class="qbody">
               <div class="qname">${escHtml(t.patientName||'Patient')} <span class="badge red">Absent / Skipped</span></div>
               <div class="qmeta">${t.phone?('<i class="fa-solid fa-phone"></i> '+escHtml(t.phone)):''} (Skipped when called)</div>
@@ -549,7 +609,7 @@
 
     function recallActiveToken() {
       if (!currentlyServingToken) return showToast('No active token to recall.', true);
-      playBeep(2);
+      playBeep();
       maybeAnnounce(currentlyServingToken.id);
       showToast(`Recalled Token #${currentlyServingToken.number}`);
     }
@@ -582,8 +642,10 @@
       const mode = document.getElementById('newMode').value;
       if (!name) return showToast('Enter patient name.', true);
       if (!currentDoctor) return showToast('Select a doctor first.', true);
-      if (!window._FB_READY) return showToast('Firebase not configured.', true);
       if (phone && phone.length !== 10) return showToast('Enter a valid 10-digit mobile.', true);
+
+      const btn = document.getElementById('btnIssue');
+      btn.disabled = true;
 
       const today = window.todayStr ? window.todayStr() : new Date().toISOString().slice(0,10);
       const isPriority = document.getElementById('newPriority').checked;
@@ -591,7 +653,9 @@
       const counterRef = window._fs.doc(window._db, 'hospitals', currentHospital, 'counters', today);
 
       try {
+        await ensureAuth();
         let createdTokenId = '';
+        
         const tokenNum = await window._fs.runTransaction(window._db, async (transaction) => {
           const counterDoc = await transaction.get(counterRef);
           let nextCount = 1;
@@ -601,18 +665,29 @@
           } else {
             transaction.set(counterRef, { count: 1 });
           }
+          
           const tNum = pad3(nextCount);
-          const tokenId = today + '-' + currentDoctor + '-' + nextCount;
+          const tokenId = `${today}-${currentDoctor}-${nextCount}`;
           createdTokenId = tokenId;
           lastIssuedTokenId = tokenId;
+          
           const tokenDocRef = window._fs.doc(window._db, 'hospitals', currentHospital, 'tokens', tokenId);
 
           transaction.set(tokenDocRef, {
-            id: tokenId, number: tNum, patientName: name, phone: phone || '',
-            doctorId: currentDoctor, hospitalId: currentHospital, date: today,
+            id: tokenId,
+            number: tNum,
+            patientName: name,
+            phone: phone || '',
+            doctorId: currentDoctor,
+            doctorName: currentDoctorName,
+            hospitalId: currentHospital,
+            date: today,
             department: 'consultation',
-            status: 'waiting', source: mode, createdAt: window._fs.serverTimestamp(),
-            priority: isPriority, counter: counter, pushToken: ''
+            status: 'waiting',
+            source: mode,
+            createdAt: window._fs.serverTimestamp(),
+            priority: isPriority,
+            counter: counter
           });
           return tNum;
         });
@@ -620,8 +695,8 @@
         document.getElementById('newName').value = '';
         document.getElementById('newPhone').value = '';
         document.getElementById('newPriority').checked = false;
-        playBeep(1);
-        showToast('Token ' + tokenNum + ' issued');
+        playBeep();
+        showToast('Token #' + tokenNum + ' issued');
 
         if (document.getElementById('autoPrintSlip').checked) {
           triggerPrintSlip(tokenNum, name, counter, createdTokenId);
@@ -631,7 +706,11 @@
           const trackLink = `${getAppBaseUrl()}/token.html?id=${createdTokenId}&h=${currentHospital}`;
           queueFreeSMS(phone, `TokSpot Alert: Hello ${name}, your Token #${tokenNum} is booked. Live pass: ${trackLink}`);
         }
-      } catch (e) { showToast('Failed: ' + e.message, true); }
+      } catch (e) {
+        showToast('Failed: ' + e.message, true);
+      } finally {
+        btn.disabled = false;
+      }
     }
 
     function triggerPrintSlip(tokenNum, patientName, counter, tokenId) {
@@ -661,16 +740,21 @@
 
     async function setStatus(id, status) {
       try {
-        await window._fs.updateDoc(window._fs.doc(window._db, 'hospitals', currentHospital, 'tokens', id), { status, updatedAt: window._fs.serverTimestamp() });
+        await window._fs.updateDoc(window._fs.doc(window._db, 'hospitals', currentHospital, 'tokens', id), { 
+          status, 
+          calledAt: status === 'called' ? window._fs.serverTimestamp() : null,
+          updatedAt: window._fs.serverTimestamp() 
+        });
+
         if (status === 'called') { 
-          playBeep(2); 
+          playBeep(); 
           maybeAnnounce(id);
 
           window._fs.getDoc(window._fs.doc(window._db, 'hospitals', currentHospital, 'tokens', id)).then(snap => {
             const t = snap.data();
             if (t && t.phone) {
               const trackLink = `${getAppBaseUrl()}/token.html?id=${id}&h=${currentHospital}`;
-              queueFreeSMS(t.phone, `TokSpot Alert: Token #${t.number}, please proceed to Counter ${t.counter || 'A'}. Track: ${trackLink}`);
+              queueFreeSMS(t.phone, `TokSpot Alert: Token #${t.number}, please proceed to ${t.counter || 'Counter A'}. Track: ${trackLink}`);
             }
           });
         }
@@ -701,7 +785,7 @@
         if (cleanPhone.length === 10) cleanPhone = '91' + cleanPhone;
 
         const trackUrl = `${getAppBaseUrl()}/token.html?id=${id}&h=${currentHospital}`;
-        const msg = `TokSpot Alert: Hello ${t.patientName}, your token ${t.number} is ready. Please proceed to Counter ${t.counter || 'A'}.\n\nLive Pass: ${trackUrl}`;
+        const msg = `TokSpot Alert: Hello ${t.patientName}, your token #${t.number} is ready. Please proceed to ${t.counter || 'Counter A'}.\n\nLive Pass: ${trackUrl}`;
         const text = encodeURIComponent(msg);
 
         const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
@@ -710,7 +794,7 @@
           if (isMobile) {
             window.location.href = `sms:${cleanPhone.replace(/^91/, '')}?body=${text}`;
           } else {
-            showToast('Opening chat in WhatsApp Web...', false, 2000);
+            showToast('Opening WhatsApp Web...', false, 2000);
             window.open(`https://web.whatsapp.com/send/?phone=${cleanPhone}&text=${text}&type=phone_number&app_absent=0`, '_blank');
           }
         } else {
@@ -726,25 +810,27 @@
     }
 
     async function loadHistory() {
-      if (!currentHospital || !currentDoctor || !window._FB_READY) return;
-      const today = window.todayStr ? window.todayStr() : new Date().toISOString().slice(0,10);
+      if (!currentHospital || !currentDoctor) return;
+      const today = window.todayStr ? window.todayStr() : new Date().toISOString().slice(0, 10);
       try {
         const snap = await window._fs.getDocs(window._fs.query(
           window._fs.collection(window._db, 'hospitals', currentHospital, 'tokens'),
-          window._fs.where('doctorId','==',currentDoctor),
-          window._fs.where('date','==',today)
+          window._fs.where('date', '==', today)
         ));
         let done = 0;
         const history = [];
         snap.docs.forEach(d => {
           const t = d.data();
-          if (t.status === 'completed') { done++; history.push(t); }
+          if (String(t.doctorId) === String(currentDoctor) && t.status === 'completed') {
+            done++;
+            history.push(t);
+          }
         });
         document.getElementById('stDone').textContent = done;
         const hl = document.getElementById('historyList');
         hl.innerHTML = history.slice(-8).reverse().map(t => `
           <div class="qrow" style="opacity:.8;padding:12px 16px;">
-            <div class="qnum" style="width:44px;height:44px;font-size:1.05rem;">${escHtml(t.number)}</div>
+            <div class="qnum" style="width:44px;height:44px;font-size:1.05rem;">#${escHtml(t.number)}</div>
             <div class="qbody"><div class="qname">${escHtml(t.patientName||'Patient')}</div><div class="qmeta">${t.source||'walk-in'}</div></div>
             <span class="badge green"><i class="fa-solid fa-check"></i> served</span>
           </div>`).join('') || '<div class="empty" style="padding:20px;"><div class="e-s">No patients served yet.</div></div>';
@@ -752,7 +838,7 @@
     }
 
     async function queueFreeSMS(phone, messageText) {
-      if (!phone || phone.length !== 10 || !window._FB_READY) return;
+      if (!phone || phone.length !== 10) return;
       try {
         await window._fs.addDoc(window._fs.collection(window._db, 'sms_queue'), {
           hospitalId: currentHospital,
