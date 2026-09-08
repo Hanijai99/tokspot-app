@@ -4,41 +4,62 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <title>Doctor Login — TokSpot</title>
-  <link rel="stylesheet" href="/css/style.css" />
+  <link rel="stylesheet" href="css/style.css" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
   <link rel="icon" type="image/png" href="logo.png" />
   <style>
-    .auth-wrapper { max-width: 440px; margin: 60px auto; padding: 0 16px; }
-    .auth-card { padding: 30px 24px; border-radius: 16px; background: var(--card); border: 1px solid var(--line); box-shadow: var(--shadow); }
+    .auth-wrapper { max-width: 440px; margin: 50px auto; padding: 0 16px; }
+    .auth-card { padding: 30px 24px; border-radius: 20px; background: var(--card); border: 1px solid var(--line); box-shadow: var(--shadow); }
     .auth-title { text-align: center; font-size: 1.5rem; font-weight: 900; color: var(--ink); margin-bottom: 6px; }
     .auth-sub { text-align: center; font-size: 0.88rem; color: var(--slate-500); margin-bottom: 24px; }
     .form-group { margin-bottom: 14px; text-align: left; }
     .form-group label { display: block; font-size: 0.84rem; font-weight: 700; color: var(--slate-700); margin-bottom: 6px; }
-    .form-control { width: 100%; padding: 12px; border-radius: 8px; border: 1px solid var(--line); box-sizing: border-box; font-size: 0.95rem; }
-    .btn-submit { width: 100%; padding: 12px; border-radius: 8px; border: none; font-weight: 800; cursor: pointer; font-size: 0.95rem; }
-    .divider { display: flex; align-items: center; text-align: center; margin: 24px 0; color: var(--slate-400); font-size: 0.82rem; font-weight: 700; }
+    .form-control { width: 100%; padding: 12px; border-radius: 10px; border: 1px solid var(--line); box-sizing: border-box; font-size: 0.95rem; }
+    .btn-submit { width: 100%; padding: 12px; border-radius: 10px; border: none; font-weight: 800; cursor: pointer; font-size: 0.95rem; }
+    .divider { display: flex; align-items: center; text-align: center; margin: 22px 0; color: var(--slate-400); font-size: 0.82rem; font-weight: 700; }
     .divider::before, .divider::after { content: ''; flex: 1; border-bottom: 1px solid var(--line); }
     .divider span { padding: 0 12px; }
     .pin-box { text-align: center; letter-spacing: 8px; font-size: 1.4rem; font-weight: 800; }
+    body.dark { background: #060b16; }
+    body.dark .auth-card { background: #121a2b; border-color: #24314a; }
+    body.dark .form-control { background: #0b1120; border-color: #24314a; color: #f8fafc; }
+    body.dark .auth-title { color: #f8fafc; }
   </style>
 </head>
 <body>
 
   <div class="topbar">
     <a class="brand" href="index.html">
-      <span class="logomark"><img src="logo.png" alt="TokSpot" /></span>TokSpot
+      <span class="logomark"><img src="logo.png" alt="TokSpot" /></span>TokSpot Doctor
     </a>
     <span class="spacer"></span>
-    <button class="icn-btn" onclick="location.href='index.html'" title="Home"><i class="fa-solid fa-house"></i></button>
+    <button class="icn-btn" onclick="location.href='staff.html'" title="Staff Portal"><i class="fa-solid fa-hospital-user"></i></button>
     <button class="icn-btn" onclick="hk.toggleDark()"><i class="fa-solid fa-moon"></i></button>
   </div>
 
   <div class="auth-wrapper">
     <div class="auth-card card">
       <div class="auth-title"><i class="fa-solid fa-user-doctor" style="color:var(--green)"></i> Doctor Portal</div>
-      <div class="auth-sub">Sign in to access your consultation room</div>
+      <div class="auth-sub">Secure consultation desk authentication</div>
 
-      <!-- 1. Email & Password Login -->
+      <!-- Station Credentials -->
+      <div class="form-group">
+        <label>Hospital Code <span class="req">*</span></label>
+        <input type="text" id="hospCode" class="form-control" placeholder="e.g. HOSP-1234" style="text-transform:uppercase;font-weight:800;letter-spacing:1px;" />
+      </div>
+
+      <!-- Method 1: Fast 4-Digit Room PIN -->
+      <div class="form-group">
+        <label style="text-align:center;">Doctor 4-Digit PIN <span class="req">*</span></label>
+        <input type="password" maxlength="4" id="stationPin" class="form-control pin-box" placeholder="••••" />
+      </div>
+      <button id="btnPinLogin" class="btn btn-submit btn-green mt-8" onclick="doctorPinLogin()">
+        <i class="fa-solid fa-door-open"></i> Open Doctor Station
+      </button>
+
+      <div class="divider"><span>OR SIGN IN WITH EMAIL</span></div>
+
+      <!-- Method 2: Doctor Email & Password -->
       <div>
         <div class="form-group">
           <label>Doctor Email</label>
@@ -48,134 +69,152 @@
           <label>Password</label>
           <input type="password" id="loginPassword" class="form-control" placeholder="••••••••" />
         </div>
-        <button id="btnEmailLogin" class="btn btn-green btn-submit mt-8" onclick="doctorEmailLogin()">Sign In with Email</button>
+        <button id="btnEmailLogin" class="btn btn-submit btn-slate" onclick="doctorEmailLogin()">
+          <i class="fa-solid fa-envelope"></i> Sign In with Email
+        </button>
 
         <div style="text-align: center; margin-top: 14px;">
-          <a href="javascript:void(0)" onclick="handleForgotPassword()" style="color: var(--green); font-size: 0.88rem; font-weight: 600; text-decoration: none;">
-            Forgot / Set New Password?
+          <a href="javascript:void(0)" onclick="handleForgotPassword()" style="color: var(--green); font-size: 0.84rem; font-weight: 600; text-decoration: none;">
+            Forgot Password?
           </a>
         </div>
-      </div>
-
-      <div class="divider"><span>OR QUICK STATION PIN</span></div>
-
-      <!-- 2. Station PIN Access -->
-      <div>
-        <div class="form-group">
-          <label style="text-align:center;">Enter 4-Digit Station PIN</label>
-          <input type="password" maxlength="4" id="stationPin" class="form-control pin-box" placeholder="••••" />
-        </div>
-        <button id="btnPinLogin" class="btn btn-submit" style="background: #0f766e; color: white;" onclick="doctorPinLogin()">
-          <i class="fa-solid fa-key"></i> Open Station via PIN
-        </button>
       </div>
     </div>
   </div>
 
-  <!-- App Core & Firebase SDKs -->
   <script src="js/firebase-config.js"></script>
   <script src="js/app.js"></script>
   <script src="js/firebase.js"></script>
-
   <script>
     window.addEventListener('load', async () => {
       if (window.hk && hk.applyDark) hk.applyDark();
       await initFirebase();
       await waitForFB();
+
+      // Auto-populate hospital code if already verified in staff gate
+      const savedHosp = sessionStorage.getItem('tokspot_frontdesk_hospital') || localStorage.getItem('tokspot_tv_hospital_code');
+      if (savedHosp) document.getElementById('hospCode').value = savedHosp;
     });
 
-    // 1. Email Login Function
+    // Resolve Hospital by Code helper
+    async function resolveHospital(code) {
+      const qHosp = await window._fs.getDocs(
+        window._fs.query(window._fs.collection(window._db, 'hospitals'), window._fs.where('hospitalCode', '==', code))
+      );
+      if (!qHosp.empty) return { slug: qHosp.docs[0].id, data: qHosp.docs[0].data() };
+
+      const qCode = await window._fs.getDocs(
+        window._fs.query(window._fs.collection(window._db, 'hospitals'), window._fs.where('code', '==', code))
+      );
+      if (!qCode.empty) return { slug: qCode.docs[0].id, data: qCode.docs[0].data() };
+
+      const directDoc = await window._fs.getDoc(window._fs.doc(window._db, 'hospitals', code.toLowerCase()));
+      if (directDoc.exists()) return { slug: directDoc.id, data: directDoc.data() };
+
+      return null;
+    }
+
+    // 1. PIN Login with strict Hospital Isolation
+    async function doctorPinLogin() {
+      const rawCode = document.getElementById('hospCode').value.trim();
+      const hospCode = rawCode.toUpperCase();
+      const pin = document.getElementById('stationPin').value.trim();
+      const btn = document.getElementById('btnPinLogin');
+
+      if (!hospCode) return showToast('Please enter your Hospital Code.', true);
+      if (pin.length !== 4) return showToast('Enter your 4-digit PIN.', true);
+
+      await waitForFB();
+      btn.disabled = true;
+      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Verifying...';
+
+      try {
+        const hospital = await resolveHospital(hospCode);
+        if (!hospital) return showToast('Invalid Hospital Code.', true);
+
+        // Search doctor ONLY inside this verified hospital
+        const qDoc = window._fs.query(
+          window._fs.collection(window._db, 'hospitals', hospital.slug, 'doctors'),
+          window._fs.where('pin', '==', pin)
+        );
+        const snap = await window._fs.getDocs(qDoc);
+
+        if (snap.empty) {
+          return showToast('Invalid PIN for this hospital.', true);
+        }
+
+        const doctorDoc = snap.docs[0];
+        const doctorData = { id: doctorDoc.id, ...doctorDoc.data(), hospitalSlug: hospital.slug, hospitalName: hospital.data.name || hospital.slug };
+
+        sessionStorage.setItem('activeDoctor', JSON.stringify(doctorData));
+
+        if (!window._auth.currentUser) {
+          try { await window._useAuth.signInAnonymously(window._auth); } catch(e){}
+        }
+
+        showToast(`Welcome Dr. ${doctorData.name || ''}!`);
+        setTimeout(() => { window.location.href = 'doctor.html'; }, 300);
+      } catch (err) {
+        showToast('Login error: ' + err.message, true);
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fa-solid fa-door-open"></i> Open Doctor Station';
+      }
+    }
+
+    // 2. Email Login with Hospital Validation
     async function doctorEmailLogin() {
+      const rawCode = document.getElementById('hospCode').value.trim();
+      const hospCode = rawCode.toUpperCase();
       const email = document.getElementById('loginEmail').value.trim();
       const pass = document.getElementById('loginPassword').value;
       const btn = document.getElementById('btnEmailLogin');
 
+      if (!hospCode) return showToast('Please enter Hospital Code.', true);
       if (!email || !pass) return showToast('Enter email and password.', true);
 
       await waitForFB();
-      if (!window._FB_READY) return showToast('Firebase not ready. Try again.', true);
-
       btn.disabled = true;
-      try {
-        const cred = await window._useAuth.signInWithEmailAndPassword(window._auth, email, pass);
-        const uid = cred.user.uid;
+      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Signing in...';
 
-        // Fetch Doctor Profile
-        try {
-          const docSnap = await window._fs.getDoc(window._fs.doc(window._db, 'doctors', uid));
-          if (docSnap.exists()) {
-            sessionStorage.setItem('activeDoctor', JSON.stringify(docSnap.data()));
-          }
-        } catch(e) {
-          console.warn('Doc profile fetch error:', e);
+      try {
+        const hospital = await resolveHospital(hospCode);
+        if (!hospital) return showToast('Invalid Hospital Code.', true);
+
+        await window._useAuth.signInWithEmailAndPassword(window._auth, email, pass);
+
+        // Fetch Doctor Profile inside this hospital
+        const qDoc = window._fs.query(
+          window._fs.collection(window._db, 'hospitals', hospital.slug, 'doctors'),
+          window._fs.where('email', '==', email)
+        );
+        const snap = await window._fs.getDocs(qDoc);
+
+        let doctorData = { email, hospitalSlug: hospital.slug, hospitalName: hospital.data.name || hospital.slug };
+        if (!snap.empty) {
+          doctorData = { id: snap.docs[0].id, ...snap.docs[0].data(), ...doctorData };
         }
 
+        sessionStorage.setItem('activeDoctor', JSON.stringify(doctorData));
         showToast('Login successful!');
-        setTimeout(() => { window.location.href = 'doctor.html'; }, 400);
+        setTimeout(() => { window.location.href = 'doctor.html'; }, 300);
       } catch (err) {
-        showToast('Login Error: ' + (err.message || err.code), true, 4000);
+        showToast('Login Error: ' + err.message, true);
       } finally {
         btn.disabled = false;
+        btn.innerHTML = '<i class="fa-solid fa-envelope"></i> Sign In with Email';
       }
     }
 
-    // 2. Forgot Password Function
     async function handleForgotPassword() {
-      const email = prompt('Enter your registered Doctor Email to receive the password reset link:');
+      const email = prompt('Enter your registered Doctor Email:');
       if (!email || !email.trim()) return;
-
       await waitForFB();
-      if (!window._FB_READY) return showToast('Firebase not ready.', true);
-
       try {
         await window._useAuth.sendPasswordResetEmail(window._auth, email.trim());
-        alert('Password reset link sent! Check your inbox or spam folder.');
+        alert('Password reset link sent to your email.');
       } catch (err) {
-        showToast('Reset Error: ' + (err.message || err.code), true, 4000);
-      }
-    }
-
-    // 3. Quick PIN Login Function
-    async function doctorPinLogin() {
-      const pin = document.getElementById('stationPin').value.trim();
-      const btn = document.getElementById('btnPinLogin');
-
-      if (pin.length !== 4) return showToast('Please enter a 4-digit PIN.', true);
-
-      await waitForFB();
-      if (!window._FB_READY) return showToast('Firebase not ready.', true);
-
-      btn.disabled = true;
-      try {
-        const q = window._fs.query(
-          window._fs.collection(window._db, 'doctors'),
-          window._fs.where('pin', '==', pin),
-          window._fs.limit(1)
-        );
-        const snap = await window._fs.getDocs(q);
-
-        if (snap.empty) {
-          return showToast('Invalid PIN. Check with hospital admin.', true);
-        }
-
-        const doctorData = snap.docs[0].data();
-        sessionStorage.setItem('activeDoctor', JSON.stringify(doctorData));
-
-        // Sign in anonymously if not logged in
-        if (!window._auth.currentUser) {
-          try {
-            await window._useAuth.signInAnonymously(window._auth);
-          } catch(e) {
-            console.warn('Anon auth warning:', e);
-          }
-        }
-
-        showToast('Access granted.');
-        setTimeout(() => { window.location.href = 'doctor.html'; }, 400);
-      } catch (err) {
-        showToast('PIN Error: ' + (err.message || err.code), true, 4000);
-      } finally {
-        btn.disabled = false;
+        showToast('Reset Error: ' + err.message, true);
       }
     }
   </script>
