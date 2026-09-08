@@ -55,7 +55,7 @@
 
     <!-- 2. Isolated Admin Dashboard -->
     <section class="hidden" id="mainCard">
-      <div style="display:flex;align-items:center;gap:12px;margin-bottom:4px;">
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:4px;flex-wrap:wrap;">
         <div class="htitle">Admin Workspace</div>
         <span class="spacer"></span>
         <span class="chip gray" id="adminEmailBadge">—</span>
@@ -70,7 +70,7 @@
           <h2 style="font-size:1.05rem;font-weight:800;margin:0;">Hospital Credentials</h2>
         </div>
         <div id="hospitalInfoBox">
-          <div class="muted">Loading assigned hospital details...</div>
+          <div class="muted"><i class="fa-solid fa-spinner fa-spin"></i> Loading assigned hospital details...</div>
         </div>
       </div>
 
@@ -180,7 +180,7 @@
       btn.disabled = true;
       try {
         await window._useAuth.signInWithEmailAndPassword(window._auth, email, pass);
-        showToast('Signed in.');
+        showToast('Signed in successfully.');
       } catch (e) {
         showToast('Auth error: ' + (e.message || e.code), true, 4000);
       } finally {
@@ -195,57 +195,90 @@
       showToast('Logged out.');
     }
 
-    // Resolve hospital & ensure Hospital Code & Recovery Key exist
+    // Resolves hospital accurately even with email case variations or missing mappings
     async function resolveAdminHospital(user) {
       document.getElementById('loginCard').classList.add('hidden');
       document.getElementById('mainCard').classList.remove('hidden');
       document.getElementById('adminEmailBadge').textContent = user.email;
 
       const infoBox = document.getElementById('hospitalInfoBox');
-      infoBox.innerHTML = '<div class="muted">Loading assigned hospital details...</div>';
+      infoBox.innerHTML = '<div class="muted"><i class="fa-solid fa-spinner fa-spin"></i> Loading assigned hospital details...</div>';
 
       try {
-        let snap = await window._fs.getDocs(
-          window._fs.query(
-            window._fs.collection(window._db, 'hospitals'),
-            window._fs.where('adminUid', '==', user.uid)
-          )
-        );
+        const emailLower = user.email.toLowerCase();
+        let targetHospitalDoc = null;
 
-        if (snap.empty) {
-          snap = await window._fs.getDocs(
-            window._fs.query(
-              window._fs.collection(window._db, 'hospitals'),
-              window._fs.where('adminEmail', '==', user.email)
-            )
-          );
-        }
+        // 1. First search: Scan hospitals collection
+        const allHospSnap = await window._fs.getDocs(window._fs.collection(window._db, 'hospitals'));
+        
+        if (!allHospSnap.empty) {
+          // Find document matching adminUid or adminEmail (case-insensitive)
+          targetHospitalDoc = allHospSnap.docs.find(d => {
+            const data = d.data();
+            const aEmail = (data.adminEmail || data.email || '').toLowerCase();
+            const aUid = data.adminUid || data.uid || '';
+            return aUid === user.uid || aEmail === emailLower;
+          });
 
-        // Fallback for first hospital onboarding
-        if (snap.empty) {
-          const allHospitals = await window._fs.getDocs(window._fs.collection(window._db, 'hospitals'));
-          if (!allHospitals.empty) {
-            const firstDoc = allHospitals.docs[0];
-            assignedHospitalSlug = firstDoc.id;
-            await checkAndInjectCodes(firstDoc.id, firstDoc.data(), user);
-            return;
-          } else {
-            infoBox.innerHTML = '<div class="empty">No hospital record mapped to this admin account.</div>';
-            return;
+          // Fallback: If only 1 hospital exists in DB, assign it directly
+          if (!targetHospitalDoc && allHospSnap.docs.length === 1) {
+            targetHospitalDoc = allHospSnap.docs[0];
           }
         }
 
-        const targetHospitalDoc = snap.docs[0];
+        // 2. If no hospital exists at all, render creation UI
+        if (!targetHospitalDoc) {
+          infoBox.innerHTML = `
+            <div style="padding:16px;background:var(--bg);border-radius:14px;border:1px dashed var(--line);text-align:center;">
+              <p style="font-weight:700;color:var(--ink);margin:0 0 6px;">No hospital record found for this admin account.</p>
+              <p class="muted" style="font-size:0.84rem;margin:0 0 12px;">Create your hospital profile to generate your booking code.</p>
+              <button class="btn btn-green" onclick="promptCreateHospital('${user.uid}', '${user.email}')">
+                <i class="fa-solid fa-plus"></i> Create Hospital Profile
+              </button>
+            </div>
+          `;
+          document.getElementById('doctorList').innerHTML = '<div class="empty">Create hospital to manage doctors.</div>';
+          return;
+        }
+
         assignedHospitalSlug = targetHospitalDoc.id;
         await checkAndInjectCodes(targetHospitalDoc.id, targetHospitalDoc.data(), user);
 
       } catch (err) {
-        console.error(err);
+        console.error('Resolve hospital error:', err);
         infoBox.innerHTML = `<div class="empty red">Access Error: ${escHtml(err.message)}</div>`;
       }
     }
 
-    // Ensure hospital has a code and recovery key; generate if missing and notify
+    async function promptCreateHospital(uid, email) {
+      const name = prompt('Enter your Hospital Name:');
+      if (!name || !name.trim()) return;
+      const city = prompt('Enter City (e.g. Chennai):') || '';
+      
+      const slug = name.toLowerCase().replace(/[^a-z0-9]/g, '-').replace(/-+/g, '-').slice(0, 30);
+      const hCode = 'HOSP-' + Math.floor(1000 + Math.random() * 9000);
+      const p1 = Math.random().toString(36).substring(2, 6).toUpperCase();
+      const p2 = Math.random().toString(36).substring(2, 6).toUpperCase();
+      const rKey = `RCV-${p1}-${p2}`;
+
+      try {
+        await window._fs.setDoc(window._fs.doc(window._db, 'hospitals', slug), {
+          name: name.trim(),
+          city: city.trim(),
+          adminUid: uid,
+          adminEmail: email,
+          hospitalCode: hCode,
+          recoveryKey: rKey,
+          createdAt: window._fs.serverTimestamp()
+        });
+        showToast('Hospital created successfully!');
+        await resolveAdminHospital(activeAdminUser);
+      } catch (e) {
+        alert('Creation failed: ' + e.message);
+      }
+    }
+
+    // Ensures Code & Recovery Key exist, updates DB, and renders without crashing
     async function checkAndInjectCodes(slug, data, user) {
       let hCode = data.hospitalCode || data.code;
       let rKey = data.recoveryKey;
@@ -265,27 +298,14 @@
       if (!data.adminEmail) updates.adminEmail = user.email;
 
       if (Object.keys(updates).length > 0) {
-        await window._fs.updateDoc(window._fs.doc(window._db, 'hospitals', slug), updates);
-        // Send automated confirmation email
         try {
-          await window._fs.addDoc(window._fs.collection(window._db, 'mail'), {
-            to: [user.email],
-            message: {
-              subject: `TokSpot: Setup Confirmation for ${data.name || slug}`,
-              html: `
-                <h3>Welcome to TokSpot!</h3>
-                <p>Your hospital credentials have been configured:</p>
-                <p><b>Patient Booking Code:</b> ${hCode}</p>
-                <p><b>Secret Recovery Key:</b> ${rKey}</p>
-                <p>Share the Booking Code with your patients to allow them to book from home.</p>
-              `
-            }
-          });
-        } catch (mailErr) {
-          console.log('Mail trigger note:', mailErr.message);
+          await window._fs.updateDoc(window._fs.doc(window._db, 'hospitals', slug), updates);
+        } catch(e) {
+          console.warn('Hospital doc update warning:', e);
         }
       }
 
+      // Render UI immediately so screen never hangs
       renderHospitalHeader(slug, { ...data, hospitalCode: hCode, recoveryKey: rKey });
       loadDoctorList();
     }
@@ -306,7 +326,7 @@
           <div class="key-box">
             <div>
               <div class="muted" style="font-size:0.75rem;font-weight:700;text-transform:uppercase;">Patient Booking Code</div>
-              <div style="font-size:1.15rem;font-weight:900;color:var(--ink);margin-top:2px;">${escHtml(data.hospitalCode)}</div>
+              <div style="font-size:1.2rem;font-weight:900;color:var(--green);margin-top:2px;letter-spacing:1px;">${escHtml(data.hospitalCode)}</div>
             </div>
             <span class="badge-code">Share with Patients</span>
           </div>
@@ -326,7 +346,7 @@
       if (!assignedHospitalSlug) return;
       await waitForFB();
       const list = document.getElementById('doctorList');
-      list.innerHTML = '<div class="muted">Loading doctors...</div>';
+      list.innerHTML = '<div class="muted"><i class="fa-solid fa-spinner fa-spin"></i> Loading doctors...</div>';
 
       try {
         const snap = await window._fs.getDocs(window._fs.collection(window._db, 'hospitals', assignedHospitalSlug, 'doctors'));
@@ -341,11 +361,11 @@
           const statusBadge = doc.status === 'closed' ? '<span class="badge red">closed</span>' : '<span class="badge green">open</span>';
           const pinBadge = doc.pin ? `<span class="badge" style="background:var(--green-050);color:var(--green);font-weight:700;">PIN: ${escHtml(doc.pin)}</span>` : '';
 
-          list.innerHTML += `<div class="mgmt-card">
+          list.innerHTML += `<div class="mgmt-card" style="padding:14px;border-radius:12px;background:var(--bg);border:1px solid var(--line);margin-bottom:10px;">
             <div style="display:flex;align-items:center;gap:12px;">
               <div style="flex:1;">
-                <div style="font-weight:700;">${escHtml(doc.name || d.id)} ${statusBadge} ${pinBadge}</div>
-                <div class="muted" style="font-size:.82rem;margin-top:2px;">${escHtml(doc.department || '')} ${doc.email ? '· ' + escHtml(doc.email) : ''}</div>
+                <div style="font-weight:700;color:var(--ink);">${escHtml(doc.name || d.id)} ${statusBadge} ${pinBadge}</div>
+                <div class="muted" style="font-size:.82rem;margin-top:2px;">${escHtml(doc.department || 'General')} ${doc.email ? '· ' + escHtml(doc.email) : ''}</div>
               </div>
               <button class="icn-btn" onclick="editDoctor('${d.id}')" title="Edit"><i class="fa-solid fa-pen"></i></button>
               <button class="icn-btn danger" onclick="deleteDoctor('${d.id}')" title="Delete"><i class="fa-solid fa-trash-can"></i></button>
@@ -440,7 +460,6 @@
       } catch (e) { showToast('Failed: ' + e.message, true); }
     }
 
-    // Modal & Recovery Logic
     function toggleRecoveryModal(show) {
       const modal = document.getElementById('recoveryModal');
       if (show) modal.classList.remove('hidden');
