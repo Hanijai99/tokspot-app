@@ -76,10 +76,29 @@
     </div>
   </div>
 
- <script src="js/firebase-config.js"></script>
+  <script src="js/firebase-config.js"></script>
   <script src="js/app.js"></script>
   <script src="js/firebase.js"></script>
   <script>
+    // Built-in failsafe toast to prevent ReferenceError crashes
+    window.showToast = window.showToast || function(msg, isErr, ms) {
+      let w = document.getElementById('hkToastWrap');
+      if (!w) {
+        w = document.createElement('div');
+        w.id = 'hkToastWrap';
+        w.style.cssText = 'position:fixed;bottom:24px;left:50%;transform:translateX(-50%);z-index:99999;display:flex;flex-direction:column;gap:8px;align-items:center;pointer-events:none;';
+        document.body.appendChild(w);
+      }
+      const t = document.createElement('div');
+      t.style.cssText = `background:${isErr ? '#ef4444' : '#16a34a'};color:#fff;padding:12px 20px;border-radius:12px;font-weight:700;font-size:0.9rem;box-shadow:0 10px 25px rgba(0,0,0,0.2);transition:opacity 0.3s;`;
+      t.textContent = msg;
+      w.appendChild(t);
+      setTimeout(() => {
+        t.style.opacity = '0';
+        setTimeout(() => t.remove(), 300);
+      }, ms || 2500);
+    };
+
     window.addEventListener('load', async () => {
       if (window.hk && hk.applyDark) hk.applyDark();
       try {
@@ -114,14 +133,12 @@
       try {
         await ensureAuth();
 
-        // 1. All hospitals fetch (Bypasses query index requirements)
         const hospSnap = await window._fs.getDocs(window._fs.collection(window._db, 'hospitals'));
         if (hospSnap.empty) {
           alert('No hospitals found in database! Please check Admin dashboard.');
           return;
         }
 
-        // Match Hospital Code or Slug
         const cleanInput = hospInput.replace(/^HOSP-?/i, '');
         const targetHospDoc = hospSnap.docs.find(d => {
           const data = d.data();
@@ -137,13 +154,11 @@
         const hospSlug = targetHospDoc.id;
         const hospData = targetHospDoc.data();
 
-        // 2. Fetch doctors in subcollection
         const docSnap = await window._fs.getDocs(
           window._fs.collection(window._db, 'hospitals', hospSlug, 'doctors')
         );
 
         let matchedDoc = null;
-
         if (!docSnap.empty) {
           matchedDoc = docSnap.docs.find(d => String(d.data().pin).trim() === pin);
         }
@@ -168,7 +183,7 @@
 
       } catch (err) {
         console.error('Login error details:', err);
-        alert('Firebase Error: ' + err.message + '\n\nIf this says permission-denied, check Firestore Security Rules.');
+        alert('Firebase Error: ' + err.message);
       } finally {
         btn.disabled = false;
         btn.innerHTML = '<i class="fa-solid fa-door-open"></i> Open Doctor Station';
@@ -223,6 +238,18 @@
         }
 
         if (!matchedDoc) {
+          try {
+            const rootDocSnap = await window._fs.getDocs(window._fs.collection(window._db, 'doctors'));
+            matchedDoc = rootDocSnap.docs.find(d => {
+              const doc = d.data();
+              const dEmail = (doc.email || '').toLowerCase().trim();
+              const dName = (doc.name || '').toLowerCase().trim();
+              return (dEmail === emailOrName || dName.includes(emailOrName)) && String(doc.pin).trim() === pin;
+            });
+          } catch(e) {}
+        }
+
+        if (!matchedDoc) {
           alert('Doctor Email/Name or PIN does not match any record.');
           return;
         }
@@ -251,9 +278,10 @@
       sessionStorage.setItem('tokspot_frontdesk_hospital', activeDoctor.hospitalCode);
 
       showToast(`Welcome Dr. ${docData.name || ''}!`);
+
       setTimeout(() => {
-        window.location.href = `doctor.html?code=${encodeURIComponent(activeDoctor.hospitalCode)}`;
-      }, 400);
+        window.location.href = `doctor.html?code=${encodeURIComponent(activeDoctor.hospitalCode)}&did=${encodeURIComponent(docId)}`;
+      }, 350);
     }
   </script>
 </body>
