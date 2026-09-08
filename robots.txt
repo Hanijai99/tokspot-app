@@ -1,0 +1,12 @@
+User-agent: *
+Allow: /
+Allow: /index.html
+Allow: /book.html
+
+# Keep doctor and admin desks unindexed for privacy
+Disallow: /admin.html
+Disallow: /doctor.html
+Disallow: /doctor-login.html
+Disallow: /frontdesk.html
+
+Sitemap: https://tokspot-app.vercel.app/sitemap.xml
