@@ -142,23 +142,38 @@
   <script src="js/app.js"></script>
   <script src="js/firebase.js"></script>
   <script>
+    // Failsafe escHtml helper to prevent ReferenceError crashes
+    window.escHtml = window.escHtml || function (s) {
+      return String(s == null ? '' : s)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    };
+
     let activeAdminUser = null;
     let assignedHospitalSlug = null;
     let editDoctorId = null;
 
     window.addEventListener('load', async () => {
       if (window.hk && hk.applyDark) hk.applyDark();
-      await initFirebase();
-      await waitForFB();
 
-      window._useAuth.onAuthStateChanged(window._auth, async (u) => {
-        if (u) {
-          activeAdminUser = u;
-          await resolveAdminHospital(u);
-        } else {
-          showLoggedOutState();
-        }
-      });
+      try {
+        if (typeof initFirebase === 'function') await initFirebase();
+        if (typeof waitForFB === 'function') await waitForFB();
+
+        window._useAuth.onAuthStateChanged(window._auth, async (u) => {
+          if (u) {
+            activeAdminUser = u;
+            await resolveAdminHospital(u);
+          } else {
+            showLoggedOutState();
+          }
+        });
+      } catch (err) {
+        console.error('Init failure:', err);
+      }
     });
 
     function showLoggedOutState() {
@@ -174,87 +189,101 @@
       const pass = document.getElementById('loginPass').value;
       const btn = document.getElementById('btnLogin');
 
-      if (!email || !pass) return showToast('Enter admin email and password.', true);
+      if (!email || !pass) return showToast('Enter email and password.', true);
 
-      await waitForFB();
       btn.disabled = true;
       try {
         await window._useAuth.signInWithEmailAndPassword(window._auth, email, pass);
         showToast('Signed in successfully.');
       } catch (e) {
-        showToast('Auth error: ' + (e.message || e.code), true, 4000);
+        showToast('Login Error: ' + (e.message || e.code), true, 4000);
       } finally {
         btn.disabled = false;
       }
     }
 
     async function adminLogout() {
-      await waitForFB();
-      await window._useAuth.signOut(window._auth);
-      showLoggedOutState();
-      showToast('Logged out.');
+      try {
+        await window._useAuth.signOut(window._auth);
+        showLoggedOutState();
+        showToast('Logged out.');
+      } catch(e) {
+        showToast(e.message, true);
+      }
     }
 
-    // Resolves hospital accurately even with email case variations or missing mappings
+    // Resolves hospital & renders instantly
     async function resolveAdminHospital(user) {
       document.getElementById('loginCard').classList.add('hidden');
       document.getElementById('mainCard').classList.remove('hidden');
       document.getElementById('adminEmailBadge').textContent = user.email;
 
       const infoBox = document.getElementById('hospitalInfoBox');
-      infoBox.innerHTML = '<div class="muted"><i class="fa-solid fa-spinner fa-spin"></i> Loading assigned hospital details...</div>';
+      infoBox.innerHTML = '<div class="muted"><i class="fa-solid fa-spinner fa-spin"></i> Fetching hospital records...</div>';
 
       try {
-        const emailLower = user.email.toLowerCase();
-        let targetHospitalDoc = null;
+        const userEmail = (user.email || '').toLowerCase().trim();
+        let matchedDoc = null;
 
-        // 1. First search: Scan hospitals collection
-        const allHospSnap = await window._fs.getDocs(window._fs.collection(window._db, 'hospitals'));
-        
-        if (!allHospSnap.empty) {
-          // Find document matching adminUid or adminEmail (case-insensitive)
-          targetHospitalDoc = allHospSnap.docs.find(d => {
+        const snap = await window._fs.getDocs(window._fs.collection(window._db, 'hospitals'));
+
+        if (!snap.empty) {
+          matchedDoc = snap.docs.find(d => {
             const data = d.data();
-            const aEmail = (data.adminEmail || data.email || '').toLowerCase();
+            const aEmail = (data.adminEmail || data.email || data.ownerEmail || '').toLowerCase().trim();
             const aUid = data.adminUid || data.uid || '';
-            return aUid === user.uid || aEmail === emailLower;
+            return aEmail === userEmail || aUid === user.uid;
           });
 
-          // Fallback: If only 1 hospital exists in DB, assign it directly
-          if (!targetHospitalDoc && allHospSnap.docs.length === 1) {
-            targetHospitalDoc = allHospSnap.docs[0];
+          // Single hospital fallback
+          if (!matchedDoc && snap.docs.length === 1) {
+            matchedDoc = snap.docs[0];
           }
         }
 
-        // 2. If no hospital exists at all, render creation UI
-        if (!targetHospitalDoc) {
+        if (!matchedDoc) {
           infoBox.innerHTML = `
-            <div style="padding:16px;background:var(--bg);border-radius:14px;border:1px dashed var(--line);text-align:center;">
-              <p style="font-weight:700;color:var(--ink);margin:0 0 6px;">No hospital record found for this admin account.</p>
-              <p class="muted" style="font-size:0.84rem;margin:0 0 12px;">Create your hospital profile to generate your booking code.</p>
-              <button class="btn btn-green" onclick="promptCreateHospital('${user.uid}', '${user.email}')">
-                <i class="fa-solid fa-plus"></i> Create Hospital Profile
+            <div style="padding:20px;background:var(--bg);border-radius:14px;border:1px dashed var(--line);text-align:center;">
+              <h3 style="margin:0 0 6px;font-size:1.05rem;">No Hospital Profile Linked</h3>
+              <p class="muted" style="font-size:0.84rem;margin:0 0 14px;">No hospital record found for <b>${escHtml(user.email)}</b>.</p>
+              <button class="btn btn-green" onclick="createInitialHospital('${user.uid}', '${user.email}')">
+                <i class="fa-solid fa-plus"></i> Set Up Hospital Now
               </button>
             </div>
           `;
-          document.getElementById('doctorList').innerHTML = '<div class="empty">Create hospital to manage doctors.</div>';
+          document.getElementById('doctorList').innerHTML = '<div class="empty">Doctors will appear once hospital is configured.</div>';
           return;
         }
 
-        assignedHospitalSlug = targetHospitalDoc.id;
-        await checkAndInjectCodes(targetHospitalDoc.id, targetHospitalDoc.data(), user);
+        assignedHospitalSlug = matchedDoc.id;
+        const hData = matchedDoc.data();
+
+        const hCode = hData.hospitalCode || hData.code || ('HOSP-' + Math.floor(1000 + Math.random() * 9000));
+        const rKey = hData.recoveryKey || ('RCV-' + Math.random().toString(36).substring(2, 6).toUpperCase() + '-' + Math.random().toString(36).substring(2, 6).toUpperCase());
+
+        renderHospitalHeader(assignedHospitalSlug, { ...hData, hospitalCode: hCode, recoveryKey: rKey });
+        loadDoctorList();
+
+        if (!hData.hospitalCode || !hData.recoveryKey || !hData.adminEmail) {
+          window._fs.updateDoc(window._fs.doc(window._db, 'hospitals', assignedHospitalSlug), {
+            hospitalCode: hCode,
+            recoveryKey: rKey,
+            adminEmail: user.email,
+            adminUid: user.uid
+          }).catch(() => {});
+        }
 
       } catch (err) {
-        console.error('Resolve hospital error:', err);
+        console.error('Resolution Error:', err);
         infoBox.innerHTML = `<div class="empty red">Access Error: ${escHtml(err.message)}</div>`;
       }
     }
 
-    async function promptCreateHospital(uid, email) {
-      const name = prompt('Enter your Hospital Name:');
+    async function createInitialHospital(uid, email) {
+      const name = prompt('Enter Hospital Name (e.g. Apollo Clinic):');
       if (!name || !name.trim()) return;
       const city = prompt('Enter City (e.g. Chennai):') || '';
-      
+
       const slug = name.toLowerCase().replace(/[^a-z0-9]/g, '-').replace(/-+/g, '-').slice(0, 30);
       const hCode = 'HOSP-' + Math.floor(1000 + Math.random() * 9000);
       const p1 = Math.random().toString(36).substring(2, 6).toUpperCase();
@@ -271,43 +300,11 @@
           recoveryKey: rKey,
           createdAt: window._fs.serverTimestamp()
         });
-        showToast('Hospital created successfully!');
+        showToast('Hospital created!');
         await resolveAdminHospital(activeAdminUser);
-      } catch (e) {
+      } catch(e) {
         alert('Creation failed: ' + e.message);
       }
-    }
-
-    // Ensures Code & Recovery Key exist, updates DB, and renders without crashing
-    async function checkAndInjectCodes(slug, data, user) {
-      let hCode = data.hospitalCode || data.code;
-      let rKey = data.recoveryKey;
-      let updates = {};
-
-      if (!hCode) {
-        hCode = 'HOSP-' + Math.floor(1000 + Math.random() * 9000);
-        updates.hospitalCode = hCode;
-      }
-      if (!rKey) {
-        const p1 = Math.random().toString(36).substring(2, 6).toUpperCase();
-        const p2 = Math.random().toString(36).substring(2, 6).toUpperCase();
-        rKey = `RCV-${p1}-${p2}`;
-        updates.recoveryKey = rKey;
-      }
-      if (!data.adminUid) updates.adminUid = user.uid;
-      if (!data.adminEmail) updates.adminEmail = user.email;
-
-      if (Object.keys(updates).length > 0) {
-        try {
-          await window._fs.updateDoc(window._fs.doc(window._db, 'hospitals', slug), updates);
-        } catch(e) {
-          console.warn('Hospital doc update warning:', e);
-        }
-      }
-
-      // Render UI immediately so screen never hangs
-      renderHospitalHeader(slug, { ...data, hospitalCode: hCode, recoveryKey: rKey });
-      loadDoctorList();
     }
 
     function renderHospitalHeader(slug, data) {
@@ -316,7 +313,7 @@
           <div>
             <div style="font-weight:800;font-size:1.15rem;color:var(--ink);">${escHtml(data.name || slug)}</div>
             <div class="muted" style="font-size:.82rem;margin-top:2px;">
-              System Slug: <b>${escHtml(slug)}</b> ${data.city ? ' · ' + escHtml(data.city) : ''}
+              System ID: <b>${escHtml(slug)}</b> ${data.city ? ' · ' + escHtml(data.city) : ''}
             </div>
           </div>
           <span class="badge green">Authorized Station</span>
@@ -344,7 +341,6 @@
 
     async function loadDoctorList() {
       if (!assignedHospitalSlug) return;
-      await waitForFB();
       const list = document.getElementById('doctorList');
       list.innerHTML = '<div class="muted"><i class="fa-solid fa-spinner fa-spin"></i> Loading doctors...</div>';
 
@@ -374,7 +370,7 @@
         });
       } catch (e) {
         console.error(e);
-        list.innerHTML = '<div class="muted">Could not load doctors list.</div>';
+        list.innerHTML = '<div class="muted">Could not load doctors list: ' + escHtml(e.message) + '</div>';
       }
     }
 
@@ -395,7 +391,6 @@
     }
 
     async function editDoctor(id) {
-      await waitForFB();
       editDoctorId = id;
       document.getElementById('formTitle').textContent = 'Edit Doctor Details';
       document.getElementById('doctorForm').classList.remove('hidden');
@@ -425,7 +420,6 @@
         return showToast('Enter doctor email & 4-digit PIN.', true);
       }
 
-      await waitForFB();
       const coll = window._fs.collection(window._db, 'hospitals', assignedHospitalSlug, 'doctors');
       const data = { name, department: dept, status, pin, hospitalSlug: assignedHospitalSlug, updatedAt: window._fs.serverTimestamp() };
       if (email) data.email = email;
@@ -451,7 +445,6 @@
 
     async function deleteDoctor(id) {
       if (!confirm('Delete this doctor?')) return;
-      await waitForFB();
       try {
         await window._fs.deleteDoc(window._fs.doc(window._db, 'hospitals', assignedHospitalSlug, 'doctors', id));
         try { await window._fs.deleteDoc(window._fs.doc(window._db, 'doctors', id)); } catch(e) {}
@@ -477,7 +470,6 @@
 
       btn.disabled = true;
       try {
-        await waitForFB();
         const snap = await window._fs.getDocs(
           window._fs.query(
             window._fs.collection(window._db, 'hospitals'),
