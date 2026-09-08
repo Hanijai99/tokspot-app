@@ -2,133 +2,230 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <title>TokSpot — Smart Hospital Queue Management & TV Display System</title>
-<meta name="description" content="TokSpot is a cloud-based hospital token and OPD queue management system with multi-language voice announcements, live TV displays, and doctor consultation desks." />
-<meta name="keywords" content="hospital queue management, OPD token system, clinic queue software, doctor token display, tamil voice token announcement" />
-<meta name="robots" content="index, follow" />
-<link rel="canonical" href="https://tokspot-app.vercel.app/" />
+  <meta name="description" content="TokSpot is a cloud-based hospital token and OPD queue management system with multi-language voice announcements, live TV displays, and doctor consultation desks." />
+  <meta name="keywords" content="hospital queue management, OPD token system, clinic queue software, doctor token display, tamil voice token announcement" />
+  <meta name="robots" content="index, follow" />
+  <link rel="canonical" href="https://tokspot-app.vercel.app/" />
 
-<!-- Open Graph for WhatsApp, LinkedIn & Social Shares -->
-<meta property="og:title" content="TokSpot — Modern Hospital Queue Management" />
-<meta property="og:description" content="Streamline OPD tokens, bilingual TV voice calls, and doctor desks with zero hardware setup." />
-<meta property="og:image" content="https://tokspot-app.vercel.app/logo.png" />
-<meta property="og:url" content="https://tokspot-app.vercel.app/" />
-<meta property="og:type" content="website" />
-  <title>TokSpot — Smart Hospital Token & Queue System</title>
+  <!-- Open Graph for WhatsApp, LinkedIn & Social Shares -->
+  <meta property="og:title" content="TokSpot — Modern Hospital Queue Management" />
+  <meta property="og:description" content="Streamline OPD tokens, bilingual TV voice calls, and doctor desks with zero hardware setup." />
+  <meta property="og:image" content="https://tokspot-app.vercel.app/logo.png" />
+  <meta property="og:url" content="https://tokspot-app.vercel.app/" />
+  <meta property="og:type" content="website" />
+
   <link rel="stylesheet" href="css/style.css" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
   <link rel="manifest" href="manifest.json" />
   <link rel="icon" type="image/png" href="logo.png" />
   <link rel="apple-touch-icon" href="logo.png" />
+
   <style>
     :root {
       --primary: #16a34a;
       --primary-dark: #15803d;
       --teal: #0d9488;
     }
-    body { background: #f8fafc; color: var(--ink); margin: 0; padding-bottom: 40px; }
+    body { background: #f8fafc; color: var(--ink); margin: 0; padding-bottom: 40px; font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
+
+    /* Topbar Navigation */
+    .landing-nav {
+      position: sticky;
+      top: 0;
+      z-index: 1000;
+      backdrop-filter: blur(12px);
+      background: rgba(255, 255, 255, 0.9);
+      border-bottom: 1px solid var(--line);
+      padding: 14px 24px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .brand-logo {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-weight: 900;
+      font-size: 1.25rem;
+      color: var(--ink);
+      text-decoration: none;
+    }
+    .brand-logo img { width: 32px; height: 32px; border-radius: 8px; }
+    .nav-actions { display: flex; align-items: center; gap: 10px; }
 
     .hero-container {
-      max-width: 620px;
+      max-width: 980px;
       margin: 0 auto;
-      padding: 44px 16px 20px;
-      text-align: center;
+      padding: 40px 16px 20px;
     }
+    .hero-grid {
+      display: grid;
+      grid-template-columns: 1.15fr 1fr;
+      gap: 36px;
+      align-items: center;
+    }
+
     .brand-badge {
-      width: 76px;
-      height: 76px;
-      border-radius: 22px;
-      margin: 0 auto 18px;
+      width: 64px;
+      height: 64px;
+      border-radius: 18px;
+      margin-bottom: 16px;
       background: linear-gradient(135deg, #22c55e, var(--teal));
       display: flex;
       align-items: center;
       justify-content: center;
-      box-shadow: 0 16px 36px rgba(22, 163, 74, 0.28);
+      box-shadow: 0 12px 28px rgba(22, 163, 74, 0.25);
       overflow: hidden;
     }
     .brand-badge img { width: 100%; height: 100%; object-fit: cover; }
 
     .main-title {
-      font-size: 2.35rem;
+      font-size: 2.5rem;
       font-weight: 900;
-      letter-spacing: -0.8px;
-      line-height: 1.18;
+      letter-spacing: -1px;
+      line-height: 1.15;
       color: var(--ink);
-      margin: 0 0 10px;
+      margin: 0 0 14px;
+    }
+    .main-title span {
+      background: linear-gradient(135deg, #0284c7, #16a34a);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
     }
     .main-subtitle {
       color: var(--slate-500);
-      font-size: 1.05rem;
+      font-size: 1.02rem;
       line-height: 1.55;
-      margin: 0 auto 26px;
-      max-width: 480px;
+      margin: 0 0 24px;
     }
 
+    .cta-row { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 24px; }
+
+    /* Live Preview Card */
+    .preview-box {
+      background: #0f172a;
+      border-radius: 22px;
+      padding: 22px;
+      color: #fff;
+      box-shadow: 0 20px 45px rgba(0,0,0,0.18);
+      border: 1px solid #1e293b;
+    }
+    .preview-badge {
+      display: inline-block;
+      font-size: 0.72rem;
+      font-weight: 800;
+      color: #22c55e;
+      background: rgba(34, 197, 94, 0.15);
+      padding: 3px 8px;
+      border-radius: 6px;
+      margin-bottom: 12px;
+    }
+    .preview-token {
+      background: #060b16;
+      border: 2px solid #16a34a;
+      border-radius: 16px;
+      padding: 20px;
+      text-align: center;
+      margin-bottom: 12px;
+    }
+    .preview-num { font-size: 4rem; font-weight: 900; color: #38bdf8; line-height: 1; margin: 4px 0; }
+    .preview-doc { color: #22c55e; font-weight: 800; font-size: 0.95rem; }
+
+    /* Patient Actions */
     .patient-actions {
       display: grid;
-      grid-template-columns: 1fr;
+      grid-template-columns: 1fr 1fr;
       gap: 16px;
-      margin-top: 24px;
-      text-align: left;
+      margin-top: 32px;
     }
-
     .action-card {
       background: #ffffff;
       border: 1px solid var(--line);
-      border-radius: 22px;
-      padding: 24px;
+      border-radius: 20px;
+      padding: 22px;
       box-shadow: var(--shadow);
-      transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
-      position: relative;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
     }
     .action-card.highlight {
       border-color: rgba(22, 163, 74, 0.4);
       background: linear-gradient(180deg, #ffffff 0%, #f0fdf4 100%);
     }
-
-    .ac-header { display: flex; align-items: center; gap: 14px; margin-bottom: 12px; }
+    .ac-header { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; }
     .ac-icon {
-      width: 48px;
-      height: 48px;
-      border-radius: 14px;
+      width: 44px;
+      height: 44px;
+      border-radius: 12px;
       background: #e0f2fe;
       color: #0284c7;
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 1.35rem;
+      font-size: 1.25rem;
       flex-shrink: 0;
     }
-    .action-card.highlight .ac-icon {
-      background: #dcfce7;
-      color: #16a34a;
-    }
+    .action-card.highlight .ac-icon { background: #dcfce7; color: #16a34a; }
+    .ac-title { font-weight: 800; font-size: 1.05rem; color: var(--ink); }
+    .ac-sub { font-size: 0.84rem; color: var(--slate-500); line-height: 1.4; }
 
-    .ac-title { font-weight: 800; font-size: 1.15rem; color: var(--ink); }
-    .ac-sub { font-size: 0.88rem; color: var(--slate-500); line-height: 1.45; }
-
-    .track-input-row {
-      display: flex;
-      gap: 8px;
-      margin-top: 14px;
-    }
+    .track-input-row { display: flex; gap: 8px; margin-top: 14px; }
     .track-input-row input {
       flex: 1;
-      font-size: 1.05rem;
+      font-size: 0.95rem;
       font-weight: 700;
       letter-spacing: 1px;
       text-transform: uppercase;
-      padding: 12px 16px;
-      border-radius: 12px;
+      padding: 10px 14px;
+      border-radius: 10px;
       border: 1px solid var(--line);
       background: var(--bg);
       color: var(--ink);
     }
-    .track-input-row button { border-radius: 12px; padding: 0 20px; }
 
+    /* Hospital Stations Portal Bar */
+    .portals-banner {
+      background: #ffffff;
+      border: 1px solid var(--line);
+      border-radius: 20px;
+      padding: 24px;
+      margin-top: 32px;
+      box-shadow: var(--shadow);
+    }
+    .portals-title {
+      font-size: 0.8rem;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: var(--slate-400);
+      margin-bottom: 14px;
+      text-align: center;
+    }
+    .portals-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12px;
+      text-align: center;
+    }
+    .portal-link {
+      background: #f8fafc;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 16px 10px;
+      color: var(--ink);
+      text-decoration: none;
+      font-weight: 700;
+      font-size: 0.88rem;
+      transition: all 0.2s;
+    }
+    .portal-link:hover { border-color: var(--primary); background: #f0fdf4; }
+    .portal-link i { font-size: 1.4rem; display: block; margin-bottom: 8px; color: var(--primary); }
+
+    /* How It Works */
     .how-it-works {
-      margin: 38px 0 20px;
+      margin: 32px 0 20px;
       background: #ffffff;
       border-radius: 20px;
       padding: 22px;
@@ -136,7 +233,7 @@
       box-shadow: var(--shadow);
     }
     .hiw-title {
-      font-size: 0.82rem;
+      font-size: 0.8rem;
       font-weight: 800;
       text-transform: uppercase;
       letter-spacing: 1.2px;
@@ -144,117 +241,187 @@
       margin-bottom: 16px;
       text-align: center;
     }
-    .hiw-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; text-align: center; }
+    .hiw-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; text-align: center; }
     .hiw-step { font-size: 0.86rem; color: var(--slate-600); }
     .hiw-step i { font-size: 1.4rem; color: var(--primary); display: block; margin-bottom: 8px; }
     .hiw-step b { display: block; color: var(--ink); margin-bottom: 2px; }
 
+    /* Dark Mode */
     body.dark { background: #060b16; }
+    body.dark .landing-nav { background: rgba(6, 11, 22, 0.9); border-color: #1e293b; }
+    body.dark .brand-logo { color: #f8fafc; }
     body.dark .main-title { color: #f1f5f9; }
-    body.dark .action-card { background: #121a2b; border-color: #24314a; }
-    body.dark .action-card.highlight { background: linear-gradient(180deg, #121a2b 0%, #0d261e 100%); }
-    body.dark .ac-title { color: #f8fafc; }
-    body.dark .how-it-works { background: #121a2b; border-color: #24314a; }
-    body.dark .hiw-step b { color: #f1f5f9; }
-    body.dark .hiw-step { color: #94a3b8; }
-    body.dark .track-input-row input { background: #0b1120; border-color: #24314a; }
+    body.dark .action-card, body.dark .portals-banner, body.dark .how-it-works { background: #121a2b; border-color: #24314a; }
+    body.dark .action-card.highlight { background: linear-gradient(180deg, #121a2b 0%, #052e16 100%); }
+    body.dark .ac-title, body.dark .hiw-step b { color: #f8fafc; }
+    body.dark .portal-link { background: #0b1120; border-color: #24314a; color: #f1f5f9; }
+    body.dark .track-input-row input { background: #0b1120; border-color: #24314a; color: #fff; }
 
-    @media (max-width: 480px) {
-      .main-title { font-size: 1.95rem; }
-      .hiw-grid { grid-template-columns: 1fr; gap: 16px; text-align: left; }
-      .hiw-step { display: flex; align-items: center; gap: 14px; }
-      .hiw-step i { margin-bottom: 0; }
+    @media (max-width: 820px) {
+      .hero-grid { grid-template-columns: 1fr; }
+      .patient-actions { grid-template-columns: 1fr; }
+      .portals-grid { grid-template-columns: 1fr 1fr; }
+      .main-title { font-size: 2.1rem; }
     }
   </style>
 </head>
 <body>
 
-  <div class="topbar">
-    <a class="brand" href="index.html">
-      <span class="logomark"><img src="logo.png" alt="TokSpot" /></span>TokSpot
+  <!-- Topbar Navigation -->
+  <header class="landing-nav">
+    <a class="brand-logo" href="index.html">
+      <img src="logo.png" alt="TokSpot" />
+      <span>TokSpot</span>
     </a>
-    <span class="spacer"></span>
-    <button class="icn-btn" onclick="hk.toggleDark()" title="Switch Theme"><i class="fa-solid fa-moon"></i></button>
-  </div>
+    <div class="nav-actions">
+      <a href="admin.html" class="btn btn-slate btn-sm"><i class="fa-solid fa-lock"></i> Login</a>
+      <a href="signup.html" class="btn btn-green btn-sm"><i class="fa-solid fa-bolt"></i> Register Hospital</a>
+      <button class="icn-btn" onclick="hk.toggleDark()" title="Switch Theme"><i class="fa-solid fa-moon"></i></button>
+    </div>
+  </header>
 
   <div class="hero-container">
 
-    <div class="brand-badge">
-      <img src="logo.png" alt="TokSpot Logo" />
+    <div class="hero-grid">
+      <!-- Left: Title & Quick Launch -->
+      <div>
+        <div class="brand-badge">
+          <img src="logo.png" alt="TokSpot Logo" />
+        </div>
+        
+        <h1 class="main-title">
+          Smart Hospital Queue & <span>Multilingual TV Display</span>
+        </h1>
+        <p class="main-subtitle">
+          Eliminate noisy waiting rooms with automated bilingual voice calling (Tamil + English), live smart TV displays, and zero-hardware OPD desks.
+        </p>
+
+        <div class="cta-row">
+          <a href="signup.html" class="btn btn-green btn-lg" style="text-decoration:none;">
+            <i class="fa-solid fa-hospital"></i> Create Hospital Free
+          </a>
+          <a href="book.html" class="btn btn-slate btn-lg" style="text-decoration:none;">
+            <i class="fa-solid fa-qrcode"></i> Patient Booking
+          </a>
+        </div>
+      </div>
+
+      <!-- Right: Realtime Preview Mockup -->
+      <div class="preview-box">
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <span class="preview-badge"><i class="fa-solid fa-circle fa-beat" style="font-size:8px;"></i> LIVE TV BOARD</span>
+          <span style="font-size:0.75rem;color:#94a3b8;">Tamil + English Audio</span>
+        </div>
+        <div class="preview-token">
+          <div style="font-size:0.75rem;color:#94a3b8;text-transform:uppercase;letter-spacing:1px;font-weight:700;">Now Calling</div>
+          <div class="preview-num">#014</div>
+          <div class="preview-doc">Dr. Rajesh · Consultation Room 1</div>
+          <div style="font-size:0.8rem;color:#cbd5e1;margin-top:6px;">
+            <i class="fa-solid fa-volume-high"></i> "டோக்கன் எண் 14, அறை 1-க்கு வரவும்"
+          </div>
+        </div>
+        <div style="display:flex;gap:8px;text-align:center;">
+          <div style="flex:1;background:#060b16;padding:10px;border-radius:10px;border:1px solid #1e293b;">
+            <div style="font-size:0.7rem;color:#94a3b8;">NEXT IN LINE</div>
+            <div style="font-weight:800;color:#38bdf8;font-size:1.15rem;">#015</div>
+          </div>
+          <div style="flex:1;background:#060b16;padding:10px;border-radius:10px;border:1px solid #1e293b;">
+            <div style="font-size:0.7rem;color:#94a3b8;">EMERGENCY</div>
+            <div style="font-weight:800;color:#ef4444;font-size:1.15rem;">#016</div>
+          </div>
+        </div>
+      </div>
     </div>
-    
-    <h1 class="main-title">Skip Crowded Waiting Rooms.</h1>
-    <p class="main-subtitle">
-      Book your hospital consultation token from home. Arrive right on time when your turn is ready.
-    </p>
+
+    <!-- Quick Portal Launch Bar for Hospital Staff -->
+    <div class="portals-banner">
+      <div class="portals-title">Instant Station Launcher</div>
+      <div class="portals-grid">
+        <a href="signup.html" class="portal-link">
+          <i class="fa-solid fa-hospital-user"></i>
+          <div>Register Hospital</div>
+          <span style="font-size:0.72rem;color:var(--slate-400);">New Setup</span>
+        </a>
+        <a href="admin.html" class="portal-link">
+          <i class="fa-solid fa-gauge-high"></i>
+          <div>Admin Desk</div>
+          <span style="font-size:0.72rem;color:var(--slate-400);">Doctors &amp; Codes</span>
+        </a>
+        <a href="doctor-login.html" class="portal-link">
+          <i class="fa-solid fa-stethoscope"></i>
+          <div>Doctor Station</div>
+          <span style="font-size:0.72rem;color:var(--slate-400);">PIN Consultation</span>
+        </a>
+        <a href="frontdesk.html" class="portal-link">
+          <i class="fa-solid fa-ticket"></i>
+          <div>Front Desk</div>
+          <span style="font-size:0.72rem;color:var(--slate-400);">Print Tokens</span>
+        </a>
+      </div>
+    </div>
 
     <!-- Main Patient Actions -->
     <div class="patient-actions">
-      
       <!-- Option 1: Book Token from Home -->
       <div class="action-card highlight">
-        <div class="ac-header">
-          <div class="ac-icon"><i class="fa-solid fa-ticket"></i></div>
-          <div>
-            <div class="ac-title">Book a Consultation Token</div>
-            <div class="ac-sub">Choose your hospital, doctor &amp; preferred time slot online.</div>
+        <div>
+          <div class="ac-header">
+            <div class="ac-icon"><i class="fa-solid fa-ticket"></i></div>
+            <div>
+              <div class="ac-title">Book a Consultation Token</div>
+              <div class="ac-sub">Choose your hospital, doctor &amp; get your live digital pass.</div>
+            </div>
           </div>
         </div>
-        <a href="book.html" class="btn btn-green btn-block btn-lg" style="margin-top:10px;text-decoration:none;">
+        <a href="book.html" class="btn btn-green btn-block btn-lg" style="margin-top:14px;text-decoration:none;">
           <i class="fa-solid fa-calendar-check"></i> Book Online Token
         </a>
       </div>
 
       <!-- Option 2: Check Active Token Status -->
       <div class="action-card">
-        <div class="ac-header">
-          <div class="ac-icon"><i class="fa-solid fa-clock-rotate-left"></i></div>
-          <div>
-            <div class="ac-title">Track My Token Status</div>
-            <div class="ac-sub">See your queue position and estimated arrival time.</div>
+        <div>
+          <div class="ac-header">
+            <div class="ac-icon"><i class="fa-solid fa-clock-rotate-left"></i></div>
+            <div>
+              <div class="ac-title">Track My Token Status</div>
+              <div class="ac-sub">See your waiting position and doctor progress live.</div>
+            </div>
           </div>
         </div>
         <form onsubmit="trackToken(event)" class="track-input-row">
-          <input id="tokenInput" type="text" placeholder="e.g. 5 or A-102" autocomplete="off" required />
+          <input id="tokenInput" type="text" placeholder="e.g. 5 or HOSP-1234" autocomplete="off" required />
           <button type="submit" class="btn btn-slate"><i class="fa-solid fa-magnifying-glass"></i> Track</button>
         </form>
       </div>
-
     </div>
 
     <!-- How it works explanation -->
     <div class="how-it-works">
-      <div class="hiw-title">How TokSpot Saves Your Time</div>
+      <div class="hiw-title">How TokSpot Saves Patient &amp; Doctor Time</div>
       <div class="hiw-grid">
         <div class="hiw-step">
           <i class="fa-solid fa-mobile-screen"></i>
           <div>
-            <b>1. Book from Home</b>
-            <span>Generate token online without standing in queues.</span>
+            <b>1. Book or Walk-in</b>
+            <span>Get your token online via QR or from front reception.</span>
           </div>
         </div>
         <div class="hiw-step">
           <i class="fa-solid fa-hourglass-half"></i>
           <div>
-            <b>2. Live Queue Sync</b>
-            <span>Track doctor consult speed directly on your phone.</span>
+            <b>2. Live Smart TV Sync</b>
+            <span>Patients follow waiting numbers on screen with voice call chimes.</span>
           </div>
         </div>
         <div class="hiw-step">
-          <i class="fa-solid fa-hospital-user"></i>
+          <i class="fa-solid fa-user-doctor"></i>
           <div>
-            <b>3. Arrive On Time</b>
-            <span>Reach the reception only when your turn is called.</span>
+            <b>3. 1-Click Consultation</b>
+            <span>Doctors call patients via PIN login without shouting or crowding.</span>
           </div>
         </div>
       </div>
-    </div>
-
-    <!-- Clean Staff Gate Link -->
-    <div style="text-align: center; margin-top: 36px; padding-top: 20px; border-top: 1px dashed var(--line);">
-      <a href="staff.html" style="font-size: 0.86rem; color: var(--slate-500); text-decoration: none; font-weight: 700; display: inline-flex; align-items: center; gap: 8px;">
-        <i class="fa-solid fa-hospital-user" style="color: var(--primary);"></i> Hospital Staff &amp; Doctor Workspace <i class="fa-solid fa-chevron-right" style="font-size: 0.75rem;"></i>
-      </a>
     </div>
 
   </div>
@@ -272,24 +439,25 @@
     function trackToken(e) {
       e.preventDefault();
       const num = document.getElementById('tokenInput').value.trim();
-      if (!num) return showToast('Please enter your token number', true);
-      window.location.href = `token.html?t=${encodeURIComponent(num)}`;
+      if (!num) return showToast('Please enter your token or hospital code', true);
+      window.location.href = `book.html?code=${encodeURIComponent(num)}`;
     }
   </script>
+
   <script type="application/ld+json">
-{
-  "@context": "https://schema.org",
-  "@type": "SoftwareApplication",
-  "name": "TokSpot",
-  "operatingSystem": "Web, Android, iOS, Windows, Smart TV",
-  "applicationCategory": "BusinessApplication",
-  "description": "Multi-tenant hospital queue management system with automated bilingual voice calling and real-time waiting displays.",
-  "offers": {
-    "@type": "Offer",
-    "price": "0",
-    "priceCurrency": "INR"
+  {
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
+    "name": "TokSpot",
+    "operatingSystem": "Web, Android, iOS, Windows, Smart TV",
+    "applicationCategory": "BusinessApplication",
+    "description": "Multi-tenant hospital queue management system with automated bilingual voice calling and real-time waiting displays.",
+    "offers": {
+      "@type": "Offer",
+      "price": "0",
+      "priceCurrency": "INR"
+    }
   }
-}
-</script>
+  </script>
 </body>
 </html>
