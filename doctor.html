@@ -10,7 +10,7 @@
   <link rel="icon" type="image/png" href="logo.png" />
   <link rel="apple-touch-icon" href="logo.png" />
   <style>
-    body { background: #0f172a; color: #f8fafc; min-height: 100vh; padding: 0; margin: 0; }
+    body { background: #0f172a; color: #f8fafc; min-height: 100vh; padding: 0; margin: 0; font-family: system-ui, -apple-system, sans-serif; }
     .doc-container { max-width: 680px; margin: 0 auto; padding: 16px 20px 40px; }
 
     .doctor-badge-bar {
@@ -26,8 +26,8 @@
     }
     .current-card.priority { border-color: #ef4444; background: linear-gradient(180deg, #2a1b1b, #1e293b); }
     
-    .curr-num { font-size: 5.8rem; font-weight: 900; color: #38bdf8; letter-spacing: -2px; line-height: 1; margin: 10px 0; }
-    .curr-name { font-size: 1.4rem; font-weight: 700; color: #fff; }
+    .curr-num { font-size: 5.5rem; font-weight: 900; color: #38bdf8; letter-spacing: -2px; line-height: 1; margin: 10px 0; }
+    .curr-name { font-size: 1.35rem; font-weight: 700; color: #fff; }
     
     .action-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-top: 20px; }
     .call-btn { 
@@ -75,7 +75,7 @@
 
   <div class="doc-container">
 
-    <!-- Doctor Station Identity Bar (No Dropdowns) -->
+    <!-- Doctor Station Identity Bar -->
     <div class="doctor-badge-bar">
       <div>
         <div style="font-weight:800;font-size:1.1rem;color:#f8fafc;" id="docNameDisplay">Loading Doctor…</div>
@@ -97,7 +97,7 @@
 
       <!-- Fast Action Controls -->
       <div class="action-grid">
-        <button class="call-btn" onclick="callNext()"><i class="fa-solid fa-bullhorn"></i> Call Next Patient</button>
+        <button class="call-btn" id="btnCallNext" onclick="callNext()"><i class="fa-solid fa-bullhorn"></i> Call Next Patient</button>
         <button class="sec-btn btn-recall" onclick="recallCurrent()"><i class="fa-solid fa-volume-high"></i> Recall</button>
         <button class="sec-btn btn-skip" onclick="skipCurrent()"><i class="fa-solid fa-user-xmark"></i> Absent / Skip</button>
         <button class="sec-btn btn-done" onclick="completeCurrent()"><i class="fa-solid fa-check-double"></i> Complete</button>
@@ -129,6 +129,29 @@
   <script src="js/app.js"></script>
   <script src="js/firebase.js"></script>
   <script>
+    // Failsafe HTML escape
+    window.escHtml = window.escHtml || function (s) {
+      return String(s == null ? '' : s)
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+    };
+
+    // Failsafe toast
+    window.showToast = window.showToast || function(msg, isErr, ms) {
+      let w = document.getElementById('hkToastWrap');
+      if (!w) {
+        w = document.createElement('div');
+        w.id = 'hkToastWrap';
+        w.style.cssText = 'position:fixed;bottom:24px;left:50%;transform:translateX(-50%);z-index:99999;display:flex;flex-direction:column;gap:8px;align-items:center;pointer-events:none;';
+        document.body.appendChild(w);
+      }
+      const t = document.createElement('div');
+      t.style.cssText = `background:${isErr ? '#ef4444' : '#16a34a'};color:#fff;padding:12px 20px;border-radius:12px;font-weight:700;font-size:0.9rem;box-shadow:0 10px 25px rgba(0,0,0,0.2);transition:opacity 0.3s;`;
+      t.textContent = msg;
+      w.appendChild(t);
+      setTimeout(() => { t.style.opacity = '0'; setTimeout(() => t.remove(), 300); }, ms || 2500);
+    };
+
     let activeDoctorProfile = null;
     let currentHospitalSlug = null;
     let currentActiveToken = null;
@@ -136,52 +159,80 @@
     let unsubQueue = null;
 
     window.addEventListener('load', async () => {
-      await initFirebase();
-      await waitForFB();
+      try {
+        if (typeof initFirebase === 'function') await initFirebase();
+        if (typeof waitForFB === 'function') await waitForFB();
+      } catch (e) {
+        console.error('Firebase init note:', e);
+      }
 
+      // Check doctor session
       const sessionData = sessionStorage.getItem('activeDoctor');
       if (!sessionData) {
         window.location.replace('doctor-login.html');
         return;
       }
 
-      activeDoctorProfile = JSON.parse(sessionData);
-      currentHospitalSlug = activeDoctorProfile.hospitalSlug;
+      try {
+        activeDoctorProfile = JSON.parse(sessionData);
+      } catch(e) {
+        sessionStorage.removeItem('activeDoctor');
+        window.location.replace('doctor-login.html');
+        return;
+      }
 
+      currentHospitalSlug = activeDoctorProfile.hospitalSlug;
       if (!currentHospitalSlug || !activeDoctorProfile.id) {
         window.location.replace('doctor-login.html');
         return;
       }
 
-      // Populate Doctor Details
-      document.getElementById('docNameDisplay').textContent = activeDoctorProfile.name || 'Doctor';
-      document.getElementById('hospNameDisplay').textContent = `${activeDoctorProfile.hospitalName || currentHospitalSlug} · ${activeDoctorProfile.department || 'General'}`;
+      // Populate doctor banner
+      document.getElementById('docNameDisplay').textContent = activeDoctorProfile.name ? `Dr. ${activeDoctorProfile.name.replace(/^Dr\.?\s*/i, '')}` : 'Doctor Desk';
+      document.getElementById('hospNameDisplay').textContent = `${activeDoctorProfile.hospitalName || currentHospitalSlug} · ${activeDoctorProfile.department || 'Consultation Room'}`;
 
       listenDoctorQueue();
     });
 
+    function getRoomCounterName() {
+      if (!activeDoctorProfile) return 'Consultation Room';
+      return activeDoctorProfile.room || activeDoctorProfile.counter || activeDoctorProfile.department || 'Consultation Room';
+    }
+
     function listenDoctorQueue() {
       if (unsubQueue) unsubQueue();
-      const today = window.todayStr ? window.todayStr() : new Date().toISOString().slice(0,10);
+      const today = window.todayStr ? window.todayStr() : new Date().toISOString().slice(0, 10);
 
-      const q = window._fs.query(
-        window._fs.collection(window._db, 'hospitals', currentHospitalSlug, 'tokens'),
-        window._fs.where('doctorId', '==', activeDoctorProfile.id),
-        window._fs.where('date', '==', today),
-        window._fs.where('status', 'in', ['waiting', 'called'])
-      );
+      // Robust listener query
+      const tokensRef = window._fs.collection(window._db, 'hospitals', currentHospitalSlug, 'tokens');
+      const q = window._fs.query(tokensRef, window._fs.where('date', '==', today));
 
       unsubQueue = window._fs.onSnapshot(q, (snap) => {
         waitingTokens = [];
         currentActiveToken = null;
 
         snap.docs.forEach(d => {
-          const t = d.data(); t.id = d.id;
-          if (t.status === 'called') currentActiveToken = t;
-          else if (t.status === 'waiting') waitingTokens.push(t);
+          const t = d.data();
+          t.id = d.id;
+
+          // Check if token belongs to this doctor OR if token has no doctor assigned yet
+          const matchesDoctor = String(t.doctorId) === String(activeDoctorProfile.id) || !t.doctorId;
+
+          if (matchesDoctor) {
+            if (t.status === 'called' || t.status === 'in-consultation') {
+              currentActiveToken = t;
+            } else if (t.status === 'waiting') {
+              waitingTokens.push(t);
+            }
+          }
         });
 
-        waitingTokens.sort((a, b) => (b.priority ? 1 : 0) - (a.priority ? 1 : 0) || String(a.number).localeCompare(String(b.number)));
+        // Numeric natural sorting (Token 1, 2, ..., 10, 11) + Priority handling
+        waitingTokens.sort((a, b) => {
+          if (b.priority && !a.priority) return 1;
+          if (!b.priority && a.priority) return -1;
+          return (Number(a.number) || 0) - (Number(b.number) || 0);
+        });
 
         document.getElementById('queueCount').textContent = `${waitingTokens.length} Waiting`;
 
@@ -189,7 +240,7 @@
         if (currentActiveToken) {
           document.getElementById('activeNumber').textContent = `#${currentActiveToken.number}`;
           document.getElementById('activeName').textContent = currentActiveToken.patientName || 'Patient';
-          document.getElementById('activeMeta').textContent = `Phone: ${currentActiveToken.phone || 'N/A'} · Source: ${currentActiveToken.source || 'walk-in'}`;
+          document.getElementById('activeMeta').textContent = `Phone: ${currentActiveToken.phone || 'N/A'} · Source: ${currentActiveToken.source || 'Desk'}`;
           card.classList.toggle('priority', !!currentActiveToken.priority);
         } else {
           document.getElementById('activeNumber').textContent = '—';
@@ -198,51 +249,80 @@
           card.classList.remove('priority');
         }
 
-        document.getElementById('queueRows').innerHTML = waitingTokens.map((t, idx) => `
-          <div class="queue-item">
-            <div>
-              <span style="font-weight:800;color:#fff;font-size:1.15rem;margin-right:10px;">#${escHtml(t.number)}</span>
-              <span style="color:#cbd5e1;font-weight:600;font-size:0.95rem;">${escHtml(t.patientName || 'Patient')}</span>
-              ${t.priority ? '<span class="badge red" style="margin-left:6px;"><i class="fa-solid fa-truck-medical"></i> PRIORITY</span>' : ''}
-            </div>
-            <span style="color:#64748b;font-size:0.85rem;font-weight:700;">Pos ${idx + 1}</span>
-          </div>
-        `).join('') || '<div style="padding:18px;text-align:center;color:#64748b;">No patients waiting in queue</div>';
+        renderQueueRows();
+      }, (err) => {
+        console.error('Queue snapshot error:', err);
+        showToast('Error syncing queue: ' + err.message, true);
       });
+    }
+
+    function renderQueueRows() {
+      const container = document.getElementById('queueRows');
+      if (!waitingTokens.length) {
+        container.innerHTML = '<div style="padding:18px;text-align:center;color:#64748b;">No patients waiting in queue</div>';
+        return;
+      }
+
+      container.innerHTML = waitingTokens.map((t, idx) => `
+        <div class="queue-item">
+          <div>
+            <span style="font-weight:800;color:#38bdf8;font-size:1.15rem;margin-right:10px;">#${escHtml(t.number)}</span>
+            <span style="color:#cbd5e1;font-weight:600;font-size:0.95rem;">${escHtml(t.patientName || 'Patient')}</span>
+            ${t.priority ? '<span class="badge red" style="margin-left:6px;"><i class="fa-solid fa-truck-medical"></i> PRIORITY</span>' : ''}
+          </div>
+          <span style="color:#64748b;font-size:0.85rem;font-weight:700;">Pos ${idx + 1}</span>
+        </div>
+      `).join('');
     }
 
     async function callNext() {
       if (!waitingTokens.length) return showToast('No waiting patients in queue.', true);
 
-      // Auto-complete existing consultation if any
-      if (currentActiveToken) {
-        const notes = document.getElementById('consultNotes').value.trim();
-        await window._fs.updateDoc(window._fs.doc(window._db, 'hospitals', currentHospitalSlug, 'tokens', currentActiveToken.id), {
-          status: 'completed',
-          doctorNotes: notes || '',
-          completedAt: window._fs.serverTimestamp()
-        });
-        document.getElementById('consultNotes').value = '';
-      }
+      const btn = document.getElementById('btnCallNext');
+      btn.disabled = true;
 
-      const nextToken = waitingTokens[0];
       try {
+        // Auto-complete previous token if still in room
+        if (currentActiveToken) {
+          const notes = document.getElementById('consultNotes').value.trim();
+          await window._fs.updateDoc(window._fs.doc(window._db, 'hospitals', currentHospitalSlug, 'tokens', currentActiveToken.id), {
+            status: 'completed',
+            doctorNotes: notes || '',
+            completedAt: window._fs.serverTimestamp()
+          });
+          document.getElementById('consultNotes').value = '';
+        }
+
+        const nextToken = waitingTokens[0];
+        const roomName = getRoomCounterName();
+
         await window._fs.updateDoc(window._fs.doc(window._db, 'hospitals', currentHospitalSlug, 'tokens', nextToken.id), {
           status: 'called',
+          doctorId: activeDoctorProfile.id,
+          doctorName: activeDoctorProfile.name || '',
+          counter: roomName,
           calledAt: window._fs.serverTimestamp()
         });
+
         playChime();
-        if (window.announceToken) window.announceToken(nextToken.number, nextToken.patientName);
-        showToast('Called Token #' + nextToken.number);
+        if (window.announceToken) {
+          window.announceToken(nextToken.number, nextToken.patientName, roomName);
+        }
+        showToast(`Calling Token #${nextToken.number}`);
       } catch (e) {
         showToast('Call failed: ' + e.message, true);
+      } finally {
+        btn.disabled = false;
       }
     }
 
     function recallCurrent() {
       if (!currentActiveToken) return showToast('No active patient to recall.', true);
       playChime();
-      if (window.announceToken) window.announceToken(currentActiveToken.number, currentActiveToken.patientName);
+      const roomName = getRoomCounterName();
+      if (window.announceToken) {
+        window.announceToken(currentActiveToken.number, currentActiveToken.patientName, roomName);
+      }
       showToast(`Recalled Token #${currentActiveToken.number}`);
     }
 
@@ -254,7 +334,7 @@
           skippedAt: window._fs.serverTimestamp()
         });
         document.getElementById('consultNotes').value = '';
-        showToast('Token #' + currentActiveToken.number + ' marked Absent.');
+        showToast(`Token #${currentActiveToken.number} marked Absent.`);
       } catch (e) {
         showToast('Skip failed: ' + e.message, true);
       }
@@ -270,7 +350,7 @@
           completedAt: window._fs.serverTimestamp()
         });
         document.getElementById('consultNotes').value = '';
-        showToast('Token #' + currentActiveToken.number + ' completed.');
+        showToast(`Token #${currentActiveToken.number} consultation completed.`);
       } catch (e) {
         showToast('Action failed: ' + e.message, true);
       }
@@ -279,8 +359,11 @@
     function playChime() {
       try {
         const audio = document.getElementById('docChime');
-        if (audio) audio.play().catch(()=>{});
-      } catch(e){}
+        if (audio) {
+          audio.currentTime = 0;
+          audio.play().catch(() => {});
+        }
+      } catch (e) {}
     }
 
     function doctorLogout() {
