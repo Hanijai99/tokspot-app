@@ -64,7 +64,7 @@
       </div>
       <div class="hsub">Manage your hospital tokens, assigned doctors, and station credentials.</div>
 
-      <!-- Hospital Credentials & Code Display Card -->
+      <!-- Hospital Credentials Card -->
       <div class="card mt-24">
         <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
           <span style="width:36px;height:36px;border-radius:12px;background:var(--green-050);color:var(--green);display:flex;align-items:center;justify-content:center;"><i class="fa-solid fa-hospital"></i></span>
@@ -145,11 +145,8 @@
   <script>
     window.escHtml = window.escHtml || function (s) {
       return String(s == null ? '' : s)
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;')
-        .replace(/'/g, '&#39;');
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
     };
 
     let activeAdminUser = null;
@@ -354,7 +351,7 @@
           const doc = d.data();
           const docId = d.id;
           const statusBadge = doc.status === 'closed' ? '<span class="badge red">closed</span>' : '<span class="badge green">open</span>';
-          const pinBadge = doc.pin ? `<span class="badge" style="background:var(--green-050);color:var(--green);font-weight:700;">PIN: ${escHtml(doc.pin)}</span>` : '';
+          const pinBadge = doc.pin ? `<span class="badge" style="background:var(--green-050);color:var(--green);font-weight:700;"><i class="fa-solid fa-shield"></i> PIN Set</span>` : '';
 
           list.innerHTML += `<div class="mgmt-card" style="padding:14px;border-radius:12px;background:var(--bg);border:1px solid var(--line);margin-bottom:10px;">
             <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
@@ -404,38 +401,54 @@
         document.getElementById('docDept').value = doc.department || '';
         document.getElementById('docEmail').value = doc.email || '';
         document.getElementById('docEmail').disabled = true;
-        document.getElementById('docPin').value = doc.pin || '';
+        document.getElementById('docPin').value = ''; // Keep empty for password security
+        document.getElementById('docPin').placeholder = 'Leave blank to keep current PIN';
         document.getElementById('docStatus').value = doc.status || 'open';
       } catch (e) { console.error(e); }
     }
 
+    // Save doctor with SHA-256 Hashed PIN
     async function saveDoctor() {
       const name = document.getElementById('docName').value.trim();
       const dept = document.getElementById('docDept').value.trim();
-      const email = document.getElementById('docEmail').value.trim();
-      const pin = document.getElementById('docPin').value.trim();
+      const email = document.getElementById('docEmail').value.trim().toLowerCase();
+      const rawPin = document.getElementById('docPin').value.trim();
       const status = document.getElementById('docStatus').value;
       const btn = document.getElementById('btnSaveDoctor');
 
       if (!name) return showToast('Enter doctor name.', true);
       if (!assignedHospitalSlug) return showToast('No hospital assigned.', true);
-      if (!editDoctorId && (!email || pin.length !== 4)) {
+      if (!editDoctorId && (!email || rawPin.length !== 4)) {
         return showToast('Enter doctor email & 4-digit PIN.', true);
       }
-
-      const coll = window._fs.collection(window._db, 'hospitals', assignedHospitalSlug, 'doctors');
-      const data = { name, department: dept, status, pin, hospitalSlug: assignedHospitalSlug, updatedAt: window._fs.serverTimestamp() };
-      if (email) data.email = email;
+      if (editDoctorId && rawPin && rawPin.length !== 4) {
+        return showToast('PIN must be exactly 4 digits.', true);
+      }
 
       btn.disabled = true;
       try {
+        const coll = window._fs.collection(window._db, 'hospitals', assignedHospitalSlug, 'doctors');
+        const data = { 
+          name, 
+          department: dept, 
+          status, 
+          hospitalSlug: assignedHospitalSlug, 
+          updatedAt: window._fs.serverTimestamp() 
+        };
+        if (email) data.email = email;
+
+        // Hash PIN using native SHA-256 function from app.js
+        if (rawPin) {
+          data.pin = await (window.hashPin ? window.hashPin(rawPin) : rawPin);
+        }
+
         if (editDoctorId) {
           await window._fs.updateDoc(window._fs.doc(coll, editDoctorId), data);
-          showToast('Doctor updated.');
+          showToast('Doctor updated securely.');
         } else {
           const docRef = await window._fs.addDoc(coll, { ...data, createdAt: window._fs.serverTimestamp() });
           await window._fs.setDoc(window._fs.doc(window._db, 'doctors', docRef.id), data);
-          showToast('Doctor onboarded.');
+          showToast('Doctor onboarded securely.');
         }
         cancelDoctorEdit();
         loadDoctorList();
