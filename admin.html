@@ -44,6 +44,11 @@
       <div class="mt-16" style="text-align:left;">
         <div class="field"><label class="label">Admin Email</label><input class="input" id="loginEmail" type="email" placeholder="admin@hospital.com" /></div>
         <div class="field"><label class="label">Password</label><input class="input" id="loginPass" type="password" /></div>
+        <div style="display:flex;justify-content:flex-end;margin-top:6px;margin-bottom:14px;">
+          <a href="javascript:void(0)" onclick="toggleResetPasswordModal(true)" style="color:#0284c7;font-size:0.82rem;font-weight:700;text-decoration:none;">
+            Forgot Admin Password?
+          </a>
+        </div>
       </div>
       <button class="btn btn-green btn-block btn-lg" id="btnLogin" onclick="adminLogin()"><i class="fa-solid fa-right-to-bracket"></i> Sign In</button>
       
@@ -117,7 +122,51 @@
 
     </section>
 
-    <!-- 3. Recovery Modal -->
+    <!-- 3. Admin Forgot Password Modal -->
+    <div id="resetPassModal" class="hidden" style="position:fixed;inset:0;background:rgba(0,0,0,0.7);backdrop-filter:blur(6px);display:flex;align-items:center;justify-content:center;z-index:9999;padding:16px;">
+      <div class="card" style="max-width:400px;width:100%;border-radius:20px;padding:24px;text-align:left;background:var(--card);border:1px solid var(--line);box-shadow:var(--shadow);">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+          <h3 style="font-size:1.15rem;font-weight:800;margin:0;">
+            <i class="fa-solid fa-lock-open" style="color:var(--green);margin-right:6px;"></i> Reset Admin Password
+          </h3>
+          <button class="icn-btn" onclick="toggleResetPasswordModal(false)"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+        <p class="muted" style="font-size:0.84rem;line-height:1.5;margin-bottom:16px;">
+          Enter your registered admin email address. An official password reset link will be sent to your inbox.
+        </p>
+        <div class="field" style="margin-bottom:14px;">
+          <label class="label">Registered Email</label>
+          <input class="input" id="resetEmailInput" type="email" placeholder="admin@hospital.com" />
+        </div>
+        <button class="btn btn-green btn-block" id="btnSendReset" onclick="executePasswordReset()">
+          <i class="fa-solid fa-paper-plane"></i> Send Reset Link
+        </button>
+      </div>
+    </div>
+
+    <!-- 4. Admin Internal Doctor PIN Reset Modal -->
+    <div id="doctorResetModal" class="hidden" style="position:fixed;inset:0;background:rgba(0,0,0,0.7);backdrop-filter:blur(6px);display:flex;align-items:center;justify-content:center;z-index:9999;padding:16px;">
+      <div class="card" style="max-width:400px;width:100%;border-radius:20px;padding:24px;background:var(--card);border:1px solid var(--line);box-shadow:var(--shadow);">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+          <h3 style="font-size:1.1rem;font-weight:800;margin:0;">
+            <i class="fa-solid fa-user-shield" style="color:var(--green);margin-right:6px;"></i> Quick Reset Doctor PIN
+          </h3>
+          <button class="icn-btn" onclick="closeDoctorResetModal()"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+        <p style="font-size:0.84rem;color:var(--slate-500);margin-bottom:14px;">
+          Directly assigning a new PIN for <b id="resetDocName" style="color:var(--ink);"></b> (<span id="resetDocEmail" style="color:#0284c7;"></span>). No email verification needed.
+        </p>
+        <div class="field" style="margin-bottom:14px;">
+          <label class="label">New 4-Digit PIN</label>
+          <input class="input" id="newDoctorPin" type="password" maxlength="4" placeholder="••••" style="text-align:center;letter-spacing:6px;font-size:1.3rem;font-weight:800;" />
+        </div>
+        <button class="btn btn-green btn-block" id="btnConfirmDoctorReset" onclick="executeDoctorPinReset()">
+          <i class="fa-solid fa-lock"></i> Update & Secure PIN
+        </button>
+      </div>
+    </div>
+
+    <!-- 5. Hospital Code Recovery Modal -->
     <div id="recoveryModal" class="hidden" style="position:fixed;inset:0;background:rgba(0,0,0,0.6);display:flex;align-items:center;justify-content:center;z-index:999;padding:16px;">
       <div class="card" style="max-width:420px;width:100%;border-radius:20px;">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
@@ -149,9 +198,18 @@
         .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
     };
 
+    // Native SHA-256 Hasher
+    async function createSha256Pin(plainPin) {
+      const enc = new TextEncoder();
+      const hashBuffer = await crypto.subtle.digest('SHA-256', enc.encode(String(plainPin).trim()));
+      const hashArray = Array.from(new Uint8Array(hashBuffer));
+      return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+    }
+
     let activeAdminUser = null;
     let assignedHospitalSlug = null;
     let editDoctorId = null;
+    let targetResetDoctorId = null;
 
     window.addEventListener('load', async () => {
       if (window.hk && hk.applyDark) hk.applyDark();
@@ -206,6 +264,47 @@
         showToast('Logged out.');
       } catch(e) {
         showToast(e.message, true);
+      }
+    }
+
+    // Admin Password Reset Modal Controls
+    function toggleResetPasswordModal(show) {
+      const modal = document.getElementById('resetPassModal');
+      const resetEmail = document.getElementById('resetEmailInput');
+      const loginEmail = document.getElementById('loginEmail');
+
+      if (show) {
+        if (loginEmail && loginEmail.value.trim()) {
+          resetEmail.value = loginEmail.value.trim();
+        }
+        modal.classList.remove('hidden');
+      } else {
+        modal.classList.add('hidden');
+      }
+    }
+
+    async function executePasswordReset() {
+      const email = document.getElementById('resetEmailInput').value.trim().toLowerCase();
+      const btn = document.getElementById('btnSendReset');
+
+      if (!email) return showToast('Please enter your admin email address.', true);
+
+      btn.disabled = true;
+      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Sending link...';
+
+      try {
+        await window._useAuth.sendPasswordResetEmail(window._auth, email);
+        showToast('Password reset link sent! Check your inbox.');
+        toggleResetPasswordModal(false);
+      } catch (err) {
+        console.error('Password reset error:', err);
+        let msg = err.message;
+        if (err.code === 'auth/user-not-found') msg = 'No admin account found with this email.';
+        if (err.code === 'auth/invalid-email') msg = 'Please enter a valid email address.';
+        showToast(msg, true, 4000);
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fa-solid fa-paper-plane"></i> Send Reset Link';
       }
     }
 
@@ -359,8 +458,11 @@
                 <div style="font-weight:700;color:var(--ink);">${escHtml(doc.name || docId)} ${statusBadge} ${pinBadge}</div>
                 <div class="muted" style="font-size:.82rem;margin-top:2px;">${escHtml(doc.department || 'General')} ${doc.email ? '· ' + escHtml(doc.email) : ''}</div>
               </div>
-              <div style="display:flex;gap:6px;">
+              <div style="display:flex;gap:6px;flex-wrap:wrap;">
                 <button class="btn btn-sm btn-slate" onclick="editDoctor('${docId}')" title="Edit Doctor Details"><i class="fa-solid fa-pen"></i> Edit</button>
+                <button class="btn btn-sm btn-slate" onclick="openDoctorResetModal('${docId}', '${escHtml(doc.name || 'Doctor')}', '${escHtml(doc.email || '')}')" title="Admin Quick Reset PIN" style="background:#e0f2fe;color:#0369a1;border:1px solid #7dd3fc;font-weight:700;">
+                  <i class="fa-solid fa-key"></i> Reset PIN
+                </button>
                 <button class="btn btn-sm btn-danger" onclick="revokeDoctorAccess('${docId}', '${escHtml(doc.name || 'Doctor')}', '${escHtml(doc.email || '')}')" title="Relieve & Permanently Revoke Access" style="background:#fee2e2;color:#b91c1c;border:1px solid #fca5a5;font-weight:700;">
                   <i class="fa-solid fa-user-xmark"></i> Relieve / Revoke
                 </button>
@@ -401,7 +503,7 @@
         document.getElementById('docDept').value = doc.department || '';
         document.getElementById('docEmail').value = doc.email || '';
         document.getElementById('docEmail').disabled = true;
-        document.getElementById('docPin').value = ''; // Keep empty for password security
+        document.getElementById('docPin').value = '';
         document.getElementById('docPin').placeholder = 'Leave blank to keep current PIN';
         document.getElementById('docStatus').value = doc.status || 'open';
       } catch (e) { console.error(e); }
@@ -426,7 +528,14 @@
       }
 
       btn.disabled = true;
+      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Hashing & Saving...';
+
       try {
+        let hashedPin = null;
+        if (rawPin) {
+          hashedPin = await createSha256Pin(rawPin);
+        }
+
         const coll = window._fs.collection(window._db, 'hospitals', assignedHospitalSlug, 'doctors');
         const data = { 
           name, 
@@ -436,18 +545,17 @@
           updatedAt: window._fs.serverTimestamp() 
         };
         if (email) data.email = email;
-
-        // Hash PIN using native SHA-256 function from app.js
-        if (rawPin) {
-          data.pin = await (window.hashPin ? window.hashPin(rawPin) : rawPin);
-        }
+        if (hashedPin) data.pin = hashedPin;
 
         if (editDoctorId) {
           await window._fs.updateDoc(window._fs.doc(coll, editDoctorId), data);
           showToast('Doctor updated securely.');
         } else {
-          const docRef = await window._fs.addDoc(coll, { ...data, createdAt: window._fs.serverTimestamp() });
-          await window._fs.setDoc(window._fs.doc(window._db, 'doctors', docRef.id), data);
+          data.createdAt = window._fs.serverTimestamp();
+          const docRef = await window._fs.addDoc(coll, data);
+          try {
+            await window._fs.setDoc(window._fs.doc(window._db, 'doctors', docRef.id), data);
+          } catch(e) {}
           showToast('Doctor onboarded securely.');
         }
         cancelDoctorEdit();
@@ -456,6 +564,59 @@
         showToast('Error: ' + e.message, true);
       } finally {
         btn.disabled = false;
+        btn.innerHTML = '<i class="fa-solid fa-floppy-disk"></i> Save Doctor';
+      }
+    }
+
+    // Admin Internal Doctor PIN Reset Controls
+    function openDoctorResetModal(docId, docName, docEmail) {
+      targetResetDoctorId = docId;
+      document.getElementById('resetDocName').textContent = docName;
+      document.getElementById('resetDocEmail').textContent = docEmail || 'No Email';
+      document.getElementById('newDoctorPin').value = '';
+      document.getElementById('doctorResetModal').classList.remove('hidden');
+    }
+
+    function closeDoctorResetModal() {
+      targetResetDoctorId = null;
+      document.getElementById('doctorResetModal').classList.add('hidden');
+    }
+
+    async function executeDoctorPinReset() {
+      const rawPin = document.getElementById('newDoctorPin').value.trim();
+      const btn = document.getElementById('btnConfirmDoctorReset');
+
+      if (rawPin.length !== 4) return showToast('PIN must be exactly 4 digits.', true);
+
+      btn.disabled = true;
+      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Hashing & Updating...';
+
+      try {
+        const hashedPin = await createSha256Pin(rawPin);
+
+        const docRef = window._fs.doc(window._db, 'hospitals', assignedHospitalSlug, 'doctors', targetResetDoctorId);
+        await window._fs.updateDoc(docRef, {
+          pin: hashedPin,
+          updatedAt: window._fs.serverTimestamp()
+        });
+
+        try {
+          const rootDocRef = window._fs.doc(window._db, 'doctors', targetResetDoctorId);
+          await window._fs.updateDoc(rootDocRef, {
+            pin: hashedPin,
+            updatedAt: window._fs.serverTimestamp()
+          });
+        } catch(e) {}
+
+        showToast('Doctor PIN successfully updated & hashed!');
+        closeDoctorResetModal();
+        loadDoctorList();
+      } catch (err) {
+        console.error('Doctor reset error:', err);
+        showToast('Failed to reset PIN: ' + err.message, true);
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fa-solid fa-lock"></i> Update & Secure PIN';
       }
     }
 
@@ -472,15 +633,11 @@
       if (!confirmAction) return;
 
       try {
-        // 1. Delete doctor doc from hospital's subcollection
         await window._fs.deleteDoc(window._fs.doc(window._db, 'hospitals', assignedHospitalSlug, 'doctors', id));
-        
-        // 2. Remove from global doctors mapping
         try { 
           await window._fs.deleteDoc(window._fs.doc(window._db, 'doctors', id)); 
         } catch(e) {}
 
-        // 3. Clear any active room assignment linked to this doctor
         try {
           const roomsSnap = await window._fs.getDocs(
             window._fs.collection(window._db, 'hospitals', assignedHospitalSlug, 'rooms')
