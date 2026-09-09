@@ -143,7 +143,23 @@
         <input type="password" id="adminPassword" class="form-control" placeholder="Min. 6 characters" required />
       </div>
 
-      <button id="btnRegister" class="btn-submit" style="margin-top:18px;" onclick="registerHospital()">
+      <!-- Strict Privacy Policy Checkbox Container -->
+      <div class="form-group" style="margin-top: 18px; margin-bottom: 22px;">
+        <div style="background: #081021; border: 1px solid #1e293b; border-radius: 12px; padding: 14px 16px;">
+          <div style="display: flex; align-items: flex-start; gap: 10px;">
+            <input type="checkbox" id="privacyCheck" disabled style="width: 18px; height: 18px; accent-color: #22c55e; margin-top: 2px; cursor: not-allowed;" />
+            <div style="font-size: 0.83rem; line-height: 1.45; color: #94a3b8;">
+              I confirm that I have read and agree to the 
+              <a href="privacy.html" id="privacyLink" target="_blank" style="color: #38bdf8; font-weight: 700; text-decoration: underline;">TokMark Privacy Policy & Doctor Security Protocol</a>.
+              <div id="readNotice" style="color: #f59e0b; font-size: 0.76rem; margin-top: 5px; font-weight: 600;">
+                <i class="fa-solid fa-circle-exclamation"></i> Click the policy link above to read and enable agreement.
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <button id="btnRegister" class="btn-submit" style="margin-top:10px;" onclick="registerHospital()">
         <i class="fa-solid fa-bolt"></i> Create Hospital Station
       </button>
 
@@ -213,6 +229,34 @@
     let pollingTimer = null;
     let registeredUser = null;
 
+    // Handle Privacy Policy read detection & unlock
+    window.addEventListener('DOMContentLoaded', () => {
+      const checkbox = document.getElementById('privacyCheck');
+      const notice = document.getElementById('readNotice');
+      const isAlreadyRead = sessionStorage.getItem('tokmark_privacy_read') === 'true' || 
+                            new URLSearchParams(window.location.search).get('policy_read') === '1';
+
+      if (isAlreadyRead && checkbox) {
+        checkbox.disabled = false;
+        checkbox.checked = true;
+        checkbox.style.cursor = 'pointer';
+        notice.innerHTML = '<span style="color: #22c55e;"><i class="fa-solid fa-circle-check"></i> Privacy Policy read and acknowledged.</span>';
+      }
+
+      // When user clicks the link to read in new tab
+      document.getElementById('privacyLink')?.addEventListener('click', () => {
+        setTimeout(() => {
+          if (checkbox) {
+            checkbox.disabled = false;
+            checkbox.checked = true;
+            checkbox.style.cursor = 'pointer';
+            sessionStorage.setItem('tokmark_privacy_read', 'true');
+            notice.innerHTML = '<span style="color: #22c55e;"><i class="fa-solid fa-circle-check"></i> Privacy Policy accepted.</span>';
+          }
+        }, 1500);
+      });
+    });
+
     window.addEventListener('load', async () => {
       try {
         if (typeof initFirebase === 'function') await initFirebase();
@@ -226,6 +270,7 @@
       const phone = document.getElementById('adminPhone').value.trim();
       const email = document.getElementById('adminEmail').value.trim().toLowerCase();
       const password = document.getElementById('adminPassword').value.trim();
+      const privacyCheck = document.getElementById('privacyCheck');
       const btn = document.getElementById('btnRegister');
 
       if (!name) return alert('Please enter Hospital Name');
@@ -233,6 +278,11 @@
       if (!phone || phone.length < 10) return alert('Please enter a valid 10-digit mobile number');
       if (!email) return alert('Please enter valid Admin Email');
       if (!password || password.length < 6) return alert('Password must be at least 6 characters');
+
+      // Strict check: Policy must be accepted
+      if (!privacyCheck.checked) {
+        return alert('Please click and read the TokMark Privacy Policy & Doctor Security Protocol before proceeding.');
+      }
 
       btn.disabled = true;
       btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Creating Station...';
@@ -260,7 +310,7 @@
         generatedCode = `HOSP-${randomNum}`;
         generatedSlug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || `hosp-${randomNum}`;
 
-        // 4. Save Hospital in Firestore (with emailVerified: false)
+        // 4. Save Hospital in Firestore
         const hospDocRef = window._fs.doc(window._db, 'hospitals', generatedSlug);
         await window._fs.setDoc(hospDocRef, {
           name: name,
@@ -271,6 +321,8 @@
           adminEmail: email,
           adminUid: adminUid,
           emailVerified: false,
+          policyAccepted: true,
+          policyAcceptedAt: window._fs.serverTimestamp(),
           createdAt: window._fs.serverTimestamp(),
           status: 'active'
         });
