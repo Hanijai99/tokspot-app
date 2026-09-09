@@ -4,12 +4,12 @@
   <script src="js/loader.js"></script>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
-  <title>Front Desk — TokSpot</title>
+  <title>Front Desk — TokMark</title>
   <link rel="stylesheet" href="css/style.css" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
   <link rel="manifest" href="manifest.json" />
-  <link rel="icon" type="image/png" href="logo.png" />
-  <link rel="apple-touch-icon" href="logo.png" />
+  <link rel="icon" type="image/png" href="logo.png?v=2" />
+  <link rel="apple-touch-icon" href="logo.png?v=2" />
   <style>
     #printSlip { display: none; }
 
@@ -71,7 +71,6 @@
       font-size: 0.85rem;
     }
 
-    /* Permanent Command Action Bar */
     .command-bar {
       display: grid;
       grid-template-columns: repeat(4, 1fr);
@@ -87,7 +86,7 @@
 </head>
 <body>
   <div class="topbar">
-    <a class="brand" href="index.html"><span class="logomark"><img src="logo.png" alt="TokSpot" /></span>TokSpot Front Desk</a>
+    <a class="brand" href="index.html"><span class="logomark"><img src="logo.png?v=2" alt="TokMark" /></span>TokMark Front Desk</a>
     <span class="spacer"></span>
     <button class="icn-btn" onclick="location.href='staff.html'" title="Staff Portal"><i class="fa-solid fa-hospital-user"></i></button>
     <button class="icn-btn" onclick="launchTvFromDesk()" title="Open Display Board"><i class="fa-solid fa-tv"></i></button>
@@ -146,7 +145,7 @@
           <span class="chip gray" id="deskActiveDoctorLabel">Dr. Name</span>
         </div>
         <div class="field"><label class="label">Patient Name <span class="req">*</span></label><input class="input" id="newName" placeholder="Patient name" /></div>
-        <div class="field"><label class="label">Mobile <span class="muted">(for arrival alerts)</span></label><input class="input" id="newPhone" placeholder="10-digit mobile" maxlength="10" inputmode="numeric" /></div>
+        <div class="field"><label class="label">Mobile <span class="muted">(Max 2 tokens per phone number per day)</span></label><input class="input" id="newPhone" placeholder="10-digit mobile" maxlength="10" inputmode="numeric" /></div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
           <div class="field" style="margin-bottom:0;">
             <label class="label">Type</label>
@@ -196,13 +195,13 @@
         </div>
       </div>
 
-      <!-- Now Serving Card With PERMANENT Command Controls -->
+      <!-- Now Serving Card -->
       <div class="token-hero mt-16" style="padding:24px 16px;">
         <div class="t-label"><i class="fa-solid fa-bullhorn"></i> Now Serving</div>
         <div class="t-num" id="currentToken" style="font-size:4.6rem;">—</div>
         <div class="t-name" id="currentPatient" style="font-size:1.05rem;">Waiting for next token…</div>
 
-        <!-- ALWAYS VISIBLE DESK COMMAND BUTTONS -->
+        <!-- Command Buttons -->
         <div class="command-bar">
           <button class="btn btn-green btn-lg" onclick="callNextWaiting()" title="Call the next patient in line">
             <i class="fa-solid fa-bullhorn"></i> Call Next (F4)
@@ -276,14 +275,12 @@
   <script src="js/app.js"></script>
   <script src="js/firebase.js"></script>
   <script>
-    // Failsafe escHtml helper
     window.escHtml = window.escHtml || function(s) {
       return String(s == null ? '' : s)
         .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
         .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
     };
 
-    // Failsafe toast
     window.showToast = window.showToast || function(msg, isErr, ms) {
       let w = document.getElementById('hkToastWrap');
       if (!w) {
@@ -299,12 +296,10 @@
       setTimeout(() => { t.style.opacity = '0'; setTimeout(() => t.remove(), 300); }, ms || 2500);
     };
 
-    // Failsafe pad3 helper
     window.pad3 = window.pad3 || function(n) {
       return String(n).padStart(3, '0');
     };
 
-    // Failsafe audio chime/beep helper
     window.playBeep = window.playBeep || function() {
       try {
         const ctx = new (window.AudioContext || window.webkitAudioContext)();
@@ -358,7 +353,7 @@
 
       const params = new URLSearchParams(window.location.search);
       const urlCode = params.get('code') || params.get('h');
-      const savedCode = sessionStorage.getItem('tokspot_frontdesk_hospital');
+      const savedCode = sessionStorage.getItem('tokmark_frontdesk_hospital') || sessionStorage.getItem('tokspot_frontdesk_hospital');
 
       if (urlCode) {
         document.getElementById('gateCodeInput').value = urlCode.toUpperCase();
@@ -400,7 +395,7 @@
         currentHospitalName = hData.name || currentHospital;
         currentHospitalCode = hData.hospitalCode || codeInput;
 
-        sessionStorage.setItem('tokspot_frontdesk_hospital', currentHospitalCode);
+        sessionStorage.setItem('tokmark_frontdesk_hospital', currentHospitalCode);
 
         document.getElementById('stationHospitalTitle').textContent = currentHospitalName;
         document.getElementById('stationCitySubtitle').textContent = hData.city ? `Station: ${hData.city}` : 'Reception Station';
@@ -422,7 +417,7 @@
 
     function disconnectStation() {
       if (!confirm('Disconnect this station from this hospital?')) return;
-      sessionStorage.removeItem('tokspot_frontdesk_hospital');
+      sessionStorage.removeItem('tokmark_frontdesk_hospital');
       currentHospital = null;
       currentHospitalCode = null;
       currentDoctor = null;
@@ -486,7 +481,6 @@
       if (unsubQueue) unsubQueue();
       const today = window.todayStr ? window.todayStr() : new Date().toISOString().slice(0, 10);
       
-      // Index-safe listener: Query date only, filter memory-side for maximum reliability
       const q = window._fs.query(
         window._fs.collection(window._db, 'hospitals', currentHospital, 'tokens'),
         window._fs.where('date', '==', today)
@@ -504,7 +498,6 @@
         const t = d.data();
         t.id = d.id;
 
-        // Match current active doctor or unassigned tokens
         if (String(t.doctorId) === String(currentDoctor) || !t.doctorId) {
           if (t.status === 'waiting') waiting.push(t);
           else if (t.status === 'called') called.push(t);
@@ -512,7 +505,6 @@
         }
       });
 
-      // Strict numeric natural sort with emergency priority override
       waiting.sort((a, b) => {
         if (b.priority && !a.priority) return 1;
         if (!b.priority && a.priority) return -1;
@@ -523,7 +515,6 @@
       document.getElementById('stCalled').textContent = called.length;
       document.getElementById('stSkipped').textContent = skipped.length;
 
-      // Active Serving Token
       called.sort((a, b) => {
         const timeA = a.calledAt?.toMillis() || a.updatedAt?.toMillis() || 0;
         const timeB = b.calledAt?.toMillis() || b.updatedAt?.toMillis() || 0;
@@ -543,7 +534,6 @@
         document.getElementById('currentPatient').textContent = 'Waiting for next token…';
       }
 
-      // Waiting Queue List
       const empty = document.getElementById('queueEmpty');
       const list = document.getElementById('queueList');
       if (waiting.length === 0) {
@@ -575,7 +565,6 @@
         }).join('');
       }
 
-      // Skipped / Absent List
       const skipSec = document.getElementById('skippedSection');
       const skipList = document.getElementById('skippedList');
       if (skipped.length > 0) {
@@ -599,7 +588,6 @@
       }
     }
 
-    // Command Bar Actions
     function callNextWaiting() {
       if (firstWaitingToken) {
         setStatus(firstWaitingToken.id, 'called');
@@ -637,6 +625,41 @@
       } catch (e) { showToast('Recovery failed: ' + e.message, true); }
     }
 
+    // Check if phone number reached 2-token daily quota
+    async function validatePhoneTokenQuota(hospitalSlug, rawPhone, todayStr) {
+      const phone = String(rawPhone || '').replace(/\D/g, '').slice(-10);
+      if (!phone) return { allowed: true };
+
+      try {
+        const tokensRef = window._fs.collection(window._db, 'hospitals', hospitalSlug, 'tokens');
+        const q = window._fs.query(
+          tokensRef,
+          window._fs.where('phone', '==', phone),
+          window._fs.where('date', '==', todayStr)
+        );
+
+        const snapshot = await window._fs.getDocs(q);
+        const existingCount = snapshot.size;
+
+        if (existingCount >= 2) {
+          return {
+            allowed: false,
+            count: existingCount,
+            message: `Limit Exceeded: Already 2 tokens issued for ${phone} today.`
+          };
+        }
+
+        return {
+          allowed: true,
+          count: existingCount,
+          isSecondToken: existingCount === 1
+        };
+      } catch (err) {
+        console.warn('Quota check fallback:', err);
+        return { allowed: true };
+      }
+    }
+
     async function issueToken() {
       const name = document.getElementById('newName').value.trim();
       const phone = document.getElementById('newPhone').value.trim().replace(/\D/g,'');
@@ -649,6 +672,24 @@
       btn.disabled = true;
 
       const today = window.todayStr ? window.todayStr() : new Date().toISOString().slice(0,10);
+
+      // Validate 2-token limit per phone number for the day
+      if (phone) {
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Checking quota...';
+        const quota = await validatePhoneTokenQuota(currentHospital, phone, today);
+        if (!quota.allowed) {
+          btn.disabled = false;
+          btn.innerHTML = '<i class="fa-solid fa-ticket"></i> Issue Token';
+          alert(quota.message);
+          return showToast(quota.message, true, 4000);
+        }
+        if (quota.isSecondToken) {
+          showToast('Notice: Issuing 2nd token for this phone number.', false, 2500);
+        }
+      }
+
+      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Issuing...';
+
       const isPriority = document.getElementById('newPriority').checked;
       const counter = document.getElementById('newCounter').value;
       const counterRef = window._fs.doc(window._db, 'hospitals', currentHospital, 'counters', today);
@@ -705,12 +746,13 @@
 
         if (phone) {
           const trackLink = `${getAppBaseUrl()}/token.html?id=${createdTokenId}&h=${currentHospital}`;
-          queueFreeSMS(phone, `TokSpot Alert: Hello ${name}, your Token #${tokenNum} is booked. Live pass: ${trackLink}`);
+          queueFreeSMS(phone, `TokMark Alert: Hello ${name}, your Token #${tokenNum} is booked. Live pass: ${trackLink}`);
         }
       } catch (e) {
         showToast('Failed: ' + e.message, true);
       } finally {
         btn.disabled = false;
+        btn.innerHTML = '<i class="fa-solid fa-ticket"></i> Issue Token';
       }
     }
 
@@ -755,7 +797,7 @@
             const t = snap.data();
             if (t && t.phone) {
               const trackLink = `${getAppBaseUrl()}/token.html?id=${id}&h=${currentHospital}`;
-              queueFreeSMS(t.phone, `TokSpot Alert: Token #${t.number}, please proceed to ${t.counter || 'Counter A'}. Track: ${trackLink}`);
+              queueFreeSMS(t.phone, `TokMark Alert: Token #${t.number}, please proceed to ${t.counter || 'Counter A'}. Track: ${trackLink}`);
             }
           });
         }
@@ -786,7 +828,7 @@
         if (cleanPhone.length === 10) cleanPhone = '91' + cleanPhone;
 
         const trackUrl = `${getAppBaseUrl()}/token.html?id=${id}&h=${currentHospital}`;
-        const msg = `TokSpot Alert: Hello ${t.patientName}, your token #${t.number} is ready. Please proceed to ${t.counter || 'Counter A'}.\n\nLive Pass: ${trackUrl}`;
+        const msg = `TokMark Alert: Hello ${t.patientName}, your token #${t.number} is ready. Please proceed to ${t.counter || 'Counter A'}.\n\nLive Pass: ${trackUrl}`;
         const text = encodeURIComponent(msg);
 
         const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
@@ -853,7 +895,7 @@
       }
     }
 
-    /* Keyboard Shortcuts */
+    /* Keyboard & Numpad Shortcuts */
     window.addEventListener('keydown', (e) => {
       const activeEl = document.activeElement;
       const activeTag = activeEl ? activeEl.tagName.toLowerCase() : '';
