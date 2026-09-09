@@ -1,8 +1,27 @@
 // =========================================================================
-// UNIVERSAL MULTI-LANGUAGE VOICE ANNOUNCEMENT ENGINE FOR TOKSPOT
+// UNIVERSAL CRYPTO UTILITIES (TOKMARK SECURITY)
 // =========================================================================
 
-window.TOKSPOT_LANGS = {
+/**
+ * Standard Web Crypto API SHA-256 Hasher
+ * Converts raw 4-digit PIN (e.g. "1234") into a secure 64-character hex string.
+ * @param {string|number} pin
+ * @returns {Promise<string>}
+ */
+window.hashPin = async function(pin) {
+  if (!pin) return '';
+  const text = String(pin).trim();
+  const msgUint8 = new TextEncoder().encode(text);
+  const hashBuffer = await crypto.subtle.digest('SHA-256', msgUint8);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+};
+
+// =========================================================================
+// UNIVERSAL MULTI-LANGUAGE VOICE ANNOUNCEMENT ENGINE FOR TOKMARK
+// =========================================================================
+
+window.TOKMARK_LANGS = {
   // --- Indian Languages ---
   'ta': {
     code: 'ta-IN',
@@ -50,7 +69,7 @@ window.TOKSPOT_LANGS = {
     template: (num, name, counter) => `ટોકન નંબર ${num}. ${name}. કૃપા કરીને કાઉન્ટર ${counter} પર જાઓ.`
   },
 
-  // --- International Languages (Future Ready) ---
+  // --- International Languages ---
   'ar': {
     code: 'ar-SA',
     name: 'Arabic',
@@ -68,12 +87,15 @@ window.TOKSPOT_LANGS = {
   }
 };
 
+// Backwards compatibility alias
+window.TOKSPOT_LANGS = window.TOKMARK_LANGS;
+
 /**
  * Universal Multi-language Caller
  * @param {string|number} tokenNumber 
  * @param {string} patientName 
  * @param {string} counter 
- * @param {Array<string>} [selectedLangKeys] - e.g. ['ta', 'en'] or ['hi', 'en']
+ * @param {Array<string>} [selectedLangKeys] - e.g. ['ta', 'en']
  */
 window.announceToken = function(tokenNumber, patientName, counter, selectedLangKeys) {
   if (!('speechSynthesis' in window)) return;
@@ -82,19 +104,17 @@ window.announceToken = function(tokenNumber, patientName, counter, selectedLangK
   window.speechSynthesis.cancel();
 
   // Pick hospital configured languages or default to Tamil + English
-  const savedLangs = JSON.parse(localStorage.getItem('tokspot_voice_langs') || '["ta", "en"]');
+  const savedLangs = JSON.parse(localStorage.getItem('tokmark_voice_langs') || localStorage.getItem('tokspot_voice_langs') || '["ta", "en"]');
   const langsToPlay = selectedLangKeys || savedLangs;
 
   const cleanCounter = counter ? String(counter).replace(/^Counter\s*/i, '') : 'A';
   const cleanName = patientName ? patientName.trim() : '';
 
   const allVoices = window.speechSynthesis.getVoices();
-
-  // Build the sequential playlist
   const utterances = [];
 
   langsToPlay.forEach(key => {
-    const langConfig = window.TOKSPOT_LANGS[key];
+    const langConfig = window.TOKMARK_LANGS[key];
     if (!langConfig) return;
 
     const speechText = langConfig.template(tokenNumber, cleanName, cleanCounter);
@@ -103,7 +123,6 @@ window.announceToken = function(tokenNumber, patientName, counter, selectedLangK
     utter.rate = 0.88;
     utter.pitch = 1.0;
 
-    // Find best voice match in client's browser/OS
     const voiceMatch = allVoices.find(v => v.lang === langConfig.code || v.lang.startsWith(key));
     if (voiceMatch) utter.voice = voiceMatch;
 
@@ -124,11 +143,9 @@ window.announceToken = function(tokenNumber, patientName, counter, selectedLangK
     };
   }
 
-  // Speak the first language in the chain
   window.speechSynthesis.speak(utterances[0]);
 };
 
-// Pre-load browser voices on startup
 if ('speechSynthesis' in window) {
   window.speechSynthesis.onvoiceschanged = () => {
     window.speechSynthesis.getVoices();
