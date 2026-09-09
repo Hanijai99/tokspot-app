@@ -4,12 +4,12 @@
   <meta charset="UTF-8" />
   <script src="js/loader.js"></script>
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
-  <title>Admin — Manage Hospital — TokSpot</title>
+  <title>Admin — Manage Hospital — TokMark</title>
   <link rel="stylesheet" href="css/style.css" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
   <link rel="manifest" href="manifest.json" />
-  <link rel="icon" type="image/png" href="logo.png" />
-  <link rel="apple-touch-icon" href="logo.png" />
+  <link rel="icon" type="image/png" href="logo.png?v=2" />
+  <link rel="apple-touch-icon" href="logo.png?v=2" />
   <style>
     .key-box {
       background: #f8fafc; border: 1px solid var(--line); border-radius: 14px;
@@ -28,7 +28,7 @@
 </head>
 <body>
   <div class="topbar">
-    <a class="brand" href="index.html"><span class="logomark"><img src="logo.png" alt="TokSpot" /></span>TokSpot Admin</a>
+    <a class="brand" href="index.html"><span class="logomark"><img src="logo.png?v=2" alt="TokMark" /></span>TokMark Admin</a>
     <span class="spacer"></span>
     <button class="icn-btn" onclick="location.href='staff.html'" title="Staff Portal"><i class="fa-solid fa-hospital-user"></i></button>
     <button class="icn-btn" onclick="hk.toggleDark()"><i class="fa-solid fa-moon"></i></button>
@@ -143,7 +143,6 @@
   <script src="js/app.js"></script>
   <script src="js/firebase.js"></script>
   <script>
-    // Failsafe escHtml helper to prevent ReferenceError crashes
     window.escHtml = window.escHtml || function (s) {
       return String(s == null ? '' : s)
         .replace(/&/g, '&amp;')
@@ -213,7 +212,6 @@
       }
     }
 
-    // Resolves hospital & renders instantly
     async function resolveAdminHospital(user) {
       document.getElementById('loginCard').classList.add('hidden');
       document.getElementById('mainCard').classList.remove('hidden');
@@ -236,7 +234,6 @@
             return aEmail === userEmail || aUid === user.uid;
           });
 
-          // Single hospital fallback
           if (!matchedDoc && snap.docs.length === 1) {
             matchedDoc = snap.docs[0];
           }
@@ -355,17 +352,22 @@
 
         snap.docs.forEach(d => {
           const doc = d.data();
+          const docId = d.id;
           const statusBadge = doc.status === 'closed' ? '<span class="badge red">closed</span>' : '<span class="badge green">open</span>';
           const pinBadge = doc.pin ? `<span class="badge" style="background:var(--green-050);color:var(--green);font-weight:700;">PIN: ${escHtml(doc.pin)}</span>` : '';
 
           list.innerHTML += `<div class="mgmt-card" style="padding:14px;border-radius:12px;background:var(--bg);border:1px solid var(--line);margin-bottom:10px;">
-            <div style="display:flex;align-items:center;gap:12px;">
-              <div style="flex:1;">
-                <div style="font-weight:700;color:var(--ink);">${escHtml(doc.name || d.id)} ${statusBadge} ${pinBadge}</div>
+            <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+              <div style="flex:1;min-width:200px;">
+                <div style="font-weight:700;color:var(--ink);">${escHtml(doc.name || docId)} ${statusBadge} ${pinBadge}</div>
                 <div class="muted" style="font-size:.82rem;margin-top:2px;">${escHtml(doc.department || 'General')} ${doc.email ? '· ' + escHtml(doc.email) : ''}</div>
               </div>
-              <button class="icn-btn" onclick="editDoctor('${d.id}')" title="Edit"><i class="fa-solid fa-pen"></i></button>
-              <button class="icn-btn danger" onclick="deleteDoctor('${d.id}')" title="Delete"><i class="fa-solid fa-trash-can"></i></button>
+              <div style="display:flex;gap:6px;">
+                <button class="btn btn-sm btn-slate" onclick="editDoctor('${docId}')" title="Edit Doctor Details"><i class="fa-solid fa-pen"></i> Edit</button>
+                <button class="btn btn-sm btn-danger" onclick="revokeDoctorAccess('${docId}', '${escHtml(doc.name || 'Doctor')}', '${escHtml(doc.email || '')}')" title="Relieve & Permanently Revoke Access" style="background:#fee2e2;color:#b91c1c;border:1px solid #fca5a5;font-weight:700;">
+                  <i class="fa-solid fa-user-xmark"></i> Relieve / Revoke
+                </button>
+              </div>
             </div>
           </div>`;
         });
@@ -444,14 +446,52 @@
       }
     }
 
-    async function deleteDoctor(id) {
-      if (!confirm('Delete this doctor?')) return;
+    // Permanent Doctor Access Revocation & Room Decoupling
+    async function revokeDoctorAccess(id, name, email) {
+      const confirmAction = confirm(
+        `WARNING: Are you sure you want to permanently revoke access for ${name} (${email})?\n\n` +
+        `• Doctor's credentials will be decoupled from this hospital immediately.\n` +
+        `• They will be unassigned from all OPD rooms.\n` +
+        `• If they are currently logged into Doctor Desk, their session will auto-terminate.\n\n` +
+        `Click OK to confirm.`
+      );
+
+      if (!confirmAction) return;
+
       try {
+        // 1. Delete doctor doc from hospital's subcollection
         await window._fs.deleteDoc(window._fs.doc(window._db, 'hospitals', assignedHospitalSlug, 'doctors', id));
-        try { await window._fs.deleteDoc(window._fs.doc(window._db, 'doctors', id)); } catch(e) {}
-        showToast('Doctor deleted.');
+        
+        // 2. Remove from global doctors mapping
+        try { 
+          await window._fs.deleteDoc(window._fs.doc(window._db, 'doctors', id)); 
+        } catch(e) {}
+
+        // 3. Clear any active room assignment linked to this doctor
+        try {
+          const roomsSnap = await window._fs.getDocs(
+            window._fs.collection(window._db, 'hospitals', assignedHospitalSlug, 'rooms')
+          );
+          roomsSnap.forEach(async (rDoc) => {
+            const rData = rDoc.data();
+            if (rData.assignedDoctorId === id || rData.doctorId === id) {
+              await window._fs.updateDoc(rDoc.ref, {
+                assignedDoctorId: null,
+                assignedDoctorName: 'Unassigned',
+                doctorId: null,
+                status: 'idle'
+              });
+            }
+          });
+        } catch (e) {
+          console.warn('Room unassign note:', e);
+        }
+
+        showToast(`${name}'s access has been completely revoked.`);
         loadDoctorList();
-      } catch (e) { showToast('Failed: ' + e.message, true); }
+      } catch (e) {
+        showToast('Failed to revoke: ' + e.message, true);
+      }
     }
 
     function toggleRecoveryModal(show) {
