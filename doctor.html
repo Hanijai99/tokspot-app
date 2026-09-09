@@ -4,12 +4,12 @@
   <script src="js/loader.js"></script>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-  <title>Doctor Desk — TokSpot</title>
+  <title>Doctor Desk — TokMark</title>
   <link rel="stylesheet" href="css/style.css" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
   <link rel="manifest" href="manifest.json" />
-  <link rel="icon" type="image/png" href="logo.png" />
-  <link rel="apple-touch-icon" href="logo.png" />
+  <link rel="icon" type="image/png" href="logo.png?v=2" />
+  <link rel="apple-touch-icon" href="logo.png?v=2" />
   <style>
     body { background: #0f172a; color: #f8fafc; min-height: 100vh; padding: 0; margin: 0; font-family: system-ui, -apple-system, sans-serif; }
     .doc-container { max-width: 680px; margin: 0 auto; padding: 16px 20px 40px; }
@@ -68,7 +68,7 @@
 
   <div class="topbar" style="background:#1e293b;border-bottom:1px solid #334155;">
     <a class="brand" href="index.html" style="color:#38bdf8;">
-      <span class="logomark"><img src="logo.png" alt="TokSpot" /></span>TokSpot Doctor
+      <span class="logomark"><img src="logo.png?v=2" alt="TokMark" /></span>TokMark Doctor
     </a>
     <span class="spacer"></span>
     <button class="icn-btn" onclick="doctorLogout()" title="Logout Station"><i class="fa-solid fa-power-off"></i></button>
@@ -130,14 +130,12 @@
   <script src="js/app.js"></script>
   <script src="js/firebase.js"></script>
   <script>
-    // Failsafe HTML escape
     window.escHtml = window.escHtml || function (s) {
       return String(s == null ? '' : s)
         .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
         .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
     };
 
-    // Failsafe toast
     window.showToast = window.showToast || function(msg, isErr, ms) {
       let w = document.getElementById('hkToastWrap');
       if (!w) {
@@ -158,6 +156,7 @@
     let currentActiveToken = null;
     let waitingTokens = [];
     let unsubQueue = null;
+    let unsubSecurity = null;
 
     window.addEventListener('load', async () => {
       try {
@@ -192,8 +191,30 @@
       document.getElementById('docNameDisplay').textContent = activeDoctorProfile.name ? `Dr. ${activeDoctorProfile.name.replace(/^Dr\.?\s*/i, '')}` : 'Doctor Desk';
       document.getElementById('hospNameDisplay').textContent = `${activeDoctorProfile.hospitalName || currentHospitalSlug} · ${activeDoctorProfile.department || 'Consultation Room'}`;
 
+      // Start Security Listener & Queue Listener
+      listenDoctorSecurity();
       listenDoctorQueue();
     });
+
+    // Real-Time Doctor Security Guard (Instant Revocation Listener)
+    function listenDoctorSecurity() {
+      if (unsubSecurity) unsubSecurity();
+      
+      const docRef = window._fs.doc(window._db, 'hospitals', currentHospitalSlug, 'doctors', activeDoctorProfile.id);
+      unsubSecurity = window._fs.onSnapshot(docRef, (docSnap) => {
+        // If document was deleted by admin or access status marked revoked
+        if (!docSnap.exists() || docSnap.data().status === 'revoked') {
+          if (unsubQueue) unsubQueue();
+          if (unsubSecurity) unsubSecurity();
+          sessionStorage.clear();
+          localStorage.removeItem('tokmark_doctor_id');
+          alert('ACCESS REVOKED: Your credentials have been decoupled from this hospital by the administrator. You are now logged out.');
+          window.location.replace('doctor-login.html');
+        }
+      }, (err) => {
+        console.warn('Security watcher note:', err);
+      });
+    }
 
     function getRoomCounterName() {
       if (!activeDoctorProfile) return 'Consultation Room';
@@ -204,7 +225,6 @@
       if (unsubQueue) unsubQueue();
       const today = window.todayStr ? window.todayStr() : new Date().toISOString().slice(0, 10);
 
-      // Robust listener query
       const tokensRef = window._fs.collection(window._db, 'hospitals', currentHospitalSlug, 'tokens');
       const q = window._fs.query(tokensRef, window._fs.where('date', '==', today));
 
@@ -216,7 +236,6 @@
           const t = d.data();
           t.id = d.id;
 
-          // Check if token belongs to this doctor OR if token has no doctor assigned yet
           const matchesDoctor = String(t.doctorId) === String(activeDoctorProfile.id) || !t.doctorId;
 
           if (matchesDoctor) {
@@ -228,7 +247,6 @@
           }
         });
 
-        // Numeric natural sorting (Token 1, 2, ..., 10, 11) + Priority handling
         waitingTokens.sort((a, b) => {
           if (b.priority && !a.priority) return 1;
           if (!b.priority && a.priority) return -1;
@@ -283,7 +301,6 @@
       btn.disabled = true;
 
       try {
-        // Auto-complete previous token if still in room
         if (currentActiveToken) {
           const notes = document.getElementById('consultNotes').value.trim();
           await window._fs.updateDoc(window._fs.doc(window._db, 'hospitals', currentHospitalSlug, 'tokens', currentActiveToken.id), {
@@ -371,6 +388,7 @@
       if (!confirm('Sign out from Doctor Desk?')) return;
       sessionStorage.removeItem('activeDoctor');
       if (unsubQueue) unsubQueue();
+      if (unsubSecurity) unsubSecurity();
       window.location.replace('doctor-login.html');
     }
 
