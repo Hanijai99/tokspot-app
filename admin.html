@@ -64,6 +64,9 @@
       <div style="display:flex;align-items:center;gap:12px;margin-bottom:4px;flex-wrap:wrap;">
         <div class="htitle">Admin Workspace</div>
         <span class="spacer"></span>
+        <button class="btn btn-mint btn-sm" onclick="openAnalyticsPage()" style="margin-right:4px;">
+          <i class="fa-solid fa-chart-line"></i> Analytics &amp; Reports
+        </button>
         <span class="chip gray" id="adminEmailBadge">—</span>
         <button class="btn btn-slate btn-sm" onclick="adminLogout()"><i class="fa-solid fa-arrow-right-from-bracket"></i> Logout</button>
       </div>
@@ -237,6 +240,15 @@
       document.getElementById('mainCard').classList.add('hidden');
       document.getElementById('loginCard').classList.remove('hidden');
       sessionStorage.clear();
+    }
+
+    // Opens dedicated analytics dashboard passing current hospital slug
+    function openAnalyticsPage() {
+      if (assignedHospitalSlug) {
+        window.location.href = `analytics.html?h=${encodeURIComponent(assignedHospitalSlug)}`;
+      } else {
+        window.location.href = 'analytics.html';
+      }
     }
 
     async function adminLogin() {
