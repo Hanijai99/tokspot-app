@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Privacy Policy & Security Standards — TokMark</title>
+  <link rel="stylesheet" href="css/style.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+  <link rel="icon" type="image/png" href="logo.png?v=2" />
+  <script src="js/loader.js"></script>
+  <style>
+    body { background: #060b16; color: #f8fafc; font-family: system-ui, -apple-system, sans-serif; line-height: 1.6; margin: 0; padding-bottom: 60px; }
+    .privacy-container { max-width: 820px; margin: 40px auto; padding: 0 20px; }
+    .header-box { border-bottom: 1px solid #1e293b; padding-bottom: 24px; margin-bottom: 32px; }
+    .brand-link { display: inline-flex; align-items: center; gap: 10px; color: #22c55e; font-size: 1.3rem; font-weight: 900; text-decoration: none; margin-bottom: 16px; }
+    h1 { font-size: 2rem; font-weight: 900; color: #fff; margin: 0 0 8px; }
+    .last-updated { font-size: 0.85rem; color: #64748b; }
+    .policy-section { background: #0b1329; border: 1px solid #1e2d4a; border-radius: 16px; padding: 24px 28px; margin-bottom: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.3); }
+    .policy-section h2 { font-size: 1.15rem; color: #38bdf8; margin-top: 0; margin-bottom: 12px; display: flex; align-items: center; gap: 10px; }
+    .policy-section p, .policy-section li { color: #cbd5e1; font-size: 0.92rem; }
+    .policy-section ul { padding-left: 20px; margin-bottom: 0; }
+    .policy-section li { margin-bottom: 8px; }
+    .badge-highlight { background: rgba(34, 197, 94, 0.12); color: #22c55e; border: 1px solid rgba(34, 197, 94, 0.3); padding: 3px 8px; border-radius: 6px; font-weight: 700; font-size: 0.8rem; }
+    .btn-action-wrap { text-align: center; margin-top: 36px; }
+    .btn-agree-back { background: linear-gradient(135deg, #00d2ff 0%, #22c55e 100%); color: #04111d; font-weight: 800; border: none; padding: 14px 32px; border-radius: 12px; font-size: 1rem; cursor: pointer; display: inline-flex; align-items: center; gap: 8px; text-decoration: none; box-shadow: 0 4px 20px rgba(34, 197, 94, 0.35); }
+    .btn-agree-back:hover { transform: translateY(-2px); box-shadow: 0 6px 26px rgba(34, 197, 94, 0.55); }
+  </style>
+</head>
+<body>
+
+  <div class="privacy-container">
+    <div class="header-box">
+      <a href="signup.html" class="brand-link">
+        <img src="logo.png?v=2" alt="TokMark Logo" style="width:32px;height:32px;" />
+        TokMark
+      </a>
+      <h1>Privacy Policy & Station Security</h1>
+      <div class="last-updated">Effective & Last Revised: September 2026 | Hospital Operating Protocol</div>
+    </div>
+
+    <!-- Section 1: Core Purpose -->
+    <div class="policy-section">
+      <h2><i class="fa-solid fa-notes-medical"></i> 1. What TokMark Does (Our Core Purpose)</h2>
+      <p>TokMark is an ultra-fast, real-time OPD queue orchestration and Smart TV token broadcast layer designed exclusively for clinics and hospitals. We do not store sensitive electronic health records (EHR) or patient clinical histories. Our architecture is built strictly to manage live turn sequences, queue notifications, and room assignments.</p>
+    </div>
+
+    <!-- Section 2: Data Collection -->
+    <div class="policy-section">
+      <h2><i class="fa-solid fa-database"></i> 2. Information We Collect</h2>
+      <ul>
+        <li><strong>Station Administrative Data:</strong> Hospital or clinic name, branch city, primary administrator phone number, and official verified email address.</li>
+        <li><strong>Temporary Queue Data:</strong> Patient token sequence numbers, patient mobile numbers for queue tracking, and assigned consultation room IDs. (Tokens auto-archive after the day's session).</li>
+        <li><strong>Staff Profiles:</strong> Doctor names, department designations, and designated station passcodes.</li>
+      </ul>
+    </div>
+
+    <!-- Section 3: Doctor Credential & Transfer Isolation Policy -->
+    <div class="policy-section" style="border-color: rgba(0, 210, 255, 0.3);">
+      <h2><i class="fa-solid fa-user-shield"></i> 3. Doctor Departure & Station Decoupling <span class="badge-highlight">Critical</span></h2>
+      <p>To prevent cross-hospital data leakage and ensure clinic confidentiality:</p>
+      <ul>
+        <li><strong>Station-Scoped Access:</strong> A doctor's login credentials and room access are locked exclusively to the issuing hospital station code.</li>
+        <li><strong>Immediate Relieving / Revocation:</strong> When a doctor moves to another hospital or resigns, the station administrator has instant authority in <code>admin.html</code> to permanently revoke the doctor's access.</li>
+        <li><strong>Zero Residual Access:</strong> Once access is revoked, active sessions are immediately terminated. The doctor cannot view patient queues, upcoming appointments, or contact details of their previous clinic.</li>
+        <li><strong>Cross-Clinic Independence:</strong> If the doctor joins another clinic utilizing TokMark, they must be registered anew with isolated station permissions under the new clinic's administrator.</li>
+      </ul>
+    </div>
+
+    <!-- Section 4: Communication & Storage -->
+    <div class="policy-section">
+      <h2><i class="fa-solid fa-lock"></i> 4. Data Security & Storage</h2>
+      <p>All queue states and station records are stored on enterprise Google Cloud Firestore infrastructure with real-time TLS 1.3 encryption in transit and AES-256 at rest. Station tokens are isolated by strict security rules so no hospital can access another hospital's live OPD queues.</p>
+    </div>
+
+    <div class="btn-action-wrap">
+      <button class="btn-agree-back" onclick="acknowledgeAndReturn()">
+        <i class="fa-solid fa-check-double"></i> I Have Read & Agree to Policy
+      </button>
+    </div>
+  </div>
+
+  <script>
+    function acknowledgeAndReturn() {
+      // Mark as read in sessionStorage
+      sessionStorage.setItem('tokmark_privacy_read', 'true');
+      window.location.href = 'signup.html?policy_read=1';
+    }
+  </script>
+</body>
+</html>
