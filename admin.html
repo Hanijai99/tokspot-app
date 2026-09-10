@@ -259,6 +259,25 @@
   <script src="js/app.js"></script>
   <script src="js/firebase.js"></script>
   <script>
+    // Robust Global Toast Failsafe
+    window.showToast = window.showToast || function(msg, isErr, ms) {
+      let w = document.getElementById('hkToastWrap');
+      if (!w) {
+        w = document.createElement('div');
+        w.id = 'hkToastWrap';
+        w.style.cssText = 'position:fixed;bottom:24px;left:50%;transform:translateX(-50%);z-index:99999;display:flex;flex-direction:column;gap:8px;align-items:center;pointer-events:none;';
+        document.body.appendChild(w);
+      }
+      const t = document.createElement('div');
+      t.style.cssText = `background:${isErr ? '#ef4444' : '#16a34a'};color:#fff;padding:12px 22px;border-radius:12px;font-weight:700;font-size:0.9rem;box-shadow:0 10px 25px rgba(0,0,0,0.25);transition:opacity 0.3s;`;
+      t.textContent = msg;
+      w.appendChild(t);
+      setTimeout(() => { 
+        t.style.opacity = '0'; 
+        setTimeout(() => t.remove(), 300); 
+      }, ms || 3000);
+    };
+
     window.escHtml = window.escHtml || function (s) {
       return String(s == null ? '' : s)
         .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
@@ -469,7 +488,7 @@
           recoveryKey: rKey,
           createdAt: window._fs.serverTimestamp()
         });
-        showToast('Hospital created!');
+        showToast('Hospital created successfully!');
         await resolveAdminHospital(activeAdminUser);
       } catch(e) {
         alert('Creation failed: ' + e.message);
