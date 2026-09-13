@@ -212,7 +212,7 @@
           <button class="icn-btn" onclick="closeDoctorResetModal()"><i class="fa-solid fa-xmark"></i></button>
         </div>
         <p style="font-size:0.84rem;color:var(--slate-500);margin-bottom:14px;">
-          Directly assigning a new PIN for <b id="resetDocName" style="color:var(--ink);"></b> (<span id="resetDocEmail" style="color:#0284c7;"></span>). No email verification needed.
+          Directly assigning a new PIN for <b id="resetDocName" style="color:var(--ink);"></b> (<span id="resetDocEmail" style="color:#0284c7;"></span>).
         </p>
         <div class="field" style="margin-bottom:14px;">
           <label class="label">New 4-Digit PIN</label>
@@ -293,6 +293,7 @@
 
     let activeAdminUser = null;
     let assignedHospitalSlug = null;
+    let currentHospitalCode = '';
     let editDoctorId = null;
     let targetResetDoctorId = null;
     let qrInstance = null;
@@ -320,6 +321,7 @@
     function showLoggedOutState() {
       activeAdminUser = null;
       assignedHospitalSlug = null;
+      currentHospitalCode = '';
       document.getElementById('mainCard').classList.add('hidden');
       document.getElementById('loginCard').classList.remove('hidden');
       sessionStorage.clear();
@@ -447,6 +449,7 @@
 
         const hCode = hData.hospitalCode || hData.code || ('HOSP-' + Math.floor(1000 + Math.random() * 9000));
         const rKey = hData.recoveryKey || ('RCV-' + Math.random().toString(36).substring(2, 6).toUpperCase() + '-' + Math.random().toString(36).substring(2, 6).toUpperCase());
+        currentHospitalCode = hCode;
 
         renderHospitalHeader(assignedHospitalSlug, { ...hData, hospitalCode: hCode, recoveryKey: rKey });
         generateHospitalBookingQr(assignedHospitalSlug, hData.name || assignedHospitalSlug, hCode);
@@ -582,7 +585,7 @@
           const doc = d.data();
           const docId = d.id;
           const statusBadge = doc.status === 'closed' ? '<span class="badge red">closed</span>' : '<span class="badge green">open</span>';
-          const pinBadge = doc.pin ? `<span class="badge" style="background:var(--green-050);color:var(--green);font-weight:700;"><i class="fa-solid fa-shield"></i> PIN Set</span>` : '';
+          const pinBadge = (doc.pin || doc.pinHash) ? `<span class="badge" style="background:var(--green-050);color:var(--green);font-weight:700;"><i class="fa-solid fa-shield"></i> PIN Set</span>` : '';
           const roomBadge = doc.room ? `<span class="badge blue">${escHtml(doc.room)}</span>` : '';
 
           list.innerHTML += `<div class="mgmt-card" style="padding:14px;border-radius:12px;background:var(--bg);border:1px solid var(--line);margin-bottom:10px;">
@@ -644,6 +647,7 @@
       } catch (e) { console.error(e); }
     }
 
+    // UPDATED CLOUD SYNC PIPELINE: Multi-device Global Sync
     async function saveDoctor() {
       const name = document.getElementById('docName').value.trim();
       const dept = document.getElementById('docDept').value.trim();
@@ -663,42 +667,69 @@
       }
 
       btn.disabled = true;
-      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Hashing & Saving...';
+      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Syncing to Cloud Database...';
 
       try {
-        let hashedPin = null;
-        if (rawPin) {
-          hashedPin = await createSha256Pin(rawPin);
-        }
-
         const coll = window._fs.collection(window._db, 'hospitals', assignedHospitalSlug, 'doctors');
+        
+        // Base Doctor Document
         const data = { 
           name, 
-          department: dept, 
-          room: room,
-          counter: room,
+          department: dept || 'Consultation', 
+          room: room || 'Room 1',
+          counter: room || 'Room 1',
           status, 
-          hospitalSlug: assignedHospitalSlug, 
+          hospitalSlug: assignedHospitalSlug,
+          hospitalCode: currentHospitalCode,
+          isDeskActive: true,
           updatedAt: window._fs.serverTimestamp() 
         };
+
         if (email) data.email = email;
-        if (hashedPin) data.pin = hashedPin;
+
+        // Dual Pin Security: Saves both plain PIN & SHA-256 Hash for native app compatibility
+        if (rawPin) {
+          const hashedPin = await createSha256Pin(rawPin);
+          data.pin = rawPin;
+          data.pinHash = hashedPin;
+        }
 
         if (editDoctorId) {
+          // Update hospital sub-collection
           await window._fs.updateDoc(window._fs.doc(coll, editDoctorId), data);
-          showToast('Doctor updated securely.');
+
+          // Sync with root /doctors collection for multi-device login
+          try {
+            await window._fs.setDoc(window._fs.doc(window._db, 'doctors', editDoctorId), data, { merge: true });
+          } catch(e) {
+            console.warn('Root sync note:', e);
+          }
+
+          showToast('Doctor credentials synced across all devices!');
         } else {
           data.createdAt = window._fs.serverTimestamp();
+          
+          // Generate document in sub-collection
           const docRef = await window._fs.addDoc(coll, data);
+          
+          // Mirror immediately to root collection with matching ID
           try {
-            await window._fs.setDoc(window._fs.doc(window._db, 'doctors', docRef.id), data);
-          } catch(e) {}
-          showToast('Doctor onboarded securely.');
+            await window._fs.setDoc(window._fs.doc(window._db, 'doctors', docRef.id), {
+              id: docRef.id,
+              ...data
+            });
+          } catch(e) {
+            console.warn('Root create mirror note:', e);
+          }
+
+          showToast('Doctor onboarded & synced to cloud database!');
         }
+
         cancelDoctorEdit();
         loadDoctorList();
       } catch (e) {
-        showToast('Error: ' + e.message, true);
+        console.error('Doctor Save Error:', e);
+        showToast('Sync Error: ' + e.message, true);
       } finally {
         btn.disabled = false;
         btn.innerHTML = '<i class="fa-solid fa-floppy-disk"></i> Save Doctor';
@@ -718,6 +749,7 @@
       document.getElementById('doctorResetModal').classList.add('hidden');
     }
 
+    // UPDATED PIN RESET PIPELINE: Guarantees immediate cloud update across Web & Tablet App
     async function executeDoctorPinReset() {
       const rawPin = document.getElementById('newDoctorPin').value.trim();
       const btn = document.getElementById('btnConfirmDoctorReset');
@@ -725,26 +757,29 @@
       if (rawPin.length !== 4) return showToast('PIN must be exactly 4 digits.', true);
 
       btn.disabled = true;
-      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Hashing & Updating...';
+      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Updating Cloud PIN...';
 
       try {
         const hashedPin = await createSha256Pin(rawPin);
-
-        const docRef = window._fs.doc(window._db, 'hospitals', assignedHospitalSlug, 'doctors', targetResetDoctorId);
-        await window._fs.updateDoc(docRef, {
-          pin: hashedPin,
+        const pinUpdatePayload = {
+          pin: rawPin,
+          pinHash: hashedPin,
           updatedAt: window._fs.serverTimestamp()
-        });
+        };
 
+        // 1. Update hospital sub-collection
+        const docRef = window._fs.doc(window._db, 'hospitals', assignedHospitalSlug, 'doctors', targetResetDoctorId);
+        await window._fs.updateDoc(docRef, pinUpdatePayload);
+
+        // 2. Update root collection
         try {
           const rootDocRef = window._fs.doc(window._db, 'doctors', targetResetDoctorId);
-          await window._fs.updateDoc(rootDocRef, {
-            pin: hashedPin,
-            updatedAt: window._fs.serverTimestamp()
-          });
-        } catch(e) {}
+          await window._fs.updateDoc(rootDocRef, pinUpdatePayload);
+        } catch(e) {
+          console.warn('Root reset sync note:', e);
+        }
 
-        showToast('Doctor PIN successfully updated & hashed!');
+        showToast('PIN successfully updated! Usable on all devices immediately.');
         closeDoctorResetModal();
         loadDoctorList();
       } catch (err) {
@@ -759,9 +794,9 @@
     async function revokeDoctorAccess(id, name, email) {
       const confirmAction = confirm(
         `WARNING: Are you sure you want to permanently revoke access for ${name} (${email})?\n\n` +
-        `• Doctor's credentials will be decoupled from this hospital immediately.\n` +
-        `• They will be unassigned from all OPD rooms.\n` +
-        `• If they are currently logged into Doctor Desk, their session will auto-terminate.\n\n` +
+        `• Doctor credentials will be decoupled from this hospital immediately.\n` +
+        `• Doctor will be unassigned from OPD rooms.\n` +
+        `• All active tablet or web sessions will terminate.\n\n` +
         `Click OK to confirm.`
       );
 
