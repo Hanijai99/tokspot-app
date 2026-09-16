@@ -23,9 +23,6 @@
   <link rel="icon" type="image/png" href="logo.png" />
   <link rel="apple-touch-icon" href="logo.png" />
 
-  <!-- Cloudflare Turnstile Official API Script -->
-  <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
-
   <style>
     :root {
       --primary: #16a34a;
@@ -187,12 +184,6 @@
       border: 1px solid var(--line);
       background: var(--bg);
       color: var(--ink);
-    }
-
-    .turnstile-wrapper {
-      margin-top: 12px;
-      display: flex;
-      justify-content: center;
     }
 
     /* Hospital Stations Portal Bar */
@@ -388,7 +379,7 @@
         </a>
       </div>
 
-      <!-- Option 2: Check Active Token Status with Cloudflare Turnstile -->
+      <!-- Option 2: Check Active Token Status -->
       <div class="action-card">
         <div>
           <div class="ac-header">
@@ -403,10 +394,6 @@
           <div class="track-input-row">
             <input id="tokenInput" type="text" placeholder="e.g. 5 or HOSP-1234" autocomplete="off" required />
             <button type="submit" class="btn btn-slate"><i class="fa-solid fa-magnifying-glass"></i> Track</button>
-          </div>
-          <!-- Turnstile Widget Container -->
-          <div class="turnstile-wrapper">
-            <div class="cf-turnstile" data-sitekey="0x4AAAAAAAE4p..." data-callback="onTurnstileSuccess"></div>
           </div>
         </form>
       </div>
@@ -452,12 +439,6 @@
     }
     if (window.hk && hk.applyDark) hk.applyDark();
 
-    // Turnstile token state
-    let turnstileToken = null;
-    function onTurnstileSuccess(token) {
-      turnstileToken = token;
-    }
-
     function trackToken(e) {
       e.preventDefault();
       const num = document.getElementById('tokenInput').value.trim();
@@ -466,14 +447,6 @@
         else alert('Please enter your token or hospital code');
         return;
       }
-
-      // Check Turnstile verification pass
-      if (!turnstileToken) {
-        if (typeof showToast === 'function') showToast('Please complete the security verification', true);
-        else alert('Please complete the security verification');
-        return;
-      }
-
       window.location.href = `book.html?code=${encodeURIComponent(num)}`;
     }
   </script>
