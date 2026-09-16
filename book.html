@@ -11,8 +11,8 @@
   <link rel="icon" type="image/png" href="logo.png" />
   <link rel="apple-touch-icon" href="logo.png" />
 
-  <!-- Cloudflare Turnstile Official Script -->
-  <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
+  <!-- Cloudflare Turnstile Script with explicit rendering support -->
+  <script src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit" async defer></script>
 
   <style>
     body { background: #f8fafc; color: var(--ink); font-family: system-ui, -apple-system, sans-serif; }
@@ -48,9 +48,10 @@
     .search-item:last-child { border-bottom: none; }
 
     .turnstile-box {
-      margin-top: 16px;
+      margin-top: 18px;
       display: flex;
       justify-content: center;
+      min-height: 65px;
     }
     
     body.dark { background: #060b16; }
@@ -121,9 +122,9 @@
         <input class="input" id="patPhone" type="tel" maxlength="10" placeholder="10-digit mobile number" />
       </div>
 
-      <!-- Turnstile Security Widget -->
+      <!-- Turnstile Container (Dynamically rendered on step reveal) -->
       <div class="turnstile-box">
-        <div class="cf-turnstile" data-sitekey="0x4AAAAAAAE4p..." data-callback="onBookingTurnstileSuccess"></div>
+        <div id="cf-booking-widget"></div>
       </div>
 
       <button class="btn btn-green btn-block btn-lg mt-20" id="btnSubmitToken" onclick="generatePatientToken()">
@@ -171,9 +172,36 @@
     let selectedDoctorName = 'Doctor';
     let hospitalDirectory = [];
     let bookingTurnstileToken = null;
+    let turnstileWidgetId = null;
 
-    function onBookingTurnstileSuccess(token) {
-      bookingTurnstileToken = token;
+    const TURNSTILE_SITE_KEY = '0x4AAAAAAAE4p3oOS4YgFWRqd';
+
+    function renderTurnstile() {
+      if (!window.turnstile) {
+        setTimeout(renderTurnstile, 200);
+        return;
+      }
+      const container = document.getElementById('cf-booking-widget');
+      if (container) {
+        container.innerHTML = '';
+        bookingTurnstileToken = null;
+        try {
+          turnstileWidgetId = turnstile.render('#cf-booking-widget', {
+            sitekey: TURNSTILE_SITE_KEY,
+            callback: function(token) {
+              bookingTurnstileToken = token;
+            },
+            'expired-callback': function() {
+              bookingTurnstileToken = null;
+            },
+            'error-callback': function() {
+              bookingTurnstileToken = null;
+            }
+          });
+        } catch (e) {
+          console.error("Turnstile render error:", e);
+        }
+      }
     }
 
     async function ensureAuth() {
@@ -343,8 +371,12 @@
 
       await loadDoctors(targetHospitalSlug);
 
+      // Unhide Step 2 details card
       document.getElementById('stepCode').classList.add('hidden');
       document.getElementById('stepDetails').classList.remove('hidden');
+
+      // Trigger Turnstile explicit rendering once DOM element is visible
+      renderTurnstile();
     }
 
     async function loadDoctors(slug) {
@@ -402,6 +434,7 @@
     function resetHospitalSelection() {
       targetHospitalSlug = null;
       selectedDoctorId = null;
+      bookingTurnstileToken = null;
       document.getElementById('hospitalSearchInput').value = '';
       document.getElementById('stepDetails').classList.add('hidden');
       document.getElementById('stepCode').classList.remove('hidden');
@@ -417,7 +450,7 @@
       if (!phone || phone.length !== 10) return showToast('Please enter a valid 10-digit mobile number.', true);
       if (!selectedDoctorId) return showToast('Please select a doctor.', true);
 
-      // Bot Check Validation
+      // Verify Cloudflare Turnstile token
       if (!bookingTurnstileToken) {
         return showToast('Please complete the security check before booking.', true);
       }
