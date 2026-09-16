@@ -10,6 +10,10 @@
   <link rel="manifest" href="manifest.json" />
   <link rel="icon" type="image/png" href="logo.png" />
   <link rel="apple-touch-icon" href="logo.png" />
+
+  <!-- Cloudflare Turnstile Official Script -->
+  <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
+
   <style>
     body { background: #f8fafc; color: var(--ink); font-family: system-ui, -apple-system, sans-serif; }
     .book-container { max-width: 480px; margin: 30px auto; padding: 0 16px; }
@@ -42,6 +46,12 @@
     }
     .search-item:hover { background: #f1f5f9; }
     .search-item:last-child { border-bottom: none; }
+
+    .turnstile-box {
+      margin-top: 16px;
+      display: flex;
+      justify-content: center;
+    }
     
     body.dark { background: #060b16; }
     body.dark .step-card { background: #121a2b; border-color: #24314a; }
@@ -111,6 +121,11 @@
         <input class="input" id="patPhone" type="tel" maxlength="10" placeholder="10-digit mobile number" />
       </div>
 
+      <!-- Turnstile Security Widget -->
+      <div class="turnstile-box">
+        <div class="cf-turnstile" data-sitekey="0x4AAAAAAAE4p..." data-callback="onBookingTurnstileSuccess"></div>
+      </div>
+
       <button class="btn btn-green btn-block btn-lg mt-20" id="btnSubmitToken" onclick="generatePatientToken()">
         <i class="fa-solid fa-ticket"></i> Confirm &amp; Get Live Token
       </button>
@@ -126,7 +141,6 @@
   <script src="js/app.js"></script>
   <script src="js/firebase.js"></script>
   <script>
-    // Inline failsafes to prevent runtime ReferenceErrors
     window.escHtml = window.escHtml || function(s) {
       return String(s == null ? '' : s)
         .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
@@ -156,6 +170,11 @@
     let selectedDoctorId = null;
     let selectedDoctorName = 'Doctor';
     let hospitalDirectory = [];
+    let bookingTurnstileToken = null;
+
+    function onBookingTurnstileSuccess(token) {
+      bookingTurnstileToken = token;
+    }
 
     async function ensureAuth() {
       if (!window._auth.currentUser) {
@@ -174,7 +193,6 @@
       await ensureAuth();
       await loadHospitalDirectory();
 
-      // Check URL Query Parameter (?code=HOSP-XXXX or ?h=slug)
       const params = new URLSearchParams(window.location.search);
       const urlCode = params.get('code') || params.get('h');
       if (urlCode) {
@@ -218,7 +236,6 @@
         return;
       }
 
-      // If directory is empty, reload it
       if (!hospitalDirectory.length) {
         await loadHospitalDirectory();
       }
@@ -235,11 +252,10 @@
         return hName.includes(query) || 
                hCity.includes(query) || 
                hCode.includes(query) || 
-               hId.includes(query) ||
+               hId.includes(query) || 
                (cleanNumQuery && cleanCodeNum === cleanNumQuery);
       });
 
-      // Direct exact match from QR link
       if (autoSelectExact && filtered.length >= 1) {
         selectHospital(filtered[0].id);
         return;
@@ -321,7 +337,6 @@
 
       targetHospitalSlug = hData.id;
 
-      // Render Header Details
       document.getElementById('dispHospitalName').textContent = hData.name;
       document.getElementById('dispHospitalCity').textContent = hData.city ? `Station: ${hData.city}` : 'Consultation Station';
       document.getElementById('dispCodeTag').textContent = hData.code;
@@ -401,6 +416,11 @@
       if (!name) return showToast('Please enter patient name.', true);
       if (!phone || phone.length !== 10) return showToast('Please enter a valid 10-digit mobile number.', true);
       if (!selectedDoctorId) return showToast('Please select a doctor.', true);
+
+      // Bot Check Validation
+      if (!bookingTurnstileToken) {
+        return showToast('Please complete the security check before booking.', true);
+      }
 
       btn.disabled = true;
       btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Generating Token...';
