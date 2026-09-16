@@ -11,8 +11,8 @@
   <link rel="icon" type="image/png" href="logo.png" />
   <link rel="apple-touch-icon" href="logo.png" />
 
-  <!-- Cloudflare Turnstile Script with explicit rendering support -->
-  <script src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit" async defer></script>
+  <!-- Cloudflare Turnstile with Explicit Callback -->
+  <script src="https://challenges.cloudflare.com/turnstile/v0/api.js?onload=onTurnstileLoaded&render=explicit" async defer></script>
 
   <style>
     body { background: #f8fafc; color: var(--ink); font-family: system-ui, -apple-system, sans-serif; }
@@ -122,7 +122,7 @@
         <input class="input" id="patPhone" type="tel" maxlength="10" placeholder="10-digit mobile number" />
       </div>
 
-      <!-- Turnstile Container (Dynamically rendered on step reveal) -->
+      <!-- Turnstile Container -->
       <div class="turnstile-box">
         <div id="cf-booking-widget"></div>
       </div>
@@ -173,34 +173,49 @@
     let hospitalDirectory = [];
     let bookingTurnstileToken = null;
     let turnstileWidgetId = null;
+    let isTurnstileScriptReady = false;
 
     const TURNSTILE_SITE_KEY = '0x4AAAAAAAE4p3oOS4YgFWRqd';
 
-    function renderTurnstile() {
-      if (!window.turnstile) {
-        setTimeout(renderTurnstile, 200);
-        return;
+    // Global onload trigger
+    window.onTurnstileLoaded = function() {
+      isTurnstileScriptReady = true;
+      const stepDetails = document.getElementById('stepDetails');
+      if (stepDetails && !stepDetails.classList.contains('hidden')) {
+        renderTurnstile();
       }
+    };
+
+    function renderTurnstile() {
+      if (!window.turnstile || !isTurnstileScriptReady) return;
+
       const container = document.getElementById('cf-booking-widget');
-      if (container) {
-        container.innerHTML = '';
-        bookingTurnstileToken = null;
-        try {
-          turnstileWidgetId = turnstile.render('#cf-booking-widget', {
-            sitekey: TURNSTILE_SITE_KEY,
-            callback: function(token) {
-              bookingTurnstileToken = token;
-            },
-            'expired-callback': function() {
-              bookingTurnstileToken = null;
-            },
-            'error-callback': function() {
-              bookingTurnstileToken = null;
-            }
-          });
-        } catch (e) {
-          console.error("Turnstile render error:", e);
-        }
+      if (!container) return;
+
+      // Clean existing render to avoid duplicate instances
+      if (turnstileWidgetId !== null) {
+        try { turnstile.remove(turnstileWidgetId); } catch(e) {}
+        turnstileWidgetId = null;
+      }
+      container.innerHTML = '';
+      bookingTurnstileToken = null;
+
+      try {
+        turnstileWidgetId = turnstile.render('#cf-booking-widget', {
+          sitekey: TURNSTILE_SITE_KEY,
+          theme: document.body.classList.contains('dark') ? 'dark' : 'light',
+          callback: function(token) {
+            bookingTurnstileToken = token;
+          },
+          'expired-callback': function() {
+            bookingTurnstileToken = null;
+          },
+          'error-callback': function() {
+            bookingTurnstileToken = null;
+          }
+        });
+      } catch (e) {
+        console.error("Turnstile render error:", e);
       }
     }
 
@@ -375,8 +390,10 @@
       document.getElementById('stepCode').classList.add('hidden');
       document.getElementById('stepDetails').classList.remove('hidden');
 
-      // Trigger Turnstile explicit rendering once DOM element is visible
-      renderTurnstile();
+      // Trigger Turnstile render with safe delay
+      setTimeout(() => {
+        renderTurnstile();
+      }, 100);
     }
 
     async function loadDoctors(slug) {
