@@ -108,3 +108,35 @@
   // Safety fallback (Max 3 seconds screen lock prevention)
   setTimeout(window.hideAppLoader, 3000);
 })();
+
+/* ============================================================
+   TOKMARK DARK THEME ENGINE (hk)
+   Applies body.dark so the night gradient background shows on
+   every page. Default is DARK; respecting saved user choice.
+   ============================================================ */
+(function () {
+  const hkThemeKey = 'tokspot_theme';
+
+  window.hk = {
+    applyDark() {
+      const saved = localStorage.getItem(hkThemeKey);
+      const dark = saved ? saved === 'dark' : true;
+      document.body.classList.toggle('dark', dark);
+      return dark;
+    },
+    toggleDark() {
+      const dark = !document.body.classList.contains('dark');
+      document.body.classList.toggle('dark', dark);
+      localStorage.setItem(hkThemeKey, dark ? 'dark' : 'light');
+      return dark;
+    }
+  };
+
+  if (document.body) {
+    window.hk.applyDark();
+  } else {
+    document.addEventListener('DOMContentLoaded', function () {
+      window.hk.applyDark();
+    });
+  }
+})();
