@@ -285,6 +285,28 @@
       .portals-grid { grid-template-columns: 1fr 1fr; }
       .main-title { font-size: 2.1rem; }
       .landing-footer { flex-direction: column; text-align: center; }
+      .hiw-grid { grid-template-columns: 1fr; gap: 18px; }
+    }
+
+    @media (max-width: 640px) {
+      .landing-nav { padding: 12px 14px; gap: 8px; flex-wrap: wrap; }
+      .nav-actions { gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+      .nav-actions .btn-sm { padding: 9px 11px; font-size: 0.82rem; }
+      .portals-grid { grid-template-columns: 1fr 1fr; gap: 8px; }
+      .portal-link { padding: 14px 6px; font-size: 0.82rem; }
+      .hero-container { padding: 28px 14px 12px; }
+    }
+
+    @media (max-width: 480px) {
+      .nav-actions a[onclick*="togglePrivacyModal"] { display: none; }
+      .brand-logo { font-size: 1.1rem; }
+      .main-title { font-size: 1.85rem; }
+      .main-subtitle { font-size: 0.95rem; }
+      .cta-row .btn-lg { padding: 14px 16px; font-size: 0.95rem; }
+      .brand-badge { width: 56px; height: 56px; }
+      .preview-box { padding: 16px; }
+      .preview-token { padding: 16px; }
+      .preview-num { font-size: 3.2rem; }
     }
   </style>
 </head>

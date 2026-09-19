@@ -274,3 +274,36 @@ body.dark .theme-toggle { background:#12544F; }
 body.dark .empty { color:#94a3b8; }
 body.dark .chip.gray, body.dark .slot.off, body.dark .badge.gray { background:#1E5C50; color:#cbd5e1; }
 
+/* =============================================================
+   RESPONSIVE — MOBILE
+   ============================================================= */
+@media (max-width: 640px) {
+  body { padding:0 14px calc(20px + env(safe-area-inset-bottom)); }
+  .topbar { gap:8px; height:56px; }
+  .topbar .brand { font-size:1.05rem; }
+  .topbar .brand .logomark { width:32px; height:32px; }
+  .card { padding:16px; }
+  .stat { padding:13px 8px; }
+  .stat .n { font-size:1.45rem; }
+  .qrow { padding:12px; gap:10px; }
+  .qrow .qnum { width:44px; height:44px; font-size:1.1rem; }
+  .toast-wrap { width:calc(100% - 28px); }
+  .theme-toggle { width:44px; height:44px; right:12px; bottom:14px; font-size:1.05rem; }
+}
+
+@media (max-width: 560px) {
+  .stats { grid-template-columns:repeat(2,1fr) !important; }
+  .steps { gap:5px; }
+  .step .lbl { font-size:.74rem; }
+  .stepper { width:22px; height:22px; font-size:.68rem; }
+  .btn-row > .btn { padding:14px 12px; }
+  .htitle { font-size:1.3rem; }
+}
+
+@media (max-width: 390px) {
+  .stats { grid-template-columns:1fr !important; }
+  .token-hero .t-num { font-size:4rem; letter-spacing:3px; }
+  .token-ticket .big { font-size:3.4rem; letter-spacing:2px; }
+  .card { padding:14px; }
+}
+

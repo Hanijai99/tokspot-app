@@ -59,6 +59,12 @@
         padding-top: 40px;
       }
     }
+
+    @media (max-width: 600px) {
+      [style*="grid-template-columns:1fr 1fr"] { grid-template-columns:1fr !important; }
+      .key-box { padding: 12px; }
+      .key-box .badge-code, .key-box .badge-rcv { font-size: 0.72rem; }
+    }
   </style>
 </head>
 <body>

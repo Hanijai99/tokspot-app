@@ -62,6 +62,24 @@
       background: #0f172a; color: #8BBB92; padding: 2px 6px; border-radius: 4px;
       font-weight: 800; border: 1px solid #334155; font-family: monospace;
     }
+
+    @media (max-width: 600px) {
+      .doc-container { padding: 12px 14px 32px; }
+      .doctor-badge-bar { flex-wrap: wrap; gap: 8px; padding: 12px 14px; }
+      .current-card { padding: 22px 14px; }
+      .curr-num { font-size: 4.2rem; }
+      .curr-name { font-size: 1.15rem; }
+      .action-grid { grid-template-columns: 1fr 1fr; gap: 8px; }
+      .call-btn { grid-column: span 2; height: 54px; font-size: 1.05rem; }
+      .sec-btn { font-size: 0.84rem; gap: 5px; padding: 0 8px; }
+      .queue-list { padding: 14px; }
+      .queue-item { padding: 11px 10px; }
+    }
+
+    @media (max-width: 400px) {
+      .curr-num { font-size: 3.4rem; }
+      .call-btn { font-size: 0.98rem; }
+    }
   </style>
 </head>
 <body>
