@@ -19,7 +19,7 @@
       padding: 24px; box-shadow: var(--shadow); margin-bottom: 20px;
     }
     .badge-code {
-      background: #dcfce7; color: #15803d; font-weight: 800;
+      background: #E4F3EA; color: #1F6B4C; font-weight: 800;
       padding: 4px 10px; border-radius: 8px; font-size: 0.85rem;
     }
     .doc-radio {
@@ -27,7 +27,7 @@
       border: 2px solid var(--line); border-radius: 14px; cursor: pointer;
       margin-bottom: 10px; transition: border-color .2s, background .2s;
     }
-    .doc-radio.selected { border-color: var(--green); background: #f0fdf4; }
+    .doc-radio.selected { border-color: var(--green); background: #ECF6EF; }
     .doc-radio input { display: none; }
 
     /* Smart Search Dropdown Styles */
@@ -44,11 +44,11 @@
     .search-item:hover { background: #f1f5f9; }
     .search-item:last-child { border-bottom: none; }
     
-    body.dark { background: #060b16; }
-    body.dark .step-card { background: #121a2b; border-color: #24314a; }
-    body.dark .doc-radio { border-color: #24314a; background: #0f172a; }
-    body.dark .doc-radio.selected { border-color: var(--green); background: #052e16; }
-    body.dark .search-dropdown { background: #1e293b; border-color: #334155; }
+    body.dark { background: #092328; }
+    body.dark .step-card { background: #12544F; border-color: #1E5C50; }
+    body.dark .doc-radio { border-color: #1E5C50; background: #0f172a; }
+    body.dark .doc-radio.selected { border-color: var(--green); background: #12544F; }
+    body.dark .search-dropdown { background: #1E5C50; border-color: #334155; }
     body.dark .search-item { border-color: #334155; }
     body.dark .search-item:hover { background: #0f172a; }
   </style>
@@ -142,7 +142,7 @@
         document.body.appendChild(w);
       }
       const t = document.createElement('div');
-      t.style.cssText = `background:${isErr ? '#ef4444' : '#16a34a'};color:#fff;padding:12px 20px;border-radius:12px;font-weight:700;font-size:0.9rem;box-shadow:0 10px 25px rgba(0,0,0,0.2);transition:opacity 0.3s;`;
+      t.style.cssText = `background:${isErr ? '#ef4444' : '#2A835F'};color:#fff;padding:12px 20px;border-radius:12px;font-weight:700;font-size:0.9rem;box-shadow:0 10px 25px rgba(0,0,0,0.2);transition:opacity 0.3s;`;
       t.textContent = msg;
       w.appendChild(t);
       setTimeout(() => { t.style.opacity = '0'; setTimeout(() => t.remove(), 300); }, ms || 2500);

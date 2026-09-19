@@ -18,7 +18,7 @@
       padding: 14px 16px; margin-top: 12px; display: flex; justify-content: space-between; align-items: center;
     }
     .badge-code {
-      background: #dcfce7; color: #15803d; font-weight: 800;
+      background: #E4F3EA; color: #1F6B4C; font-weight: 800;
       padding: 4px 10px; border-radius: 8px; font-size: 0.95rem; letter-spacing: 1px;
     }
     .badge-rcv {
@@ -43,8 +43,8 @@
       border-radius: 12px;
       box-shadow: 0 4px 14px rgba(0,0,0,0.08);
     }
-    body.dark .key-box { background: #0f172a; border-color: #24314a; }
-    body.dark .qr-standee-box { background: #111a2e; border-color: #24314a; }
+    body.dark .key-box { background: #0f172a; border-color: #1E5C50; }
+    body.dark .qr-standee-box { background: #12544F; border-color: #1E5C50; }
 
     @media print {
       body * { visibility: hidden; }
@@ -73,14 +73,14 @@
 
     <!-- 1. Strict Login Card -->
     <section id="loginCard" class="card" style="max-width:420px;margin:40px auto;text-align:center;">
-      <div style="width:64px;height:64px;border-radius:20px;background:linear-gradient(135deg,#22c55e,#0d9488);display:flex;align-items:center;justify-content:center;font-size:1.9rem;margin:0 auto 16px;box-shadow:0 12px 30px rgba(22,163,74,.3);color:#fff;"><i class="fa-solid fa-shield-halved"></i></div>
+      <div style="width:64px;height:64px;border-radius:20px;background:linear-gradient(135deg,#8BBB92,#2A835F);display:flex;align-items:center;justify-content:center;font-size:1.9rem;margin:0 auto 16px;box-shadow:0 12px 30px rgba(42,131,95,.3);color:#fff;"><i class="fa-solid fa-shield-halved"></i></div>
       <div class="htitle">Hospital Admin Login</div>
       <div class="hsub mt-6">Sign in to manage doctors, view hospital code & recovery key.</div>
       <div class="mt-16" style="text-align:left;">
         <div class="field"><label class="label">Admin Email</label><input class="input" id="loginEmail" type="email" placeholder="admin@hospital.com" /></div>
         <div class="field"><label class="label">Password</label><input class="input" id="loginPass" type="password" /></div>
         <div style="display:flex;justify-content:flex-end;margin-top:6px;margin-bottom:14px;">
-          <a href="javascript:void(0)" onclick="toggleResetPasswordModal(true)" style="color:#0284c7;font-size:0.82rem;font-weight:700;text-decoration:none;">
+          <a href="javascript:void(0)" onclick="toggleResetPasswordModal(true)" style="color:#2A835F;font-size:0.82rem;font-weight:700;text-decoration:none;">
             Forgot Admin Password?
           </a>
         </div>
@@ -212,7 +212,7 @@
           <button class="icn-btn" onclick="closeDoctorResetModal()"><i class="fa-solid fa-xmark"></i></button>
         </div>
         <p style="font-size:0.84rem;color:var(--slate-500);margin-bottom:14px;">
-          Directly assigning a new PIN for <b id="resetDocName" style="color:var(--ink);"></b> (<span id="resetDocEmail" style="color:#0284c7;"></span>).
+          Directly assigning a new PIN for <b id="resetDocName" style="color:var(--ink);"></b> (<span id="resetDocEmail" style="color:#2A835F;"></span>).
         </p>
         <div class="field" style="margin-bottom:14px;">
           <label class="label">New 4-Digit PIN</label>
@@ -269,7 +269,7 @@
         document.body.appendChild(w);
       }
       const t = document.createElement('div');
-      t.style.cssText = `background:${isErr ? '#ef4444' : '#16a34a'};color:#fff;padding:12px 22px;border-radius:12px;font-weight:700;font-size:0.9rem;box-shadow:0 10px 25px rgba(0,0,0,0.25);transition:opacity 0.3s;`;
+      t.style.cssText = `background:${isErr ? '#ef4444' : '#2A835F'};color:#fff;padding:12px 22px;border-radius:12px;font-weight:700;font-size:0.9rem;box-shadow:0 10px 25px rgba(0,0,0,0.25);transition:opacity 0.3s;`;
       t.textContent = msg;
       w.appendChild(t);
       setTimeout(() => { 
@@ -596,7 +596,7 @@
               </div>
               <div style="display:flex;gap:6px;flex-wrap:wrap;">
                 <button class="btn btn-sm btn-slate" onclick="editDoctor('${docId}')" title="Edit Doctor Details"><i class="fa-solid fa-pen"></i> Edit</button>
-                <button class="btn btn-sm btn-slate" onclick="openDoctorResetModal('${docId}', '${escHtml(doc.name || 'Doctor')}', '${escHtml(doc.email || '')}')" title="Admin Quick Reset PIN" style="background:#e0f2fe;color:#0369a1;border:1px solid #7dd3fc;font-weight:700;">
+                <button class="btn btn-sm btn-slate" onclick="openDoctorResetModal('${docId}', '${escHtml(doc.name || 'Doctor')}', '${escHtml(doc.email || '')}')" title="Admin Quick Reset PIN" style="background:#D7EBE0;color:#1F6B4C;border:1px solid #8BBB92;font-weight:700;">
                   <i class="fa-solid fa-key"></i> Reset PIN
                 </button>
                 <button class="btn btn-sm btn-danger" onclick="revokeDoctorAccess('${docId}', '${escHtml(doc.name || 'Doctor')}', '${escHtml(doc.email || '')}')" title="Relieve & Permanently Revoke Access" style="background:#fee2e2;color:#b91c1c;border:1px solid #fca5a5;font-weight:700;">

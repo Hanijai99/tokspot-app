@@ -10,7 +10,7 @@
     #appLoader {
       position: fixed;
       inset: 0;
-      background: #060b16;
+      background: #092328;
       display: flex;
       flex-direction: column;
       align-items: center;
@@ -40,7 +40,7 @@
     .tok-progress-track {
       width: 120px;
       height: 3px;
-      background: #111a2e;
+      background: #12544F;
       border-radius: 99px;
       margin-top: 20px;
       overflow: hidden;
@@ -52,13 +52,13 @@
       left: -50%;
       height: 100%;
       width: 50%;
-      background: linear-gradient(90deg, #00d2ff, #22c55e);
+      background: linear-gradient(90deg, #8BBB92, #8BBB92);
       border-radius: 99px;
       animation: tokShimmer 1.1s infinite ease-in-out;
     }
     @keyframes tokPulse {
-      0%, 100% { transform: scale(0.95); filter: drop-shadow(0 0 10px rgba(34, 197, 94, 0.25)); }
-      50% { transform: scale(1.06); filter: drop-shadow(0 0 22px rgba(0, 210, 255, 0.6)); }
+      0%, 100% { transform: scale(0.95); filter: drop-shadow(0 0 10px rgba(139, 187, 146, 0.25)); }
+      50% { transform: scale(1.06); filter: drop-shadow(0 0 22px rgba(139, 187, 146, 0.6)); }
     }
     @keyframes tokShimmer {
       0% { left: -50%; }

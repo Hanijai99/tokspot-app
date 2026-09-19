@@ -57,14 +57,14 @@
       font-family: monospace;
     }
     body.dark .hotkey-bar kbd {
-      background: #1e293b;
+      background: #1E5C50;
       color: #f1f5f9;
       border-color: #334155;
     }
 
     .badge-code {
-      background: #dcfce7;
-      color: #15803d;
+      background: #E4F3EA;
+      color: #1F6B4C;
       font-weight: 800;
       padding: 4px 10px;
       border-radius: 8px;
@@ -290,7 +290,7 @@
         document.body.appendChild(w);
       }
       const t = document.createElement('div');
-      t.style.cssText = `background:${isErr ? '#ef4444' : '#16a34a'};color:#fff;padding:12px 20px;border-radius:12px;font-weight:700;font-size:0.9rem;box-shadow:0 10px 25px rgba(0,0,0,0.2);transition:opacity 0.3s;`;
+      t.style.cssText = `background:${isErr ? '#ef4444' : '#2A835F'};color:#fff;padding:12px 20px;border-radius:12px;font-weight:700;font-size:0.9rem;box-shadow:0 10px 25px rgba(0,0,0,0.2);transition:opacity 0.3s;`;
       t.textContent = msg;
       w.appendChild(t);
       setTimeout(() => { t.style.opacity = '0'; setTimeout(() => t.remove(), 300); }, ms || 2500);

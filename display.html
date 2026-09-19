@@ -10,22 +10,22 @@
   <link rel="manifest" href="manifest.json" />
   <link rel="icon" type="image/png" href="logo.png" />
   <style>
-    body { background: #060b16; color: #f8fafc; font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; margin: 0; padding: 0; overflow-x: hidden; }
+    body { background: #092328; color: #f8fafc; font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; margin: 0; padding: 0; overflow-x: hidden; }
     
     /* Setup Gate Card */
     .gate-container {
       max-width: 440px; margin: 80px auto; padding: 24px;
-      background: #121a2b; border: 1px solid #24314a; border-radius: 24px;
+      background: #12544F; border: 1px solid #1E5C50; border-radius: 24px;
       text-align: center; box-shadow: 0 20px 50px rgba(0,0,0,0.5);
     }
 
     /* TV Display Layout */
     .tv-screen { display: flex; flex-direction: column; min-height: 100vh; }
     .tv-header {
-      padding: 18px 32px; background: #0b1120; border-bottom: 2px solid #1e293b;
+      padding: 18px 32px; background: #092328; border-bottom: 2px solid #1E5C50;
       display: flex; justify-content: space-between; align-items: center;
     }
-    .tv-hospital-name { font-size: 1.8rem; font-weight: 900; letter-spacing: -0.5px; color: #22c55e; }
+    .tv-hospital-name { font-size: 1.8rem; font-weight: 900; letter-spacing: -0.5px; color: #8BBB92; }
     .tv-clock { font-size: 1.5rem; font-weight: 800; font-family: monospace; color: #94a3b8; }
 
     .tv-body {
@@ -35,13 +35,13 @@
 
     /* Big Hero: Currently Called Token */
     .hero-box {
-      background: #121a2b; border: 2px solid #16a34a; border-radius: 28px;
+      background: #12544F; border: 2px solid #2A835F; border-radius: 28px;
       padding: 32px; text-align: center; display: flex; flex-direction: column;
-      justify-content: center; align-items: center; box-shadow: 0 0 50px rgba(34, 197, 94, 0.15);
+      justify-content: center; align-items: center; box-shadow: 0 0 50px rgba(139, 187, 146, 0.15);
       position: relative;
     }
     .hero-badge {
-      background: #16a34a; color: #ffffff; font-weight: 900; font-size: 1.1rem;
+      background: #2A835F; color: #ffffff; font-weight: 900; font-size: 1.1rem;
       padding: 6px 18px; border-radius: 50px; text-transform: uppercase; letter-spacing: 1.5px;
     }
     .hero-token {
@@ -49,11 +49,11 @@
       color: #ffffff; letter-spacing: -4px;
     }
     .hero-patient { font-size: 2rem; font-weight: 800; color: #cbd5e1; }
-    .hero-meta { font-size: 1.4rem; font-weight: 800; color: #38bdf8; margin-top: 10px; }
+    .hero-meta { font-size: 1.4rem; font-weight: 800; color: #8BBB92; margin-top: 10px; }
 
     /* Upcoming / Waiting Grid */
     .queue-box {
-      background: #0f172a; border: 1px solid #1e293b; border-radius: 28px;
+      background: #0f172a; border: 1px solid #1E5C50; border-radius: 28px;
       padding: 24px; display: flex; flex-direction: column;
     }
     .queue-title {
@@ -65,7 +65,7 @@
       overflow-y: auto; max-height: 520px;
     }
     .tv-token-chip {
-      background: #1e293b; border: 1px solid #334155; border-radius: 16px;
+      background: #1E5C50; border: 1px solid #334155; border-radius: 16px;
       padding: 14px 18px; display: flex; justify-content: space-between; align-items: center;
     }
     .tv-token-chip.priority { border-color: #ef4444; background: #2a1215; }
@@ -99,7 +99,7 @@
 
   <!-- STEP 1: Hospital Gate (Auto-bypasses if code is in URL) -->
   <div id="displayGate" class="gate-container">
-    <div style="width:60px;height:60px;border-radius:20px;background:rgba(34,197,94,0.15);color:#22c55e;display:flex;align-items:center;justify-content:center;font-size:1.8rem;margin:0 auto 16px;">
+    <div style="width:60px;height:60px;border-radius:20px;background:rgba(139,187,146,0.15);color:#8BBB92;display:flex;align-items:center;justify-content:center;font-size:1.8rem;margin:0 auto 16px;">
       <i class="fa-solid fa-tv"></i>
     </div>
     <h2 style="margin:0;font-size:1.4rem;font-weight:900;">Waiting Hall TV Screen</h2>
@@ -108,7 +108,7 @@
     </p>
 
     <div style="display:flex;gap:8px;">
-      <input class="input" id="tvCodeInput" type="text" placeholder="e.g. HOSP-1234" style="background:#0b1120;border-color:#24314a;color:#fff;font-weight:800;letter-spacing:1px;text-transform:uppercase;" />
+      <input class="input" id="tvCodeInput" type="text" placeholder="e.g. HOSP-1234" style="background:#092328;border-color:#1E5C50;color:#fff;font-weight:800;letter-spacing:1px;text-transform:uppercase;" />
       <button class="btn btn-green" id="btnLaunchTv" onclick="launchDisplay()"><i class="fa-solid fa-play"></i> Launch</button>
     </div>
   </div>
@@ -118,7 +118,7 @@
     <div class="tv-header">
       <div style="display:flex;align-items:center;gap:12px;">
         <span class="tv-hospital-name" id="tvHospName">Hospital Name</span>
-        <span style="background:rgba(34,197,94,0.15);color:#22c55e;font-size:0.82rem;font-weight:800;padding:4px 10px;border-radius:8px;" id="tvHospCode">HOSP-CODE</span>
+        <span style="background:rgba(139,187,146,0.15);color:#8BBB92;font-size:0.82rem;font-weight:800;padding:4px 10px;border-radius:8px;" id="tvHospCode">HOSP-CODE</span>
       </div>
       <div class="tv-clock" id="tvLiveClock">--:--:--</div>
     </div>
@@ -172,7 +172,7 @@
         document.body.appendChild(w);
       }
       const t = document.createElement('div');
-      t.style.cssText = `background:${isErr ? '#ef4444' : '#16a34a'};color:#fff;padding:12px 20px;border-radius:12px;font-weight:700;font-size:0.9rem;box-shadow:0 10px 25px rgba(0,0,0,0.2);transition:opacity 0.3s;`;
+      t.style.cssText = `background:${isErr ? '#ef4444' : '#2A835F'};color:#fff;padding:12px 20px;border-radius:12px;font-weight:700;font-size:0.9rem;box-shadow:0 10px 25px rgba(0,0,0,0.2);transition:opacity 0.3s;`;
       t.textContent = msg;
       w.appendChild(t);
       setTimeout(() => { t.style.opacity = '0'; setTimeout(() => t.remove(), 300); }, ms || 2500);
@@ -396,7 +396,7 @@
             <div class="tv-chip-num">#${escHtml(t.number)}</div>
             <div class="tv-chip-doc">${escHtml(t.patientName ? t.patientName.slice(0, 14) : 'Patient')}</div>
           </div>
-          <span style="font-size:0.8rem;font-weight:800;color:${t.priority ? '#ef4444' : '#22c55e'};">
+          <span style="font-size:0.8rem;font-weight:800;color:${t.priority ? '#ef4444' : '#8BBB92'};">
             ${t.priority ? 'PRIORITY' : 'WAITING'}
           </span>
         </div>

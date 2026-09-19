@@ -21,9 +21,9 @@
     .divider::before, .divider::after { content: ''; flex: 1; border-bottom: 1px solid var(--line); }
     .divider span { padding: 0 12px; }
     .pin-box { text-align: center; letter-spacing: 8px; font-size: 1.4rem; font-weight: 800; }
-    body.dark { background: #060b16; }
-    body.dark .auth-card { background: #121a2b; border-color: #24314a; }
-    body.dark .form-control { background: #0b1120; border-color: #24314a; color: #f8fafc; }
+    body.dark { background: #092328; }
+    body.dark .auth-card { background: #12544F; border-color: #1E5C50; }
+    body.dark .form-control { background: #092328; border-color: #1E5C50; color: #f8fafc; }
     body.dark .auth-title { color: #f8fafc; }
   </style>
 </head>
@@ -90,7 +90,7 @@
         document.body.appendChild(w);
       }
       const t = document.createElement('div');
-      t.style.cssText = `background:${isErr ? '#ef4444' : '#16a34a'};color:#fff;padding:12px 20px;border-radius:12px;font-weight:700;font-size:0.9rem;box-shadow:0 10px 25px rgba(0,0,0,0.2);transition:opacity 0.3s;`;
+      t.style.cssText = `background:${isErr ? '#ef4444' : '#2A835F'};color:#fff;padding:12px 20px;border-radius:12px;font-weight:700;font-size:0.9rem;box-shadow:0 10px 25px rgba(0,0,0,0.2);transition:opacity 0.3s;`;
       t.textContent = msg;
       w.appendChild(t);
       setTimeout(() => { t.style.opacity = '0'; setTimeout(() => t.remove(), 300); }, ms || 2500);
