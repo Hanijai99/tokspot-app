@@ -120,7 +120,7 @@
   window.hk = {
     applyDark() {
       const saved = localStorage.getItem(hkThemeKey);
-      const dark = saved ? saved === 'dark' : true;
+      const dark = saved ? saved === 'dark' : false;
       document.body.classList.toggle('dark', dark);
       return dark;
     },

@@ -31,13 +31,16 @@
 
   /* Night gradient background — 60/30/10 (color order preserved) */
   --night-bg: linear-gradient(180deg,#093C5D 0%,#093C5D 60%,#3B7597 90%,#6FD1D7 97%,#5DF8D8 100%);
+
+  /* Day (light) gradient background — cream base + brand colors in order */
+  --day-bg: linear-gradient(180deg,#F4F0E4 0%,#F4F0E4 60%,#3B7597 90%,#6FD1D7 96%,#5DF8D8 100%);
 }
 
 * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
 html { scroll-behavior:smooth; }
 body {
   font-family:'Inter','Segoe UI',system-ui,-apple-system,sans-serif;
-  background:var(--bg); color:var(--ink);
+  background:var(--day-bg); color:var(--ink);
   min-height:100vh; -webkit-font-smoothing:antialiased;
   padding:0 16px calc(24px + env(safe-area-inset-bottom));
 }
