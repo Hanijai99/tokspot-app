@@ -17,6 +17,25 @@ window.hashPin = async function(pin) {
   return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
 };
 
+window.matchesStoredPin = async function(storedPinValue, inputPin) {
+  if (!storedPinValue || !inputPin) return false;
+  const stored = String(storedPinValue).trim();
+  const input = String(inputPin).trim();
+
+  // Support legacy plain-text PIN values during migration window.
+  if (stored.length === 4) {
+    return stored === input;
+  }
+
+  // Preferred secure form: one-way hash and compare with fresh input hash.
+  if (stored.length === 64) {
+    const freshHash = await window.hashPin(input);
+    return stored === freshHash;
+  }
+
+  return false;
+};
+
 // =========================================================================
 // UNIVERSAL MULTI-LANGUAGE VOICE ANNOUNCEMENT ENGINE FOR TOKMARK
 // =========================================================================
@@ -66,7 +85,7 @@ window.TOKMARK_LANGS = {
   'gu': {
     code: 'gu-IN',
     name: 'Gujarati',
-    template: (num, name, counter) => `ટોકન નંબર ${num}. ${name}. કૃપા કરીને કાઉન્ટર ${counter} પર જાઓ.`
+    template: (num, name, counter) => `ટોકન নম্বর ${num}. ${name}. કૃપા કરીને કાઉન્ટર ${counter} પર જાઓ.`
   },
 
   // --- International Languages ---
