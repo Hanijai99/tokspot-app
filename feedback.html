@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <script src="js/loader.js"></script>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
+  <title>Rate Your Visit — TokSpot</title>
+  <link rel="stylesheet" href="css/style.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+  <link rel="manifest" href="manifest.json" />
+  <link rel="icon" type="image/png" href="logo.png" />
+  <style>
+    body { background: #f8fafc; color: var(--ink); margin: 0; padding-bottom: 40px; }
+    .fb-container { max-width: 440px; margin: 30px auto; padding: 0 16px; }
+    .stars { display: flex; justify-content: center; gap: 10px; margin: 18px 0 6px; }
+    .star { font-size: 2.3rem; color: #cbd5e1; cursor: pointer; transition: transform .12s var(--ease), color .12s var(--ease); }
+    .star.on { color: #f59e0b; transform: scale(1.12); }
+    .star:active { transform: scale(0.92); }
+    #starLbl { text-align: center; font-size: 0.8rem; font-weight: 700; color: var(--slate-500); min-height: 1.2em; margin-bottom: 10px; }
+    .rating-tags { display: flex; gap: 8px; justify-content: center; margin-bottom: 16px; flex-wrap: wrap; }
+    .tag { font-size: 0.75rem; font-weight: 700; color: var(--slate-500); background: #f1f5f9; border: 1px solid var(--line); padding: 6px 12px; border-radius: 999px; }
+    .tag.sel { background: #E4F3EA; color: #1F6B4C; border-color: #D3E9DB; }
+    body.dark { background: #092328; }
+    body.dark .tag { background: #0f172a; color: #cbd5e1; border-color: #1E5C50; }
+    body.dark .star { color: #334155; }
+    body.dark .star.on { color: #fbbf24; }
+  </style>
+</head>
+<body>
+
+  <div class="topbar">
+    <a class="brand" href="index.html">
+      <span class="logomark"><img src="logo.png" alt="TokSpot" /></span>TokSpot
+    </a>
+    <span class="spacer"></span>
+    <button class="icn-btn" onclick="hk.toggleDark()"><i class="fa-solid fa-moon"></i></button>
+  </div>
+
+  <div class="fb-container">
+
+    <!-- Loading -->
+    <div id="loaderCard" class="card" style="text-align:center;padding:40px 16px;">
+      <i class="fa-solid fa-circle-notch fa-spin" style="font-size:2rem;color:var(--green);"></i>
+      <div class="muted mt-12" style="font-weight:600;" data-i18n="feedback.sub">Your feedback helps us serve you better.</div>
+    </div>
+
+    <!-- Error -->
+    <div id="errorCard" class="card hidden" style="text-align:center;padding:30px 16px;">
+      <i class="fa-solid fa-circle-exclamation" style="font-size:2.4rem;color:#ef4444;margin-bottom:12px;"></i>
+      <div style="font-weight:800;font-size:1.1rem;color:var(--ink);" id="errorMsg">Visit not found</div>
+      <a href="index.html" class="btn btn-green mt-16" style="text-decoration:none;"><i class="fa-solid fa-house"></i> Home</a>
+    </div>
+
+    <!-- Rating form -->
+    <div id="formCard" class="card hidden" style="text-align:center;padding:26px 18px;">
+      <i class="fa-solid fa-heart" style="font-size:1.7rem;color:#ef4444;margin-bottom:8px;"></i>
+      <h2 style="font-size:1.25rem;font-weight:900;margin:6px 0 2px;" data-i18n="feedback.title">How was your visit?</h2>
+      <div class="muted" style="font-size:0.86rem;margin-top:6px;"><span data-i18n="feedback.doctor">Doctor</span>: <b id="fbDoctorName">—</b></div>
+
+      <div class="stars" id="starBox">
+        <span class="star" data-v="1"><i class="fa-solid fa-star"></i></span>
+        <span class="star" data-v="2"><i class="fa-solid fa-star"></i></span>
+        <span class="star" data-v="3"><i class="fa-solid fa-star"></i></span>
+        <span class="star" data-v="4"><i class="fa-solid fa-star"></i></span>
+        <span class="star" data-v="5"><i class="fa-solid fa-star"></i></span>
+      </div>
+      <div id="starLbl" data-i18n="feedback.tap">Tap a star to rate</div>
+
+      <div class="rating-tags" id="tagRow">
+        <span class="tag" data-t="delayed">⏱️ Delayed</span>
+        <span class="tag" data-t="helpful">💙 Helpful</span>
+        <span class="tag" data-t="clean">🧹 Clean</span>
+        <span class="tag" data-t="friendly">😊 Friendly</span>
+      </div>
+
+      <textarea id="fbComment" class="form-control" rows="3" placeholder=""
+        data-i18n-ph="feedback.comment" style="margin-top:4px;"></textarea>
+
+      <button class="btn btn-green btn-block mt-16" id="btnSubmit">
+        <i class="fa-solid fa-paper-plane"></i> <span data-i18n="feedback.submit">Send Feedback</span>
+      </button>
+    </div>
+
+    <!-- Thanks -->
+    <div id="thanksCard" class="card hidden" style="text-align:center;padding:40px 16px;">
+      <i class="fa-solid fa-circle-check" style="font-size:2.6rem;color:var(--green);margin-bottom:12px;"></i>
+      <div style="font-weight:900;font-size:1.25rem;" data-i18n="feedback.thanksTitle">Thank you!</div>
+      <p class="muted" style="font-size:0.88rem;margin-top:6px;" data-i18n="feedback.thanksSub">Your feedback has been recorded.</p>
+      <a href="index.html" class="btn btn-green mt-16" style="text-decoration:none;"><i class="fa-solid fa-house"></i> Home</a>
+    </div>
+  </div>
+
+  <script src="js/firebase-config.js"></script>
+  <script src="js/app.js"></script>
+  <script src="js/firebase.js"></script>
+  <script src="js/queue-domain.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/i18n.js"></script>
+  <script>
+    if (window.I18N) I18N.init();
+    if (window.hk && hk.applyDark) hk.applyDark();
+
+    const FUNC = window.TokSpotAPI && window.TokSpotAPI.mode() === 'functions';
+    let tokenStatus = null;
+    let rating = 0;
+    let tags = [];
+
+    // Prototype mode: pages talk to Firestore directly, so anonymous
+    // auth must be established first (functions mode needs none here).
+    async function ensureAuth() {
+      await waitForFB();
+      if (!window._auth.currentUser) {
+        await window._auth.signInAnonymously();
+      }
+    }
+
+    window.showToast = window.showToast || function (msg, isErr, ms) {
+      const el = document.getElementById('toast') || document.createElement('div');
+      if (!el.id) { el.id = 'toast'; el.style.cssText = 'position:fixed;left:50%;bottom:24px;transform:translateX(-50%);z-index:999;background:#0f172a;color:#fff;padding:10px 18px;border-radius:12px;font-size:0.85rem;font-weight:700;box-shadow:0 8px 24px rgba(0,0,0,.2);max-width:88vw;'; document.body.appendChild(el); }
+      el.style.background = isErr ? '#dc2626' : '#0f172a';
+      el.textContent = msg;
+      el.style.display = 'block';
+      clearTimeout(window.__toastT);
+      window.__toastT = setTimeout(() => { el.style.display = 'none'; }, ms || 2600);
+    };
+
+    window.addEventListener('load', async () => {
+      await initFirebase();
+      await waitForFB();
+
+      const params = new URLSearchParams(window.location.search);
+      const slug = params.get('h');
+      const tokenId = params.get('t');
+      const number = params.get('n');
+      if (!slug || (!tokenId && !number)) return showError(I18N.t('feedback.err.invalid'));
+      loadVisit(slug, tokenId, number);
+    });
+
+    async function loadVisit(slug, tokenId, number) {
+      try {
+        if (FUNC) {
+          let res;
+          if (tokenId) {
+            res = await window.TokSpotAPI.getTokenStatus({ slug, tokenId });
+          } else {
+            const code = localStorage.getItem('tokspot_hosp_code') || '';
+            if (!code) return showError(I18N.t('feedback.err.invalid'));
+            res = await window.TokSpotAPI.getTokenByNumber({ code, number: String(number).padStart(3, '0') });
+          }
+          tokenStatus = res;
+        } else {
+          await ensureAuth();
+          let snap;
+          let docId;
+          if (tokenId) {
+            docId = tokenId;
+            snap = await window._fs.getDoc(window._fs.doc(window._db, 'hospitals', slug, 'tokens', tokenId));
+          } else {
+            const q = await window._fs.getDocs(window._fs.query(
+              window._fs.collection(window._db, 'hospitals', slug, 'tokens'),
+              window._fs.where('status', 'in', ['completed', 'called', 'waiting', 'skipped'])
+            ));
+            const found = q.docs.map(d => ({ id: d.id, ...d.data() }))
+              .filter(t => String(t.number).padStart(3, '0') === String(number).padStart(3, '0'));
+            if (!found.length) return showError(I18N.t('feedback.err.invalid'));
+            const t = found[0];
+            docId = t.id;
+            snap = await window._fs.getDoc(window._fs.doc(window._db, 'hospitals', slug, 'tokens', t.id));
+          }
+          if (!snap.exists()) return showError(I18N.t('feedback.err.invalid'));
+          tokenStatus = { ...snap.data(), tokenId: docId, status: window.TokspotQueue.normalizeStatus(snap.data().status), doctorName: snap.data().doctorName || '' };
+        }
+      } catch (e) {
+        console.error(e);
+        return showError(I18N.t('feedback.err.invalid'));
+      }
+
+      if (tokenStatus.status !== 'completed') {
+        return showNotReady();
+      }
+      document.getElementById('loaderCard').classList.add('hidden');
+      document.getElementById('fbDoctorName').textContent = tokenStatus.doctorName || '—';
+      document.getElementById('formCard').classList.remove('hidden');
+      wireStars();
+    }
+
+    function wireStars() {
+      const stars = [...document.querySelectorAll('#starBox .star')];
+      const lbl = document.getElementById('starLbl');
+      const labels = ['', 'Poor', 'Fair', 'Good', 'Very good', 'Excellent'];
+      stars.forEach(s => {
+        s.addEventListener('click', () => {
+          rating = Number(s.dataset.v);
+          stars.forEach(x => x.classList.toggle('on', Number(x.dataset.v) <= rating));
+          lbl.textContent = labels[rating];
+        });
+      });
+      const tagsEls = [...document.querySelectorAll('#tagRow .tag')];
+      tagsEls.forEach(tag => {
+        tag.addEventListener('click', () => {
+          tag.classList.toggle('sel');
+          tags = tagsEls.filter(x => x.classList.contains('sel')).map(x => x.dataset.t);
+        });
+      });
+      document.getElementById('btnSubmit').addEventListener('click', submitFeedback);
+    }
+
+    async function submitFeedback() {
+      if (!rating) return showToast(I18N.t('feedback.err.required'), true);
+      const btn = document.getElementById('btnSubmit');
+      btn.disabled = true;
+      try {
+        const comment = document.getElementById('fbComment').value.trim();
+        const tagged = tags.length ? ('#' + tags.join(' #')) : '';
+        const fullComment = [comment, tagged].filter(Boolean).join('\n');
+        await window.TokSpotAPI.submitFeedback({
+          slug: new URLSearchParams(window.location.search).get('h'),
+          tokenId: new URLSearchParams(window.location.search).get('t'),
+          rating,
+          comment: fullComment,
+        });
+        document.getElementById('formCard').classList.add('hidden');
+        document.getElementById('thanksCard').classList.remove('hidden');
+      } catch (e) {
+        showToast(e.message || I18N.t('feedback.err.invalid'), true);
+        if (e && e.message && e.message.toLowerCase().includes('already')) {
+          document.getElementById('formCard').classList.add('hidden');
+          document.getElementById('thanksCard').classList.remove('hidden');
+        }
+      } finally {
+        btn.disabled = false;
+      }
+    }
+
+    function showNotReady() {
+      document.getElementById('loaderCard').classList.add('hidden');
+      const msg = document.getElementById('errorMsg');
+      msg.textContent = I18N.t('feedback.notReady');
+      document.getElementById('errorCard').classList.remove('hidden');
+    }
+
+    function showError(msg) {
+      document.getElementById('loaderCard').classList.add('hidden');
+      if (msg) document.getElementById('errorMsg').textContent = msg;
+      document.getElementById('errorCard').classList.remove('hidden');
+    }
+  </script>
+</body>
+</html>

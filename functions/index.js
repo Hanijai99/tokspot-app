@@ -75,6 +75,10 @@ const RL = {
   createAppt: { maxCalls: 20, periodSeconds: 60 },
   deskAppts: { maxCalls: 60, periodSeconds: 60 },
   apptCheckIn: { maxCalls: 60, periodSeconds: 60 },
+  reminderScan: { maxCalls: 10, periodSeconds: 60 },
+  feedback: { maxCalls: 10, periodSeconds: 60 },
+  analytics: { maxCalls: 30, periodSeconds: 60 },
+  handover: { maxCalls: 20, periodSeconds: 60 },
 };
 
 // ------------------------------------------------------------------
@@ -213,6 +217,17 @@ exports.issueToken = onCall({ maxInstances: 10, rateLimiting: RL.issue }, async 
   const tz = getHospitalTz(hospital);
   const today = todayInZone(tz);
 
+  // Capture the wait estimate shown at issue time (before the new token
+  // joins the queue) so analytics can later compare estimate vs actual.
+  let estWaitMinutes = null;
+  try {
+    const snap = await db.collection(`hospitals/${slug}/tokens`)
+      .where('doctorId', '==', doctorId).where('date', '==', today).get();
+    const rows = [];
+    snap.forEach((d) => rows.push(d.data()));
+    estWaitMinutes = queueStats(rows).waitEstimateMinutes;
+  } catch (_) { estWaitMinutes = null; }
+
   const key = String(idempotencyKey || '').slice(0, 80);
   let tokenId = '';
   let number = '';
@@ -264,6 +279,7 @@ exports.issueToken = onCall({ maxInstances: 10, rateLimiting: RL.issue }, async 
         priority: Boolean(priority),
         counter: counter || 'Counter A',
         idempotencyKey: key || null,
+        estWaitMinutes,
         createdAt: new Date(),
       });
     });
@@ -356,6 +372,12 @@ exports.transitionToken = onCall({ maxInstances: 10, rateLimiting: RL.transition
   if (nextStatus === 'called' && outcome.phone) {
     await notifyPatient(slug, hospital, outcome.phone,
       `Good news! Token #${outcome.number} is now called. Please proceed to ${changes && changes.counter ? changes.counter : 'your doctor'}.`);
+  }
+  // Feedback survey goes out on completion (feature: patient feedback).
+  if (nextStatus === 'completed' && outcome.phone) {
+    const base = process.env.TOKSPOT_BASE_URL || 'https://tokspot-app.vercel.app';
+    await notifyPatient(slug, hospital, outcome.phone,
+      `Your consultation is complete. Please rate your visit: ${base}/feedback.html?h=${encodeURIComponent(slug)}&t=${encodeURIComponent(tokenId)}`);
   }
   return { from: outcome.from, nextStatus };
 });
@@ -923,6 +945,319 @@ exports.checkInAppointment = onCall({ rateLimiting: RL.apptCheckIn }, async (req
 });
 
 // ------------------------------------------------------------------
+//  Round 7 — appointment reminders + no-show, feedback, analytics,
+//  and queue handover. All code-gated/authorized server-side.
+// ------------------------------------------------------------------
+
+// Resolve a hospital slug from a (sanitized) desk code. Returns null
+// when no hospital matches — callers decide the error context.
+async function slugForCode(code) {
+  const hospitals = await db.collection('hospitals').get();
+  let slug = null;
+  hospitals.forEach((h) => {
+    if (normalizeHospitalCode(h.data().hospitalCode) === normalizeHospitalCode(code)) slug = h.id;
+  });
+  return slug;
+}
+
+// minutes since midnight for a "HH:MM" slot string (or null).
+function slotMinutes(slotStart) {
+  const m = /^(\d{1,2}):(\d{2})$/.exec(String(slotStart || ''));
+  if (!m) return null;
+  return Number(m[1]) * 60 + Number(m[2]);
+}
+
+// Drive a full reminder + no-show sweep for one hospital: sends the
+// day-before reminder for tomorrow's bookings, the 2-hour-before
+// reminder for today's upcoming slots, and auto-marks booked
+// appointments whose slot passed 30+ minutes ago (still un-checked-in)
+// as no-show. Idempotent via reminderSent1d/reminderSent2h flags.
+async function runAppointmentSweep(slug, hospital) {
+  const tz = getHospitalTz(hospital);
+  const now = new Date();
+  const today = todayInZone(tz, now);
+  const tomorrow = todayInZone(tz, new Date(now.getTime() + 86400000));
+  const nowParts = new Intl.DateTimeFormat('en-GB', {
+    timeZone: tz, hour: '2-digit', minute: '2-digit', hour12: false,
+  }).formatToParts(new Date());
+  const partVal = (type) => (nowParts.find((p) => p.type === type) || { value: '0' }).value;
+  const nowClock = (Number(partVal('hour')) % 24) * 60 + Number(partVal('minute'));
+
+  let remindersSent = 0;
+  let noShowsMarked = 0;
+
+  // Today: 2-hour-before reminders + overdue auto no-show.
+  const todayDocs = await db.collection(`hospitals/${slug}/appointments`)
+    .where('date', '==', today).where('status', '==', 'booked').get();
+  await Promise.all(todayDocs.docs.map(async (d) => {
+    const a = d.data();
+    const slotMin = slotMinutes(a.slotStart);
+    if (slotMin === null) return;
+    const minsUntil = slotMin - nowClock;
+
+    // Overdue by >= 30 min and never checked in → no-show.
+    if (minsUntil <= -30 && !a.tokenId) {
+      await d.ref.update({ status: 'no-show', noShowAt: new Date() });
+      await audit(null, slug, 'appointment:no-show', d.id, 'ok', { auto: true, slotStart: a.slotStart });
+      noShowsMarked++;
+      return;
+    }
+    // Within the next 2 hours → one reminder per visit.
+    if (minsUntil > 0 && minsUntil <= 120 && !a.reminderSent2h && a.phone) {
+      await notifyPatient(slug, hospital, a.phone,
+        `Reminder: Your appointment at ${hospital.name || slug} is at ${a.slotStart}. Please be ready — you are next in line soon.`);
+      await d.ref.update({ reminderSent2h: new Date() });
+      remindersSent++;
+    }
+  }));
+
+  // Tomorrow: single day-before reminder.
+  const tomorrowDocs = await db.collection(`hospitals/${slug}/appointments`)
+    .where('date', '==', tomorrow).where('status', '==', 'booked').get();
+  await Promise.all(tomorrowDocs.docs.map(async (d) => {
+    const a = d.data();
+    if (a.reminderSent1d || !a.phone) return;
+    await notifyPatient(slug, hospital, a.phone,
+      `Reminder: Your appointment at ${hospital.name || slug} is tomorrow at ${a.slotStart}. Please arrive 10 minutes early.`);
+    await d.ref.update({ reminderSent1d: new Date() });
+    remindersSent++;
+  }));
+
+  return { remindersSent, noShowsMarked };
+}
+
+// Desk-triggered scan for the station's hospital (also used by the
+// scheduled runner). Code-gated, no admin auth required.
+exports.appointmentReminderScan = onCall({ rateLimiting: RL.reminderScan }, async (request) => {
+  const { code } = request.data || {};
+  if (!code) throw new HttpsError('invalid-argument', 'code required.');
+  const slug = await slugForCode(code);
+  if (!slug) throw new HttpsError('permission-denied', 'Invalid hospital code.');
+  const hospital = await loadHospital(slug);
+  const result = await runAppointmentSweep(slug, hospital);
+  await audit(request.auth && request.auth.uid, slug, 'appointment:reminder-scan', null, 'ok', result);
+  return { ok: true, ...result };
+});
+
+// Manual no-show mark for a single overdue booking (desk).
+exports.markNoShow = onCall({ rateLimiting: RL.reminderScan }, async (request) => {
+  const { code, appointmentId } = request.data || {};
+  if (!code || !appointmentId) throw new HttpsError('invalid-argument', 'code + appointmentId required.');
+  const slug = await slugForCode(code);
+  if (!slug) throw new HttpsError('permission-denied', 'Invalid hospital code.');
+  const aSnap = await db.doc(`hospitals/${slug}/appointments/${appointmentId}`).get();
+  if (!aSnap.exists) throw new HttpsError('not-found', 'Appointment not found.');
+  const a = aSnap.data();
+  if (a.status !== 'booked') {
+    throw new HttpsError('failed-precondition', 'Only booked appointments can be marked no-show.');
+  }
+  await db.doc(`hospitals/${slug}/appointments/${appointmentId}`).update({ status: 'no-show', noShowAt: new Date() });
+  await audit(request.auth && request.auth.uid, slug, 'appointment:no-show', appointmentId, 'ok', { manual: true, slotStart: a.slotStart });
+  return { ok: true };
+});
+
+// Patient feedback for a completed token (one submission per token).
+// Public callable — callers only need the unguessable tokenId.
+exports.submitFeedback = onCall({ rateLimiting: RL.feedback }, async (request) => {
+  const { slug, tokenId, rating, comment } = request.data || {};
+  if (!slug || !tokenId) throw new HttpsError('invalid-argument', 'slug + tokenId required.');
+  const r = Math.floor(Number(rating));
+  if (!(r >= 1 && r <= 5)) throw new HttpsError('invalid-argument', 'Rating must be an integer 1-5.');
+  const cleanComment = String(comment || '').trim().slice(0, 300);
+
+  const hospital = await loadHospital(slug);
+  if (!hospital) throw new HttpsError('not-found', 'Hospital not found.');
+  const tSnap = await db.doc(`hospitals/${slug}/tokens/${tokenId}`).get();
+  if (!tSnap.exists) throw new HttpsError('not-found', 'Token not found.');
+  const t = tSnap.data();
+  if (normalizeStatus(t.status) !== 'completed') {
+    throw new HttpsError('failed-precondition', 'Feedback is available after the consultation completes.');
+  }
+  const dup = await db.collection(`hospitals/${slug}/feedback`)
+    .where('tokenId', '==', tokenId).get();
+  if (!dup.empty) throw new HttpsError('already-exists', 'Feedback already submitted for this visit.');
+
+  let doctorName = '';
+  if (t.doctorId) {
+    const dSnap = await db.doc(`hospitals/${slug}/doctors/${t.doctorId}`).get();
+    if (dSnap.exists) doctorName = dSnap.data().name || '';
+  }
+  const fbId = db.collection(`hospitals/${slug}/feedback`).doc().id;
+  await db.doc(`hospitals/${slug}/feedback/${fbId}`).set({
+    id: fbId,
+    tokenId,
+    doctorId: t.doctorId || '',
+    doctorName,
+    date: t.date || todayInZone(getHospitalTz(hospital)),
+    rating: r,
+    comment: cleanComment,
+    createdAt: new Date(),
+  });
+  await audit(request.auth && request.auth.uid, slug, 'feedback:submit', tokenId, 'ok', { rating: r });
+  return { ok: true, feedbackId: fbId, doctorName };
+});
+
+// Desk/admin feed of today's feedback (code-gated, sanitized — no
+// patient names/phones; feedback docs never carry them).
+exports.listFeedback = onCall({ rateLimiting: RL.analytics }, async (request) => {
+  const { code } = request.data || {};
+  if (!code) throw new HttpsError('invalid-argument', 'code required.');
+  const slug = await slugForCode(code);
+  if (!slug) throw new HttpsError('permission-denied', 'Invalid hospital code.');
+  const hospital = await loadHospital(slug);
+  const date = todayInZone(getHospitalTz(hospital));
+  const docs = await db.collection(`hospitals/${slug}/feedback`).where('date', '==', date).get();
+  const rows = [];
+  docs.forEach((d) => {
+    const f = d.data();
+    rows.push({
+      id: d.id,
+      doctorName: f.doctorName || '',
+      rating: f.rating || 0,
+      comment: f.comment || '',
+      createdAt: f.createdAt ? f.createdAt.toMillis() : null,
+    });
+  });
+  rows.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+  return { date, rows };
+});
+
+// Admin daily analytics roll-up: core counts, source split, hourly
+// volume, per-doctor performance (waiting/served + avg serve + EWT
+// accuracy + avg rating), and feedback summary. Server-computed so the
+// admin page needs no direct token reads in functions mode.
+exports.getAnalytics = onCall({ rateLimiting: RL.analytics }, async (request) => {
+  const { slug } = request.data || {};
+  const hospital = await assertAdmin(request, slug);
+  const date = todayInZone(getHospitalTz(hospital));
+
+  const tokDocs = await db.collection(`hospitals/${slug}/tokens`).where('date', '==', date).get();
+  const counts = { total: 0, waiting: 0, called: 0, completed: 0, skipped: 0, canceled: 0 };
+  const source = { appointment: 0, walkin: 0, self: 0, online: 0 };
+  const hourly = Array(24).fill(0);
+  const perDoctor = {};
+  const servedAll = [];
+
+  tokDocs.forEach((d) => {
+    const t = d.data();
+    counts.total++;
+    const st = normalizeStatus(t.status);
+    if (st === 'waiting') counts.waiting++;
+    else if (st === 'called') counts.called++;
+    else if (st === 'completed') counts.completed++;
+    else if (st === 'skipped') counts.skipped++;
+    else if (st === 'canceled') counts.canceled++;
+
+    const src = String(t.source || 'walkin');
+    if (source[src] !== undefined) source[src]++;
+    else source.walkin++;
+
+    if (t.createdAt && t.createdAt.toDate) {
+      const h = t.createdAt.toDate().getHours();
+      if (h >= 0 && h < 24) hourly[h]++;
+    }
+
+    const docId = String(t.doctorId || 'unassigned');
+    perDoctor[docId] = perDoctor[docId] || { waiting: 0, called: 0, completed: 0, skipped: 0, canceled: 0, served: [], estErrSum: 0, estErrCount: 0 };
+    const pd = perDoctor[docId];
+    if (st === 'waiting') pd.waiting++;
+    else if (st === 'called') pd.called++;
+    else if (st === 'completed') pd.completed++;
+    else if (st === 'skipped') pd.skipped++;
+    else if (st === 'canceled') pd.canceled++;
+
+    if (t.createdAt && t.calledAt && t.createdAt.toDate && t.calledAt.toDate &&
+        (st === 'completed' || st === 'skipped')) {
+      const actualMin = (t.calledAt.toDate().getTime() - t.createdAt.toDate().getTime()) / 60000;
+      servedAll.push(actualMin);
+      pd.served.push(actualMin);
+      if (Number.isFinite(Number(t.estWaitMinutes))) {
+        pd.estErrSum += Math.abs(Number(t.estWaitMinutes) - actualMin);
+        pd.estErrCount++;
+      }
+    }
+  });
+
+  // Doctor names for the table.
+  const docDocs = await db.collection(`hospitals/${slug}/doctors`).get();
+  const names = {};
+  docDocs.forEach((d) => { names[d.id] = d.data().name || d.id; });
+
+  // Feedback roll-up per doctor + overall.
+  const fbDocs = await db.collection(`hospitals/${slug}/feedback`).where('date', '==', date).get();
+  const fbByDoctor = {};
+  let fbCount = 0;
+  let fbSum = 0;
+  fbDocs.forEach((d) => {
+    const f = d.data();
+    const r = Number(f.rating) || 0;
+    fbCount++;
+    fbSum += r;
+    const docId = String(f.doctorId || 'unassigned');
+    fbByDoctor[docId] = fbByDoctor[docId] || { sum: 0, count: 0 };
+    fbByDoctor[docId].sum += r;
+    fbByDoctor[docId].count++;
+  });
+
+  const doctorRows = Object.keys(perDoctor).map((docId) => {
+    const pd = perDoctor[docId];
+    const avgServe = pd.served.length ? pd.served.reduce((a, b) => a + b, 0) / pd.served.length : null;
+    const fb = fbByDoctor[docId];
+    return {
+      id: docId,
+      name: names[docId] || docId,
+      waiting: pd.waiting,
+      called: pd.called,
+      completed: pd.completed,
+      skipped: pd.skipped,
+      canceled: pd.canceled,
+      served: pd.served.length,
+      avgServeMinutes: avgServe === null ? null : Math.round(avgServe * 10) / 10,
+      estErrorMinutes: pd.estErrCount ? Math.round((pd.estErrSum / pd.estErrCount) * 10) / 10 : null,
+      avgRating: fb && fb.count ? Math.round((fb.sum / fb.count) * 10) / 10 : null,
+    };
+  });
+  doctorRows.sort((a, b) => (b.waiting + b.called + b.completed) - (a.waiting + a.called + a.completed));
+
+  const avgWaitAll = servedAll.length ? servedAll.reduce((a, b) => a + b, 0) / servedAll.length : null;
+  const peakHour = hourly.reduce((best, v, i) => (v > hourly[best] ? i : best), 0);
+
+  return {
+    date,
+    counts,
+    source,
+    hourly,
+    peakHour: counts.total ? peakHour : null,
+    avgWaitMinutes: avgWaitAll === null ? null : Math.round(avgWaitAll * 10) / 10,
+    doctorRows,
+    feedback: { count: fbCount, avgRating: fbCount ? Math.round((fbSum / fbCount) * 10) / 10 : null },
+  };
+});
+
+// Queue handover: move every *waiting* token of one doctor to another
+// for today (called/active tokens stay where they are). Desk code-gated.
+exports.transferQueue = onCall({ rateLimiting: RL.handover }, async (request) => {
+  const { code, fromDoctorId, toDoctorId } = request.data || {};
+  if (!code || !fromDoctorId || !toDoctorId) throw new HttpsError('invalid-argument', 'code + fromDoctorId + toDoctorId required.');
+  if (fromDoctorId === toDoctorId) throw new HttpsError('invalid-argument', 'Pick a different target doctor.');
+  const slug = await slugForCode(code);
+  if (!slug) throw new HttpsError('permission-denied', 'Invalid hospital code.');
+  const hospital = await loadHospital(slug);
+  const date = todayInZone(getHospitalTz(hospital));
+  const docs = await db.collection(`hospitals/${slug}/tokens`)
+    .where('doctorId', '==', fromDoctorId).where('date', '==', date).get();
+  let moved = 0;
+  await Promise.all(docs.docs.map(async (d) => {
+    const t = d.data();
+    if (normalizeStatus(t.status) !== 'waiting') return;
+    await d.ref.update({ doctorId: toDoctorId, transferredAt: new Date(), transferredFrom: fromDoctorId });
+    moved++;
+  }));
+  await audit(request.auth && request.auth.uid, slug, 'queue:transfer', fromDoctorId, 'ok', { toDoctorId, moved });
+  return { moved };
+});
+
+// ------------------------------------------------------------------
 //  listAuditEvents — admin-only accountability feed
 // ------------------------------------------------------------------
 exports.listAuditEvents = onCall({ rateLimiting: RL.audit }, async (request) => {
@@ -1115,6 +1450,28 @@ exports.tokenCalledNotify = onDocumentUpdated(
 );
 
 // ------------------------------------------------------------------
+//  appointmentReminderRunner — scheduled sweep every 30 minutes across
+//  every hospital. Sends day-before + 2-hour-before appointment
+//  reminders (via the SMS/WhatsApp outbox) and auto-marks overdue
+//  un-checked-in bookings as no-show. Idempotent flags prevent repeats.
+// ------------------------------------------------------------------
+exports.appointmentReminderRunner = onSchedule({ schedule: 'every 30 minutes', timeZone: DEFAULT_TZ }, async () => {
+  const hospitals = await db.collection('hospitals').get();
+  let remindersSent = 0;
+  let noShowsMarked = 0;
+  await Promise.all(hospitals.docs.map(async (h) => {
+    try {
+      const r = await runAppointmentSweep(h.id, h.data());
+      remindersSent += r.remindersSent;
+      noShowsMarked += r.noShowsMarked;
+    } catch (e) {
+      console.error('reminder sweep failed', h.id, e.message);
+    }
+  }));
+  console.log('appointment reminder sweep complete', JSON.stringify({ remindersSent, noShowsMarked }));
+});
+
+// ------------------------------------------------------------------
 //  retentionRunner — daily data-minimization job. Tokens older than
 //  RETENTION_TOKEN_DAYS, audit log older than RETENTION_AUDIT_DAYS and
 //  SMS rows older than RETENTION_SMS_DAYS are deleted in batches.
@@ -1123,6 +1480,7 @@ exports.tokenCalledNotify = onDocumentUpdated(
 const RETENTION_TOKEN_DAYS = 90;
 const RETENTION_AUDIT_DAYS = 365;
 const RETENTION_SMS_DAYS = 30;
+const RETENTION_FEEDBACK_DAYS = 365;
 
 async function deleteWhereOlderThan(refGetter, field, cutoff, limit) {
   let total = 0;
@@ -1148,6 +1506,9 @@ exports.retentionRunner = onSchedule({ schedule: '30 4 * * *', timeZone: 'Asia/K
     () => db.collection('auditLog'), 'at', new Date(t - RETENTION_AUDIT_DAYS * 864e5), 400);
   results.sms = await deleteWhereOlderThan(
     () => db.collection('sms_queue'), 'createdAt', new Date(t - RETENTION_SMS_DAYS * 864e5), 400);
+  // Feedback rows are date-keyed strings, so purge by the date field.
+  results.feedback = await deleteWhereOlderThan(
+    () => db.collectionGroup('feedback'), 'date', daysAgoIso(RETENTION_FEEDBACK_DAYS, t), 400);
 
   console.log('retention run complete', JSON.stringify(results));
 });

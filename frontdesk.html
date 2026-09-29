@@ -229,11 +229,25 @@
 
       <!-- Waiting Queue -->
       <h2 style="font-size:1.05rem;font-weight:800;margin:22px 0 12px;">Waiting Queue</h2>
+      <div class="card" style="padding:10px 12px;margin-bottom:12px;">
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+          <i class="fa-solid fa-arrows-turn-to-dots" style="color:var(--green);"></i>
+          <span style="font-size:0.8rem;font-weight:700;flex:1;" data-i18n="desk.transferPrompt">Move waiting tokens to another doctor</span>
+          <select class="input" id="handoverTarget" style="flex:1;min-width:130px;" onchange="this.value && (document.getElementById('btnHandover').disabled=false)">
+            <option value="">Select doctor…</option>
+          </select>
+          <button class="btn btn-slate btn-sm" onclick="handoverQueue()" id="btnHandover" disabled>
+            <i class="fa-solid fa-hand-holding-medical"></i> <span data-i18n="desk.transferBtn">Handover</span>
+          </button>
+        </div>
+      </div>
       <div id="queueList"></div>
       <div class="empty hidden" id="queueEmpty"><div class="e-ic"><i class="fa-regular fa-clock"></i></div><div class="e-t">No tokens waiting</div><div class="e-s">Issue a token to get started.</div></div>
 
       <!-- Today's Appointments -->
-      <h2 style="font-size:1.05rem;font-weight:800;margin:22px 0 12px;">Today's Appointments <span class="badge green" id="apptCount">0</span></h2>
+      <h2 style="font-size:1.05rem;font-weight:800;margin:22px 0 12px;">Today's Appointments <span class="badge green" id="apptCount">0</span>
+        <button class="btn btn-sm btn-ghost" style="float:right;" onclick="scanAppointments()"><i class="fa-solid fa-bell"></i> <span data-i18n="desk.remind">Reminders &amp; No-shows</span></button>
+      </h2>
       <div id="apptList"></div>
       <div class="empty hidden" id="apptEmpty"><div class="e-ic"><i class="fa-regular fa-calendar-check"></i></div><div class="e-t">No advanced bookings for today</div><div class="e-s">Patients booking on the website appear here for check-in.</div></div>
 
@@ -457,6 +471,8 @@
     async function loadHospitalDoctors(hospitalSlug) {
       const ds = document.getElementById('doctorSelect');
       ds.innerHTML = '<option value="">Select Doctor for this station…</option>';
+      const handoverSel = document.getElementById('handoverTarget');
+      handoverSel.innerHTML = '<option value="">Select doctor…</option>';
       try {
         let doctors = [];
         if (FUNC) {
@@ -474,10 +490,133 @@
           o.dataset.room = doc.department || doc.counter || doc.room || 'Counter A';
           o.textContent = (doc.name || doc.id) + (doc.department ? ' · ' + doc.department : '');
           ds.appendChild(o);
+
+          // Handover target: every doctor except the one selected for
+          // this station (refreshed on onDoctor via rebuildHandoverList).
+          const h = document.createElement('option');
+          h.value = doc.id;
+          h.textContent = (doc.name || doc.id) + (doc.department ? ' · ' + doc.department : '');
+          document.getElementById('handoverTarget').appendChild(h);
         });
+        rebuildHandoverList();
       } catch (e) {
         console.error(e);
         showToast('Error loading doctors: ' + e.message, true);
+      }
+    }
+
+    // Rebuild the handover target list to exclude the current doctor
+    // and keep the button disabled until a valid target is chosen.
+    function rebuildHandoverList() {
+      const target = document.getElementById('handoverTarget');
+      const btn = document.getElementById('btnHandover');
+      if (!target || !btn) return;
+      if (!currentDoctor) { btn.disabled = true; return; }
+      const current = currentDoctor;
+      [...target.options].forEach(o => {
+        o.disabled = o.value === current;
+      });
+      if (target.value === current) target.value = '';
+      btn.disabled = !target.value;
+    }
+
+    async function handoverQueue() {
+      const target = document.getElementById('handoverTarget').value;
+      if (!currentDoctor || !target) return showToast('Pick a handover doctor first.', true);
+      if (target === currentDoctor) return showToast('Choose a different doctor.', true);
+      if (!confirm(`Move all waiting tokens from ${currentDoctorName} to the selected doctor?`)) return;
+      try {
+        await ensureAuth();
+        let moved = 0;
+        if (FUNC) {
+          const res = await window.TokSpotAPI.transferQueue({ code: currentHospitalCode, fromDoctorId: currentDoctor, toDoctorId: target });
+          moved = res.moved || 0;
+        } else {
+          // Prototype: bulk-update waiting token rows client-side.
+          const today = window.todayStr ? window.todayStr() : new Date().toISOString().slice(0, 10);
+          const snap = await window._fs.getDocs(window._fs.query(
+            window._fs.collection(window._db, 'hospitals', currentHospital, 'tokens'),
+            window._fs.where('doctorId', '==', currentDoctor),
+            window._fs.where('date', '==', today)
+          ));
+          const waiting = snap.docs.filter(d => d.data().status === 'waiting');
+          await Promise.all(waiting.map(d => window._fs.updateDoc(d.ref, {
+            doctorId: target,
+            transferredAt: window._fs.serverTimestamp ? window._fs.serverTimestamp() : new Date(),
+            transferredFrom: currentDoctor,
+          })));
+          moved = waiting.length;
+        }
+        showToast(`Handover complete: ${moved} waiting token(s) moved.`);
+        document.getElementById('handoverTarget').value = '';
+        rebuildHandoverList();
+      } catch (e) {
+        console.error(e);
+        showToast('Handover failed: ' + e.message, true);
+      }
+    }
+
+    // Run the reminder + no-show sweep (functions: real server sweep;
+    // prototype: mark overdue no-shows client-side and surface a note).
+    async function scanAppointments() {
+      const btn = document.querySelector('button[onclick="scanAppointments()"]');
+      if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Scanning…'; }
+      try {
+        await ensureAuth();
+        if (FUNC) {
+          const res = await window.TokSpotAPI.appointmentReminderScan({ code: currentHospitalCode });
+          showToast(`Done — ${res.remindersSent || 0} reminder(s) queued, ${res.noShowsMarked || 0} no-show(s) marked.`);
+        } else {
+          // Prototype has no SMS outbox; still mark overdue no-shows.
+          const today = window.todayStr ? window.todayStr() : new Date().toISOString().slice(0, 10);
+          const snap = await window._fs.getDocs(window._fs.query(
+            window._fs.collection(window._db, 'hospitals', currentHospital, 'appointments'),
+            window._fs.where('doctorId', '==', currentDoctor),
+            window._fs.where('date', '==', today)
+          ));
+          const nowMin = new Date().getHours() * 60 + new Date().getMinutes();
+          let noShow = 0;
+          await Promise.all(snap.docs.map(async (d) => {
+            const a = d.data();
+            if (a.status !== 'booked' || a.tokenId) return;
+            const m = /^(\d{1,2}):(\d{2})$/.exec(String(a.slotStart || ''));
+            if (!m) return;
+            const slotMin = Number(m[1]) * 60 + Number(m[2]);
+            if (nowMin - slotMin >= 30) {
+              await window._fs.updateDoc(d.ref, { status: 'no-show', noShowAt: new Date() });
+              noShow++;
+            }
+          }));
+          showToast(`Prototype: ${noShow} overdue booking(s) marked no-show. SMS reminders need functions mode.`);
+        }
+        loadAppointments();
+      } catch (e) {
+        console.error(e);
+        showToast('Scan failed: ' + e.message, true);
+      } finally {
+        if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-bell"></i> ' + (I18N && I18N.t ? I18N.t('desk.remind') : 'Reminders & No-shows'); }
+      }
+    }
+
+    // Manually mark one booked appointment as no-show.
+    async function markApptNoShow(apptId) {
+      const appt = apptRows.find(a => a.id === apptId);
+      if (!appt) return;
+      if (!confirm(`Mark ${appt.patientName || 'patient'}'s ${appt.slotStart || ''} booking as no-show?`)) return;
+      try {
+        await ensureAuth();
+        if (FUNC) {
+          await window.TokSpotAPI.markNoShow({ code: currentHospitalCode, appointmentId: apptId });
+        } else {
+          await window._fs.updateDoc(
+            window._fs.doc(window._db, 'hospitals', currentHospital, 'appointments', apptId),
+            { status: 'no-show', noShowAt: window._fs.serverTimestamp ? window._fs.serverTimestamp() : new Date() }
+          );
+        }
+        showToast('Marked as no-show.');
+        loadAppointments();
+      } catch (e) {
+        showToast('No-show failed: ' + e.message, true);
       }
     }
 
@@ -499,6 +638,7 @@
       setupQueueListener();
       loadHistory();
       loadAppointments();
+      rebuildHandoverList();
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
 
@@ -755,6 +895,15 @@
       }
     }
 
+    // True when a booked appointment's slot has passed (>= 30 min ago).
+    function appointmentOverdue(slotStart) {
+      const m = /^(\d{1,2}):(\d{2})$/.exec(String(slotStart || ''));
+      if (!m) return false;
+      const nowMin = new Date().getHours() * 60 + new Date().getMinutes();
+      const slotMin = Number(m[1]) * 60 + Number(m[2]);
+      return nowMin - slotMin >= 30;
+    }
+
     async function loadAppointments() {
       const list = document.getElementById('apptList');
       const empty = document.getElementById('apptEmpty');
@@ -791,14 +940,16 @@
             ? '<span class="badge green">Checked in</span>'
             : (isBooked ? '<span class="badge amber">Booked</span>' : '<span class="badge slate">' + escHtml(a.status || '') + '</span>');
           const numStyle = isBooked ? 'background:#e0e7ff;color:#4338ca;' : (arrived ? 'background:#dcfce7;color:#166534;' : '');
+          const overdue = isBooked && !a.tokenId && appointmentOverdue(a.slotStart);
           return `
-          <div class="qrow" style="${isBooked ? 'border-color:#c7d2fe;' : (arrived ? 'border-color:#86efac;' : '')}">
+          <div class="qrow" style="${isBooked ? 'border-color:' + (overdue ? '#fca5a5;background:#fff5f5' : '#c7d2fe') + ';' : (arrived ? 'border-color:#86efac;' : '')}">
             <div class="qnum" style="${numStyle}">${escHtml(a.slotStart || '--:--')}</div>
             <div class="qbody">
-              <div class="qname">${escHtml(a.patientName || 'Patient')} <span class="badge blue">${escHtml(a.phone || '')}</span> ${badge}</div>
-              <div class="qmeta">Advanced booking${a.createdBy ? ' · ' + a.createdBy : ''}${a.tokenId ? ' · Token issued' : ''}</div>
+              <div class="qname">${escHtml(a.patientName || 'Patient')} <span class="badge blue">${escHtml(a.phone || '')}</span> ${overdue ? '<span class="badge red">Overdue</span>' : badge}</div>
+              <div class="qmeta">Advanced booking${a.createdBy ? ' · ' + a.createdBy : ''}${a.tokenId ? ' · Token issued' : ''}${overdue ? ' · missed slot — mark no-show' : ''}</div>
               <div class="btn-row mt-12">
                 ${isBooked ? `<button class="btn btn-sm btn-green" onclick="checkInAppt('${a.id}')"><i class="fa-solid fa-user-check"></i> Check-in → Token</button>` : ''}
+                ${overdue ? `<button class="btn btn-sm btn-danger" onclick="markApptNoShow('${a.id}')"><i class="fa-solid fa-user-slash"></i> ${I18N && I18N.t ? I18N.t('desk.noShow') : 'No-Show'}</button>` : ''}
               </div>
             </div>
           </div>`;

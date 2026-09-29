@@ -91,6 +91,42 @@
         <div class="stat"><div class="n" id="kCanc" style="color:#dc2626;">0</div><div class="k">Canceled</div></div>
       </div>
     </div>
+
+    <div class="card mt-16 no-print">
+      <div class="htitle" style="font-size:1.05rem;">Source &amp; Quality</div>
+      <div class="hsub" style="margin-top:4px;">Today · walk-in vs appointment · serve time · feedback</div>
+      <div class="stats mt-16" style="grid-template-columns: repeat(4, 1fr);">
+        <div class="stat"><div class="n" id="kSourceAppt">0</div><div class="k">Appointments</div></div>
+        <div class="stat"><div class="n" id="kSourceWalkin">0</div><div class="k">Walk-ins</div></div>
+        <div class="stat"><div class="n" id="kAvgServe">0m</div><div class="k">Avg Serve</div></div>
+        <div class="stat"><div class="n" id="kRating">—</div><div class="k">Avg Rating</div></div>
+      </div>
+    </div>
+
+    <div class="card mt-16 no-print">
+      <div class="htitle" style="font-size:1.05rem;">Per-Doctor Performance</div>
+      <div class="hsub" style="margin-top:4px;">Waiting / served · avg serve · EWT accuracy · avg rating</div>
+      <div style="overflow-x:auto;" class="mt-12">
+        <table style="width:100%;border-collapse:collapse;font-size:0.82rem;" id="doctorTable">
+          <thead>
+            <tr style="text-align:left;border-bottom:1px solid var(--line);">
+              <th style="padding:6px 8px;">Doctor</th>
+              <th style="padding:6px 8px;">Waiting</th>
+              <th style="padding:6px 8px;">Served</th>
+              <th style="padding:6px 8px;">Avg Serve</th>
+              <th style="padding:6px 8px;">EWT Err</th>
+              <th style="padding:6px 8px;">Rating</th>
+            </tr>
+          </thead>
+          <tbody id="doctorBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="card mt-16 no-print">
+      <div class="htitle" style="font-size:1.05rem;"><i class="fa-regular fa-comment"></i> <span data-i18n="analytics.feedback">Patient Feedback</span></div>
+      <div id="feedbackBox" class="mt-12"><div class="muted">No feedback yet today.</div></div>
+    </div>
   </div>
 
   <button class="theme-toggle no-print" onclick="hk.toggleDark()"><i class="fa-solid fa-moon"></i></button>
@@ -102,6 +138,7 @@
   <script src="js/app.js"></script>
   <script src="js/firebase.js"></script>
   <script src="js/queue-domain.js"></script>
+  <script src="js/api.js"></script>
   <script>
     let currentTokensCache = [];
     let currentHospitalSlug = '';
@@ -159,6 +196,16 @@
 
       const today = window.todayStr();
       try {
+        // Functions mode: the server computes the full roll-up
+        // (admin-gated) — no direct token/feedback reads needed.
+        if (window.TokSpotAPI && window.TokSpotAPI.mode() === 'functions') {
+          const data = await window.TokSpotAPI.getAnalytics({ slug: currentHospitalSlug });
+          renderAll(data);
+          btnExport.disabled = true; // CSV needs client rows; functions mode uses the API
+          btnPrint.disabled = true;
+          return;
+        }
+
         const selectedHospital = await window._fs.getDoc(window._fs.doc(window._db, 'hospitals', currentHospitalSlug));
         if (!selectedHospital.exists() || !window.TokspotQueue.isHospitalAdmin(window._auth.currentUser, selectedHospital.data())) {
           throw new Error('You are not authorized to view this hospital report.');
@@ -172,6 +219,8 @@
         const counts = {};
         let total = 0, done = 0, wait = 0, canc = 0, skip = 0;
         for (let h = 0; h < 24; h++) counts[h] = 0;
+        const source = { appointment: 0, walkin: 0, self: 0, online: 0 };
+        const perDoctor = {};
 
         snap.docs.forEach(d => {
           const t = d.data();
@@ -187,21 +236,145 @@
           let hr = null;
           if (t.createdAt && t.createdAt.toDate) hr = t.createdAt.toDate().getHours();
           if (hr !== null) counts[hr]++;
+
+          const src = String(t.source || 'walkin');
+          if (source[src] !== undefined) source[src]++; else source.walkin++;
+
+          const docId = String(t.doctorId || 'unassigned');
+          perDoctor[docId] = perDoctor[docId] || { waiting: 0, completed: 0, skipped: 0, served: [] };
+          const pd = perDoctor[docId];
+          if (t.status === 'waiting') pd.waiting++;
+          if (t.status === 'completed') pd.completed++;
+          if (t.status === 'skipped') pd.skipped++;
+          if (t.createdAt && t.calledAt && t.createdAt.toDate && t.calledAt.toDate &&
+              (t.status === 'completed' || t.status === 'skipped')) {
+            pd.served.push((t.calledAt.toDate().getTime() - t.createdAt.toDate().getTime()) / 60000);
+          }
         });
 
-        document.getElementById('kTotal').textContent = total;
-        document.getElementById('kDone').textContent = done;
-        document.getElementById('kWait').textContent = wait;
-        document.getElementById('kSkip').textContent = skip;
-        document.getElementById('kCanc').textContent = canc;
-        const avgWait = window.TokspotQueue.averageWaitMinutes(currentTokensCache);
-        document.getElementById('kAvg').textContent = avgWait === null ? '—' : `${avgWait}m`;
-        
-        renderChart(counts);
+        // Feedback (prototype reads directly — same collection shape).
+        let fbRows = [];
+        try {
+          const fbSnap = await window._fs.getDocs(window._fs.query(
+            window._fs.collection(window._db, 'hospitals', currentHospitalSlug, 'feedback'),
+            window._fs.where('date', '==', today)
+          ));
+          fbRows = fbSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+        } catch (_) { fbRows = []; }
+
+        // Doctor names for the table.
+        const names = {};
+        try {
+          const docSnap = await window._fs.getDocs(window._fs.collection(window._db, 'hospitals', currentHospitalSlug, 'doctors'));
+          docSnap.docs.forEach(d => { names[d.id] = d.data().name || d.id; });
+        } catch (_) {}
+
+        const doctorRows = Object.keys(perDoctor).map(docId => {
+          const pd = perDoctor[docId];
+          const avgServe = pd.served.length ? pd.served.reduce((a, b) => a + b, 0) / pd.served.length : null;
+          return {
+            id: docId,
+            name: names[docId] || docId,
+            waiting: pd.waiting,
+            served: pd.served.length,
+            avgServeMinutes: avgServe === null ? null : Math.round(avgServe * 10) / 10,
+            estErrorMinutes: null, // EWT accuracy is captured server-side only
+            avgRating: null,
+          };
+        });
+        doctorRows.sort((a, b) => (b.waiting + b.served) - (a.waiting + a.served));
+
+        const fbSum = fbRows.reduce((a, f) => a + (Number(f.rating) || 0), 0);
+        renderAll({
+          date: today,
+          counts: { total, waiting: wait, called: 0, completed: done, skipped: skip, canceled: canc },
+          source,
+          hourly: counts,
+          peakHour: null,
+          avgWaitMinutes: window.TokspotQueue.averageWaitMinutes(currentTokensCache),
+          doctorRows,
+          feedback: { count: fbRows.length, avgRating: fbRows.length ? Math.round((fbSum / fbRows.length) * 10) / 10 : null, rows: fbRows },
+        });
 
         btnExport.disabled = total === 0;
         btnPrint.disabled = total === 0;
       } catch (e) { showToast('Failed: ' + e.message, true); }
+    }
+
+    // Render the full dashboard from a normalized stats object shared by
+    // both the functions API (getAnalytics) and the prototype path.
+    function renderAll(data) {
+      const c = data.counts || {};
+      document.getElementById('kTotal').textContent = c.total || 0;
+      document.getElementById('kDone').textContent = c.completed || 0;
+      document.getElementById('kWait').textContent = (c.waiting || 0) + (c.called || 0);
+      document.getElementById('kSkip').textContent = c.skipped || 0;
+      document.getElementById('kCanc').textContent = c.canceled || 0;
+      document.getElementById('kAvg').textContent = data.avgWaitMinutes === null || data.avgWaitMinutes === undefined
+        ? '—' : `${data.avgWaitMinutes}m`;
+
+      const source = data.source || {};
+      document.getElementById('kSourceAppt').textContent = source.appointment || 0;
+      document.getElementById('kSourceWalkin').textContent = (source.walkin || 0);
+      document.getElementById('kAvgServe').textContent = avgOfDoctorServes(data.doctorRows || []);
+      const fb = data.feedback || {};
+      document.getElementById('kRating').textContent = fb.avgRating === null || fb.avgRating === undefined ? '—' : `${fb.avgRating} ★`;
+
+      // Hourly chart: accept array (functions) or object (prototype).
+      const hourly = Array.isArray(data.hourly)
+        ? Object.fromEntries(data.hourly.map((v, i) => [i, v || 0]))
+        : (data.hourly || {});
+      renderChart(hourly);
+      renderDoctorTable(data.doctorRows || []);
+      renderFeedback(fb.rows || [], fb.count || 0);
+    }
+
+    function avgOfDoctorServes(rows) {
+      const vals = rows.filter(r => r.avgServeMinutes !== null && r.avgServeMinutes !== undefined).map(r => r.avgServeMinutes);
+      if (!vals.length) return '—';
+      return Math.round((vals.reduce((a, b) => a + b, 0) / vals.length) * 10) / 10 + 'm';
+    }
+
+    function renderDoctorTable(rows) {
+      const body = document.getElementById('doctorBody');
+      if (!body) return;
+      if (!rows.length) {
+        body.innerHTML = '<tr><td colspan="6" class="muted" style="padding:10px 8px;">No tokens issued yet today.</td></tr>';
+        return;
+      }
+      body.innerHTML = rows.map(r => `
+        <tr style="border-bottom:1px solid var(--line);">
+          <td style="padding:6px 8px;font-weight:700;">${esc(r.name || r.id)}</td>
+          <td style="padding:6px 8px;">${r.waiting || 0}</td>
+          <td style="padding:6px 8px;">${r.served || 0}</td>
+          <td style="padding:6px 8px;">${r.avgServeMinutes === null || r.avgServeMinutes === undefined ? '—' : r.avgServeMinutes + 'm'}</td>
+          <td style="padding:6px 8px;">${r.estErrorMinutes === null || r.estErrorMinutes === undefined ? '—' : '±' + r.estErrorMinutes + 'm'}</td>
+          <td style="padding:6px 8px;">${r.avgRating === null || r.avgRating === undefined ? '—' : r.avgRating + ' ★'}</td>
+        </tr>`).join('');
+    }
+
+    function renderFeedback(rows, count) {
+      const box = document.getElementById('feedbackBox');
+      if (!box) return;
+      if (!rows || !rows.length) {
+        box.innerHTML = '<div class="muted">No feedback yet today.</div>';
+        return;
+      }
+      const sorted = [...rows].sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+      box.innerHTML = sorted.slice(0, 10).map(f => {
+        const stars = '★'.repeat(Math.max(0, Math.min(5, Number(f.rating) || 0))) + '☆'.repeat(Math.max(0, 5 - (Number(f.rating) || 0)));
+        return `<div style="padding:10px 0;border-bottom:1px dashed var(--line);">
+          <div style="display:flex;align-items:center;gap:8px;">
+            <span style="color:#f59e0b;letter-spacing:2px;">${stars}</span>
+            <b style="font-size:0.82rem;">${esc(f.doctorName || 'Doctor')}</b>
+          </div>
+          ${f.comment ? `<div style="font-size:0.8rem;color:var(--slate-500);margin-top:4px;">${esc(f.comment)}</div>` : ''}
+        </div>`;
+      }).join('');
+    }
+
+    function esc(v) {
+      return String(v == null ? '' : v).replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
     }
 
     function renderChart(counts) {

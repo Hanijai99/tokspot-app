@@ -329,6 +329,90 @@
     return callFunction('flushWhatsAppOutbox', { slug });
   }
 
+  // Desk — run the reminder + no-show sweep for the station's hospital.
+  async function appointmentReminderScan(opts) {
+    const { code } = opts || {};
+    if (!code) throw new Error('code required.');
+    if (apiMode() !== 'functions') return readNeedsFunctions('appointmentReminderScan');
+    return callFunction('appointmentReminderScan', { code });
+  }
+
+  // Desk — manually mark a single overdue booking as no-show.
+  async function markNoShow(opts) {
+    const { code, appointmentId } = opts || {};
+    if (!code || !appointmentId) throw new Error('code + appointmentId required.');
+    if (apiMode() !== 'functions') return readNeedsFunctions('markNoShow');
+    return callFunction('markNoShow', { code, appointmentId });
+  }
+
+  // Patient — submit feedback for a completed token. Works in both
+  // modes: prototype writes the feedback doc client-side (mirroring the
+  // server doc shape), functions mode uses the callable.
+  async function submitFeedback(opts) {
+    const { slug, tokenId, rating, comment } = opts || {};
+    if (!slug || !tokenId || !rating) throw new Error('slug + tokenId + rating required.');
+    if (apiMode() === 'functions') {
+      return callFunction('submitFeedback', {
+        slug, tokenId, rating: Math.floor(Number(rating)), comment: String(comment || '').trim().slice(0, 300),
+      });
+    }
+    await ensureAuth();
+    requireFs();
+    let tokenData = null;
+    try {
+      const snap = await win._fs.getDoc(win._fs.doc(win._db, 'hospitals', slug, 'tokens', tokenId));
+      if (snap.exists()) tokenData = snap.data();
+    } catch (_) { tokenData = null; }
+    if (!tokenData) throw new Error('Token not found.');
+    if (win.TokspotQueue && win.TokspotQueue.normalizeStatus) {
+      if (win.TokspotQueue.normalizeStatus(tokenData.status) !== 'completed') {
+        throw new Error('Feedback is available after the consultation completes.');
+      }
+    }
+    const dup = await win._fs.getDocs(win._fs.query(
+      win._fs.collection(win._db, 'hospitals', slug, 'feedback'),
+      win._fs.where('tokenId', '==', tokenId)
+    ));
+    if (!dup.empty) throw new Error('Feedback already submitted for this visit.');
+    const fbId = win._fs.collection(win._db, 'hospitals', slug, 'feedback').doc().id;
+    await win._fs.setDoc(win._fs.doc(win._db, 'hospitals', slug, 'feedback', fbId), {
+      id: fbId,
+      tokenId,
+      doctorId: tokenData.doctorId || '',
+      doctorName: tokenData.doctorName || '',
+      date: tokenData.date || todayStr(),
+      rating: Math.floor(Number(rating)),
+      comment: String(comment || '').trim().slice(0, 300),
+      createdAt: win._fs.serverTimestamp ? win._fs.serverTimestamp() : new Date(),
+    });
+    return { ok: true, feedbackId: fbId, doctorName: tokenData.doctorName || '' };
+  }
+
+  // Desk — today's feedback rows (sanitized, functions mode).
+  async function listFeedback(opts) {
+    const { code } = opts || {};
+    if (!code) throw new Error('code required.');
+    if (apiMode() !== 'functions') return readNeedsFunctions('listFeedback');
+    return callFunction('listFeedback', { code });
+  }
+
+  // Admin — daily analytics roll-up (functions mode only; prototype
+  // analytics.html computes equivalent stats client-side).
+  async function getAnalytics(opts) {
+    const { slug } = opts || {};
+    if (!slug) throw new Error('slug required.');
+    if (apiMode() !== 'functions') return readNeedsFunctions('getAnalytics');
+    return callFunction('getAnalytics', { slug });
+  }
+
+  // Desk — move waiting tokens from one doctor to another (handover).
+  async function transferQueue(opts) {
+    const { code, fromDoctorId, toDoctorId } = opts || {};
+    if (!code || !fromDoctorId || !toDoctorId) throw new Error('code + fromDoctorId + toDoctorId required.');
+    if (apiMode() !== 'functions') return readNeedsFunctions('transferQueue');
+    return callFunction('transferQueue', { code, fromDoctorId, toDoctorId });
+  }
+
   return {
     mode: apiMode,
     newTokenId,
@@ -354,5 +438,11 @@
     revokeDoctor,
     flushSmsOutbox,
     flushWhatsAppOutbox,
+    appointmentReminderScan,
+    markNoShow,
+    submitFeedback,
+    listFeedback,
+    getAnalytics,
+    transferQueue,
   };
 });
