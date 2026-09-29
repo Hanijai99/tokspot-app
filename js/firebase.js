@@ -68,7 +68,7 @@
       if (String(window.TOKSPOT_APP_CHECK_SITE_KEY || '').trim()) {
         window._loadAppCheck(app, String(window.TOKSPOT_APP_CHECK_SITE_KEY).trim()).catch(() => {});
       }
-      window.appCheck = appCheck || window._appCheck || null;
+      window.appCheck = window._appCheck || null;
       
       // Expose all firestore methods including runTransaction
       window._fs = {

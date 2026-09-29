@@ -21,8 +21,8 @@ jobs:
       - name: Install
         run: npm ci
 
-      - name: Unit tests (domain, adapter, drift)
-        run: node --test tests/queue-domain.test.cjs tests/domain-sync.test.cjs tests/api-adapter.test.cjs
+      - name: Unit tests (domain, adapter, drift, init smoke)
+        run: node --test tests/queue-domain.test.cjs tests/domain-sync.test.cjs tests/api-adapter.test.cjs tests/init-firebase-smoke.test.cjs
 
       - name: Firestore rules tests (emulator)
         run: npx --no-install firebase emulators:exec --project tokspot-rules-test --only firestore "node --test tests/firestore-rules.test.cjs"
