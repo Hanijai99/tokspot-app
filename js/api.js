@@ -68,14 +68,19 @@
 
   // ---- issueToken ---------------------------------------------------
 
+  function generateIdempotencyKey() {
+    if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID();
+    return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 12)}`;
+  }
+
   /**
    * @param {object} opts { slug, doctorId, doctorName, name, phone,
-   *   priority, counter, source, extra } — extra fields are merged
-   *   into the token document (prototype mode only).
-   * @returns {Promise<{tokenId: string, tokenNum: string}>}
+   *   priority, counter, source, extra, idempotencyKey } — extra
+   *   fields are merged into the token document (prototype mode only).
+   * @returns {Promise<{tokenId: string, tokenNum: string, reused?: boolean}>}
    */
   async function issueToken(opts) {
-    const { slug, doctorId, doctorName, name, phone, priority, counter, source, extra } = opts || {};
+    const { slug, doctorId, doctorName, name, phone, priority, counter, source, extra, idempotencyKey } = opts || {};
     if (!slug || !doctorId || !name) {
       throw new Error('Hospital, doctor and patient name are required.');
     }
@@ -85,8 +90,9 @@
         phone: String(phone || '').replace(/\D/g, '').slice(-10),
         priority: Boolean(priority), counter: counter || 'Counter A',
         source: source || 'desk',
+        idempotencyKey: idempotencyKey || generateIdempotencyKey(),
       });
-      return { tokenId: res.tokenId, tokenNum: res.number };
+      return { tokenId: res.tokenId, tokenNum: res.number, reused: Boolean(res.reused) };
     }
 
     // prototype mode — identical semantics to the inline page transactions
@@ -188,30 +194,96 @@
 
   async function getTokenStatus(opts) {
     const { slug, tokenId } = opts || {};
+    if (!slug || !tokenId) throw new Error('slug + tokenId required.');
     if (apiMode() !== 'functions') return readNeedsFunctions('getTokenStatus');
     return callFunction('getTokenStatus', { slug, tokenId });
   }
 
   async function getDoctorQueue(opts) {
     const { slug, doctorId } = opts || {};
+    if (!slug || !doctorId) throw new Error('slug + doctorId required.');
     if (apiMode() !== 'functions') return readNeedsFunctions('getDoctorQueue');
     return callFunction('getDoctorQueue', { slug, doctorId });
   }
 
   async function getTvFeed(opts) {
     const { slug } = opts || {};
+    if (!slug) throw new Error('slug required.');
     if (apiMode() !== 'functions') return readNeedsFunctions('getTvFeed');
     return callFunction('getTvFeed', { slug });
+  }
+
+  // Public token lookup scoped to one hospital code (no cross-tenant scan).
+  async function getTokenByNumber(opts) {
+    const { code, number } = opts || {};
+    if (!code || !number) throw new Error('code + number required.');
+    if (apiMode() !== 'functions') return readNeedsFunctions('getTokenByNumber');
+    return callFunction('getTokenByNumber', { code, number });
+  }
+
+  // Public hospital code → slug lookup (TV + doctor login).
+  async function resolveHospitalByCode(opts) {
+    const { code } = opts || {};
+    if (!code) throw new Error('code required.');
+    if (apiMode() !== 'functions') return readNeedsFunctions('resolveHospitalByCode');
+    return callFunction('resolveHospitalByCode', { code });
+  }
+
+  // Admin accountability feed.
+  async function listAuditEvents(opts) {
+    const { slug, limit } = opts || {};
+    if (!slug) throw new Error('slug required.');
+    if (apiMode() !== 'functions') return readNeedsFunctions('listAuditEvents');
+    return callFunction('listAuditEvents', { slug, limit: Number(limit) || 50 });
+  }
+
+  // Self-service doctor profile (functions mode — no client doc reads).
+  async function getMyDoctorProfile(opts) {
+    const { slug } = opts || {};
+    if (!slug) throw new Error('slug required.');
+    if (apiMode() !== 'functions') return readNeedsFunctions('getMyDoctorProfile');
+    return callFunction('getMyDoctorProfile', { slug });
+  }
+
+  // Admin — provision/revoke Auth-backed doctor accounts.
+  async function provisionDoctor(opts) {
+    const { slug, doctorId, email, name, department, room } = opts || {};
+    if (!slug || !doctorId || !email) throw new Error('slug, doctorId and email required.');
+    if (apiMode() !== 'functions') return readNeedsFunctions('provisionDoctor');
+    return callFunction('provisionDoctor', { slug, doctorId, email, name, department, room });
+  }
+
+  async function revokeDoctor(opts) {
+    const { slug, doctorId } = opts || {};
+    if (!slug || !doctorId) throw new Error('slug + doctorId required.');
+    if (apiMode() !== 'functions') return readNeedsFunctions('revokeDoctor');
+    return callFunction('revokeDoctor', { slug, doctorId });
+  }
+
+  // Admin — drain the pending SMS outbox through the provider adapter.
+  async function flushSmsOutbox(opts) {
+    const { slug } = opts || {};
+    if (!slug) throw new Error('slug required.');
+    if (apiMode() !== 'functions') return readNeedsFunctions('flushSmsOutbox');
+    return callFunction('flushSmsOutbox', { slug });
   }
 
   return {
     mode: apiMode,
     newTokenId,
+    generateIdempotencyKey,
     issueToken,
     transition,
     cancelToken,
     getTokenStatus,
     getDoctorQueue,
     getTvFeed,
+    getTokenByNumber,
+    resolveHospitalByCode,
+    listAuditEvents,
+    getMyDoctorProfile,
+    provisionDoctor,
+    revokeDoctor,
+    flushSmsOutbox,
   };
 });

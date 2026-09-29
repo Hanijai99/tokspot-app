@@ -173,6 +173,23 @@
         <button class="btn btn-mint btn-block mt-16" onclick="showDoctorForm()"><i class="fa-solid fa-plus"></i> Add Doctor</button>
       </div>
 
+      <!-- Security Audit Trail Card -->
+      <div class="card mt-24">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
+          <span style="width:36px;height:36px;border-radius:12px;background:var(--green-050);color:var(--green);display:flex;align-items:center;justify-content:center;"><i class="fa-solid fa-shield-halved"></i></span>
+          <h2 style="font-size:1.05rem;font-weight:800;margin:0;">Security Audit Trail</h2>
+          <span class="spacer"></span>
+          <button class="btn btn-slate btn-sm" onclick="loadAuditLog()"><i class="fa-solid fa-rotate"></i> Refresh</button>
+        </div>
+        <p class="muted" style="font-size:0.84rem;margin-top:0;">
+          Append-only server log of token issuance, transitions and doctor
+          provisioning (Functions writes only — clients cannot forge entries).
+        </p>
+        <div id="auditLogBox" style="max-height:340px;overflow-y:auto;">
+          <div class="muted"><i class="fa-solid fa-spinner fa-spin"></i> Loading audit events...</div>
+        </div>
+      </div>
+
     </section>
 
     <!-- 3. Admin Forgot Password Modal -->
@@ -253,6 +270,7 @@
   <script src="js/firebase-config.js"></script>
   <script src="js/app.js"></script>
   <script src="js/firebase.js"></script>
+  <script src="js/api.js"></script>
   <script>
     // Robust Global Toast Failsafe
     window.showToast = window.showToast || function(msg, isErr, ms) {
@@ -283,6 +301,7 @@
     let assignedHospitalSlug = null;
     let currentHospitalCode = '';
     let editDoctorId = null;
+    const FUNC = window.TokSpotAPI && window.TokSpotAPI.mode() === 'functions';
     let targetResetDoctorId = null;
     let qrInstance = null;
 
@@ -441,6 +460,7 @@
         renderHospitalHeader(assignedHospitalSlug, { ...hData, hospitalCode: hCode });
         generateHospitalBookingQr(assignedHospitalSlug, hData.name || assignedHospitalSlug, hCode);
         loadDoctorList();
+        loadAuditLog();
 
         if (!hData.hospitalCode || !hData.adminEmail || hData.recoveryKey) {
           window._fs.updateDoc(window._fs.doc(window._db, 'hospitals', assignedHospitalSlug), {
@@ -584,6 +604,52 @@
       }
     }
 
+    async function loadAuditLog() {
+      const box = document.getElementById('auditLogBox');
+      if (!box) return;
+      if (!assignedHospitalSlug) { box.innerHTML = '<div class="muted">Hospital not linked yet.</div>'; return; }
+      box.innerHTML = '<div class="muted"><i class="fa-solid fa-spinner fa-spin"></i> Loading audit events...</div>';
+      try {
+        let rows = [];
+        if (FUNC) {
+          const res = await window.TokSpotAPI.listAuditEvents({ slug: assignedHospitalSlug, limit: 30 });
+          rows = res.rows || [];
+        } else {
+          const snap = await window._fs.getDocs(window._fs.query(
+            window._fs.collection(window._db, 'auditLog'),
+            window._fs.where('slug', '==', assignedHospitalSlug),
+            window._fs.orderBy('at', 'desc'),
+            window._fs.limit(30)
+          ));
+          rows = snap.docs.map(d => d.data());
+        }
+
+        if (!rows.length) {
+          box.innerHTML = '<div class="empty" style="padding:18px;text-align:center;">No audit events yet — this trail fills once the hospital runs on the trusted backend.</div>';
+          return;
+        }
+
+        box.innerHTML = rows.map(e => {
+          const t = new Date(e.at);
+          const time = isNaN(t.getTime()) ? '--' : t.toLocaleString();
+          const icon = e.outcome === 'ok'
+            ? '<i class="fa-solid fa-circle-check" style="color:#2A835F;"></i>'
+            : '<i class="fa-solid fa-circle-xmark" style="color:#ef4444;"></i>';
+          return `
+            <div style="display:flex;gap:10px;align-items:flex-start;padding:10px 0;border-bottom:1px solid var(--line);">
+              <span style="margin-top:2px;">${icon}</span>
+              <div style="flex:1;min-width:0;">
+                <div style="font-weight:800;font-size:0.86rem;color:var(--ink);">${escHtml(e.action)}${e.targetId ? ' · ' + escHtml(String(e.targetId).slice(0, 12)) : ''}</div>
+                <div class="muted" style="font-size:0.76rem;">${time} · by ${escHtml(String(e.actorUid || 'system').slice(0, 8))}${e.detail && e.detail.number ? ' · #' + escHtml(e.detail.number) : ''}</div>
+              </div>
+            </div>
+          `;
+        }).join('');
+      } catch (err) {
+        box.innerHTML = `<div class="empty red" style="padding:14px;">Audit log unavailable: ${escHtml(err.message)}</div>`;
+      }
+    }
+
     function showDoctorForm() { 
       editDoctorId = null;
       document.getElementById('formTitle').textContent = 'Add New Doctor';
@@ -636,6 +702,31 @@
       btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Syncing to Cloud Database...';
 
       try {
+        // Secure backend mode: creating a doctor provisions a Firebase
+        // Auth account (email/password) server-side and links authUid.
+        // No PINs, no client-side role writes.
+        if (FUNC) {
+          if (editDoctorId) {
+            // Profile edits happen on the sub-collection; Auth identity is
+            // fixed at provisioning time (use revoke + re-provision to move).
+            await window._fs.updateDoc(window._fs.doc(window._db, 'hospitals', assignedHospitalSlug, 'doctors', editDoctorId), {
+              name, department: dept || 'Consultation', room: room || 'Room 1',
+              counter: room || 'Room 1', updatedAt: window._fs.serverTimestamp(),
+            });
+            showToast('Doctor profile updated.');
+          } else {
+            if (!email) return showToast('Enter doctor email to provision secure sign-in.', true);
+            const doctorId = String(email.split('@')[0]).replace(/[^a-z0-9]/gi, '-').toLowerCase();
+            const res = await window.TokSpotAPI.provisionDoctor({
+              slug: assignedHospitalSlug, doctorId, email, name, department: dept, room,
+            });
+            showToast(`Doctor provisioned. Temp credentials were issued to ${email} (authUid ${res.authUid.slice(0, 6)}…).`);
+          }
+          cancelDoctorEdit();
+          loadDoctorList();
+          return;
+        }
+
         const coll = window._fs.collection(window._db, 'hospitals', assignedHospitalSlug, 'doctors');
         
         // Base Doctor Document
@@ -726,10 +817,14 @@
       if (!confirmAction) return;
 
       try {
-        await window._fs.deleteDoc(window._fs.doc(window._db, 'hospitals', assignedHospitalSlug, 'doctors', id));
-        try { 
-          await window._fs.deleteDoc(window._fs.doc(window._db, 'doctors', id)); 
-        } catch(e) {}
+        if (FUNC) {
+          await window.TokSpotAPI.revokeDoctor({ slug: assignedHospitalSlug, doctorId: id });
+        } else {
+          await window._fs.deleteDoc(window._fs.doc(window._db, 'hospitals', assignedHospitalSlug, 'doctors', id));
+          try {
+            await window._fs.deleteDoc(window._fs.doc(window._db, 'doctors', id));
+          } catch(e) {}
+        }
 
         try {
           const roomsSnap = await window._fs.getDocs(

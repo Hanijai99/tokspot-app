@@ -60,19 +60,23 @@
 
       <div class="divider"><span>OR VERIFY BY EMAIL & PIN</span></div>
 
-      <!-- Method 2: Doctor Email + PIN -->
+      <!-- Method 2: Doctor Email + Password (Firebase Auth) -->
       <div>
         <div class="form-group">
-          <label>Doctor Email or Name</label>
-          <input type="text" id="loginEmail" class="form-control" placeholder="Firebase Auth provisioning required" disabled />
+          <label>Doctor Email</label>
+          <input type="email" id="loginEmail" class="form-control" placeholder="doctor@hospital.com" autocomplete="username" />
         </div>
         <div class="form-group">
-          <label>Assigned Room PIN</label>
-          <input type="password" maxlength="4" id="loginPinAlt" class="form-control pin-box" placeholder="PIN sign-in disabled" disabled />
+          <label>Password</label>
+          <input type="password" id="loginPassword" class="form-control" placeholder="Your secure sign-in password" autocomplete="current-password" />
         </div>
-        <button id="btnEmailLogin" class="btn btn-submit btn-slate" onclick="doctorEmailPinLogin()">
-          <i class="fa-solid fa-id-badge"></i> Sign In with Email & PIN
+        <button id="btnEmailLogin" class="btn btn-submit btn-green" onclick="doctorEmailLogin()">
+          <i class="fa-solid fa-id-badge"></i> Secure Sign In
         </button>
+        <div class="muted" style="font-size:0.78rem;margin-top:10px;text-align:center;">
+          Secure sign-in works after the hospital is moved to the trusted
+          backend (Functions + Firebase Auth). PIN buttons above stay disabled.
+        </div>
       </div>
     </div>
   </div>
@@ -80,6 +84,7 @@
   <script src="js/firebase-config.js"></script>
   <script src="js/app.js"></script>
   <script src="js/firebase.js"></script>
+  <script src="js/api.js"></script>
   <script>
     window.showToast = window.showToast || function(msg, isErr, ms) {
       let w = document.getElementById('hkToastWrap');
@@ -108,14 +113,62 @@
       if (savedHosp) document.getElementById('hospCode').value = savedHosp.toUpperCase();
     });
 
-    // 1. Fast PIN Login
+    // 1. Fast PIN Login (legacy — permanently disabled, PINs removed)
     async function doctorPinLogin() {
-      showToast('Doctor PIN sign-in is disabled until Firebase Auth accounts and server-enforced doctor roles are provisioned.', true, 5000);
+      showToast('Doctor PIN sign-in is disabled. Use Secure Sign In (email + password) below.', true, 5000);
     }
 
-    // 2. Email & PIN Login
-    async function doctorEmailPinLogin() {
-      showToast('Email + PIN sign-in is disabled until Firebase Auth accounts and server-enforced doctor roles are provisioned.', true, 5000);
+    // 2. Secure email + password sign-in (Firebase Auth, functions mode)
+    async function doctorEmailLogin() {
+      const codeInput = (document.getElementById('hospCode').value || '').trim().toUpperCase();
+      const email = (document.getElementById('loginEmail').value || '').trim();
+      const password = document.getElementById('loginPassword').value;
+
+      if (!codeInput) return showToast('Enter the hospital code.', true, 4000);
+      if (!email || !password) return showToast('Enter your doctor email and password.', true, 4000);
+
+      const btn = document.getElementById('btnEmailLogin');
+      btn.disabled = true;
+      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Signing in...';
+
+      try {
+        // Resolve the code to a hospital slug on the server (client-side
+        // hospital scans are denied by the target rules).
+        let slug = String((new URLSearchParams(window.location.search).get('h') || ''));
+        if (!slug) {
+          const resolved = await window.TokSpotAPI.resolveHospitalByCode({ code: codeInput });
+          slug = resolved.id;
+        }
+        if (window._auth.currentUser && !window._auth.currentUser.isAnonymous) {
+          await window._useAuth.signOut(window._auth);
+        }
+        await window._useAuth.signInWithEmailAndPassword(window._auth, email, password);
+
+        // Server-authoritative profile (authUid must match this account).
+        const profile = await window.TokSpotAPI.getMyDoctorProfile({ slug });
+        const session = {
+          id: profile.id,
+          name: profile.name,
+          department: profile.department,
+          room: profile.room,
+          hospitalSlug: profile.hospitalSlug,
+          hospitalName: profile.hospitalName,
+          hospitalCode: profile.hospitalCode,
+        };
+        sessionStorage.setItem('activeDoctor', JSON.stringify(session));
+        localStorage.setItem('tokmark_hospital_code', codeInput);
+        window.location.replace('doctor.html');
+      } catch (e) {
+        let msg = e.message || 'Sign-in failed.';
+        if (e.code === 'auth/wrong-password' || e.code === 'auth/user-not-found') msg = 'Invalid email or password.';
+        if (e.code === 'auth/invalid-credential') msg = 'Invalid email or password.';
+        if (e.code === 'auth/too-many-requests') msg = 'Too many attempts. Please try again in a minute.';
+        showToast(msg, true, 5000);
+        try { if (window._auth.currentUser) await window._useAuth.signOut(window._auth); } catch (_) {}
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fa-solid fa-id-badge"></i> Secure Sign In';
+      }
     }
 
   </script>

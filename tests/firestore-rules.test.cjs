@@ -54,6 +54,8 @@ before(async () => {
       id: 't1', number: '001', patientName: 'PII', phone: '9999999999',
       doctorId: 'd1', date: '2026-09-26', status: 'waiting', createdAt: new Date(),
     });
+    await db.doc('auditLog/a1').set({ slug: 'h1', action: 'issue', outcome: 'ok', at: new Date() });
+    await db.doc('auditLog/a2').set({ slug: 'h2', action: 'issue', outcome: 'ok', at: new Date() });
   });
 });
 
@@ -113,5 +115,48 @@ if (!rulesTest || !EMU) {
       admin.firestore().doc('auditLog/e1').set({ action: 'forged' }),
       DENIED
     );
+  });
+
+  test('assigned doctor cannot list the private day queue (Functions gated)', async () => {
+    const doc = await testEnv.authenticatedContext('doctor-1');
+    const db = doc.firestore(); // cache — settings can only be applied once
+    await assert.rejects(
+      db.collection('hospitals/h1/tokens')
+        .where('doctorId', '==', 'd1').where('date', '==', '2026-09-26').get(),
+      DENIED
+    );
+  });
+
+  test('anonymous cannot write sms_queue rows (browser never enqueues SMS)', async () => {
+    const anon = testEnv.unauthenticatedContext();
+    await assert.rejects(
+      anon.firestore().collection('sms_queue').add({ to: '+919999999999', status: 'pending' }),
+      DENIED
+    );
+  });
+
+  test('anonymous cannot write queueState locks (server-only)', async () => {
+    const anon = testEnv.unauthenticatedContext();
+    await assert.rejects(
+      anon.firestore().doc('hospitals/h1/queueState/2026-09-26_d1').set({ activeTokenId: 'x' }),
+      DENIED
+    );
+  });
+
+  test('admin can list the day tokens (reporting)', async () => {
+    const admin = await testEnv.authenticatedContext('admin-1');
+    const db = admin.firestore();
+    const snap = await db.collection('hospitals/h1/tokens')
+      .where('date', '==', '2026-09-26').get();
+    assert.ok(snap.size >= 1, 'admin should see day tokens');
+    assert.ok(!snap.empty);
+  });
+
+  test('admin can read own hospital audit trail, not other tenants', async () => {
+    const admin = await testEnv.authenticatedContext('admin-1');
+    const db = admin.firestore();
+    const own = await db.doc('auditLog/a1').get();
+    assert.strictEqual(own.data().action, 'issue');
+    await assert.rejects(db.doc('auditLog/a2').get(), DENIED);
   });
 }

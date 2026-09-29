@@ -157,6 +157,8 @@
     let waitingTokens = [];
     let unsubQueue = null;
     let unsubSecurity = null;
+    let queuePollTimer = null;
+    const FUNC = window.TokSpotAPI && window.TokSpotAPI.mode() === 'functions';
 
     window.addEventListener('load', async () => {
       try {
@@ -245,6 +247,7 @@
     }
 
     function listenDoctorQueue() {
+      if (FUNC) { startDoctorQueuePolling(); return; }
       if (unsubQueue) unsubQueue();
       const today = window.todayStr ? window.todayStr() : new Date().toISOString().slice(0, 10);
 
@@ -291,11 +294,65 @@
           card.classList.remove('priority');
         }
 
-        renderQueueRows();
+        finalizeDoctorQueue();
       }, (err) => {
         console.error('Queue snapshot error:', err);
         showToast('Error syncing queue: ' + err.message, true);
       });
+    }
+
+    // Shared render step for both snapshot (prototype) and polled
+    // (functions) queue data.
+    function finalizeDoctorQueue() {
+      waitingTokens.sort((a, b) => {
+        if (b.priority && !a.priority) return 1;
+        if (!b.priority && a.priority) return -1;
+        return (Number(a.number) || 0) - (Number(b.number) || 0);
+      });
+
+      document.getElementById('queueCount').textContent = `${waitingTokens.length} Waiting`;
+
+      const card = document.getElementById('activeCard');
+      if (currentActiveToken) {
+        document.getElementById('activeNumber').textContent = `#${currentActiveToken.number}`;
+        document.getElementById('activeName').textContent = currentActiveToken.patientName || 'Patient';
+        document.getElementById('activeMeta').textContent = `Phone: ${currentActiveToken.phone || 'N/A'} · Source: ${currentActiveToken.source || 'Desk'}`;
+        card.classList.toggle('priority', !!currentActiveToken.priority);
+      } else {
+        document.getElementById('activeNumber').textContent = '—';
+        document.getElementById('activeName').textContent = 'Waiting for next patient';
+        document.getElementById('activeMeta').textContent = '';
+        card.classList.remove('priority');
+      }
+
+      renderQueueRows();
+    }
+
+    // Functions mode: poll the server-filtered day queue (no client
+    // token reads — the target rules deny those for doctor roles).
+    function startDoctorQueuePolling() {
+      if (unsubQueue) { unsubQueue(); unsubQueue = null; }
+      const tick = async () => {
+        try {
+          const res = await window.TokSpotAPI.getDoctorQueue({
+            slug: currentHospitalSlug,
+            doctorId: activeDoctorProfile.id,
+          });
+          waitingTokens = [];
+          currentActiveToken = null;
+          (res.rows || []).forEach((t) => {
+            if (t.status === 'called') currentActiveToken = t;
+            else if (t.status === 'waiting') waitingTokens.push(t);
+          });
+          finalizeDoctorQueue();
+        } catch (e) {
+          console.error('Queue poll error:', e);
+          showToast('Error syncing queue: ' + e.message, true);
+        }
+      };
+      tick();
+      if (queuePollTimer) clearInterval(queuePollTimer);
+      queuePollTimer = setInterval(tick, 3000);
     }
 
     function renderQueueRows() {

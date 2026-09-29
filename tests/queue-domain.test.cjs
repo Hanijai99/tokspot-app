@@ -101,7 +101,9 @@ test('doctor PIN login remains closed until secure Auth provisioning exists', ()
   const loginPage = fs.readFileSync(path.join(__dirname, '..', 'doctor-login.html'), 'utf8');
   const adminPage = fs.readFileSync(path.join(__dirname, '..', 'admin.html'), 'utf8');
   assert.match(loginPage, /async function doctorPinLogin\(\) \{\s*showToast\(/);
-  assert.match(loginPage, /async function doctorEmailPinLogin\(\) \{\s*showToast\(/);
+  assert.match(loginPage, /async function doctorEmailLogin\(\) \{/);
+  assert.match(loginPage, /getMyDoctorProfile/);
+  assert.match(loginPage, /resolveHospitalByCode/);
   assert.doesNotMatch(loginPage, /checkPinMatch|signInAnonymously/);
   assert.doesNotMatch(adminPage, /data\.pin\s*=\s*rawPin|data\.pinHash\s*=\s*hashedPin|pin:\s*rawPin/);
 });

@@ -859,6 +859,9 @@
 
     async function queueFreeSMS(phone, messageText) {
       if (!phone || phone.length !== 10) return;
+      // In functions mode the trusted backend enqueues SMS itself
+      // (issueToken / transitionToken write to sms_queue server-side).
+      if (window.TokSpotAPI && window.TokSpotAPI.mode() === 'functions') return;
       try {
         await window._fs.addDoc(window._fs.collection(window._db, 'sms_queue'), {
           hospitalId: currentHospital,

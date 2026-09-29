@@ -1,0 +1,32 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Unit tests (domain, adapter, drift)
+        run: node --test tests/queue-domain.test.cjs tests/domain-sync.test.cjs tests/api-adapter.test.cjs
+
+      - name: Firestore rules tests (emulator)
+        run: npx --no-install firebase emulators:exec --project tokspot-rules-test --only firestore "node --test tests/firestore-rules.test.cjs"
+        timeout-minutes: 8
+
+      - name: Syntax check server API
+        run: node --check functions/index.js && node --check js/api.js

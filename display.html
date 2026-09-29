@@ -155,6 +155,7 @@
   <script src="js/firebase-config.js"></script>
   <script src="js/app.js"></script>
   <script src="js/firebase.js"></script>
+  <script src="js/api.js"></script>
   <script>
     // Inline failsafes to guarantee zero ReferenceError crashes
     window.escHtml = window.escHtml || function(s) {
@@ -181,6 +182,8 @@
     let activeHospitalSlug = null;
     let unsubTvTokens = null;
     let lastCalledTokenKey = null;
+    let tvPollTimer = null;
+    const FUNC = window.TokSpotAPI && window.TokSpotAPI.mode() === 'functions';
     let isAudioUnlocked = false;
 
     // Realtime Clock
@@ -261,14 +264,20 @@
       try {
         await ensureAuth();
 
-        const hospSnap = await window._fs.getDocs(window._fs.collection(window._db, 'hospitals'));
-        const cleanInput = codeInput.replace(/^HOSP-?/i, '');
+        let targetDoc = null;
 
-        const targetDoc = hospSnap.docs.find(d => {
-          const data = d.data();
-          const c = (data.hospitalCode || data.code || '').toUpperCase();
-          return c === codeInput || c.replace(/^HOSP-?/i, '') === cleanInput || d.id.toUpperCase() === codeInput;
-        });
+        if (FUNC) {
+          const resolved = await window.TokSpotAPI.resolveHospitalByCode({ code: codeInput });
+          targetDoc = { id: resolved.id, data: () => resolved };
+        } else {
+          const hospSnap = await window._fs.getDocs(window._fs.collection(window._db, 'hospitals'));
+          const cleanInput = codeInput.replace(/^HOSP-?/i, '');
+          targetDoc = hospSnap.docs.find(d => {
+            const data = d.data();
+            const c = (data.hospitalCode || data.code || '').toUpperCase();
+            return c === codeInput || c.replace(/^HOSP-?/i, '') === cleanInput || d.id.toUpperCase() === codeInput;
+          });
+        }
 
         if (!targetDoc) {
           showToast(`Hospital Code "${codeInput}" not found.`, true);
@@ -301,6 +310,7 @@
       if (!confirm('Disconnect this TV display from the current hospital?')) return;
       localStorage.removeItem('tokspot_tv_hospital_code');
       if (unsubTvTokens) { unsubTvTokens(); unsubTvTokens = null; }
+      if (tvPollTimer) { clearInterval(tvPollTimer); tvPollTimer = null; }
       activeHospitalSlug = null;
       document.getElementById('tvDashboard').classList.add('hidden');
       document.getElementById('displayGate').classList.remove('hidden');
@@ -316,6 +326,7 @@
     }
 
     function startTvRealtimeSync(slug) {
+      if (FUNC) { startTvFeedPolling(slug); return; }
       if (unsubTvTokens) unsubTvTokens();
       const today = window.todayStr ? window.todayStr() : new Date().toISOString().slice(0, 10);
 
@@ -340,47 +351,79 @@
           }
         });
 
-        // Sort called tokens by calledAt timestamp (latest called takes Hero card)
-        called.sort((a, b) => {
-          const timeA = a.calledAt?.toMillis() || a.updatedAt?.toMillis() || 0;
-          const timeB = b.calledAt?.toMillis() || b.updatedAt?.toMillis() || 0;
-          return timeB - timeA;
-        });
-
-        // Numeric sort for waiting queue with priority override
-        waiting.sort((a, b) => {
-          if (b.priority && !a.priority) return 1;
-          if (!b.priority && a.priority) return -1;
-          return (Number(a.number) || 0) - (Number(b.number) || 0);
-        });
-
-        const active = called[0] || null;
-
-        if (active) {
-          document.getElementById('tvActiveNum').textContent = `#${active.number}`;
-          document.getElementById('tvActivePatient').textContent = 'Please proceed to the displayed room';
-          
-          const counterLabel = active.counter || active.doctorName || 'Consultation Room';
-          document.getElementById('tvActiveDoctor').textContent = `Please proceed to: ${counterLabel}`;
-
-          // Unique identifier key to identify new calls or recalls
-          const currentCallKey = `${active.id}_${active.calledAt?.toMillis() || active.number}`;
-
-          if (lastCalledTokenKey !== currentCallKey) {
-            lastCalledTokenKey = currentCallKey;
-            handlePatientCallAudio(active.number, '', counterLabel);
-          }
-        } else {
-          document.getElementById('tvActiveNum').textContent = '—';
-          document.getElementById('tvActivePatient').textContent = 'Waiting for next token…';
-          document.getElementById('tvActiveDoctor').textContent = 'Consultation Desk Ready';
-        }
-
-        // Render upcoming queue list
-        renderWaitingList(waiting);
+        renderTvBoard(called, waiting);
       }, (err) => {
         console.error('Realtime sync error:', err);
       });
+    }
+
+    // Shared board rendering (normalizes Firestore Timestamps and
+    // callable millis so both prototype snapshots and the functions
+    // feed render through the same path).
+    function tvMillis(v) {
+      if (v == null) return 0;
+      if (typeof v === 'number') return v;
+      if (typeof v.toMillis === 'function') return v.toMillis();
+      return 0;
+    }
+
+    function renderTvBoard(called, waiting) {
+      // Sort called tokens by calledAt timestamp (latest called takes Hero card)
+      called.sort((a, b) => {
+        return tvMillis(b.calledAt) - tvMillis(a.calledAt);
+      });
+
+      // Numeric sort for waiting queue with priority override
+      waiting.sort((a, b) => {
+        if (b.priority && !a.priority) return 1;
+        if (!b.priority && a.priority) return -1;
+        return (Number(a.number) || 0) - (Number(b.number) || 0);
+      });
+
+      const active = called[0] || null;
+
+      if (active) {
+        document.getElementById('tvActiveNum').textContent = `#${active.number}`;
+        document.getElementById('tvActivePatient').textContent = 'Please proceed to the displayed room';
+
+        const counterLabel = active.counter || active.doctorName || 'Consultation Room';
+        document.getElementById('tvActiveDoctor').textContent = `Please proceed to: ${counterLabel}`;
+
+        // Unique identifier key to identify new calls or recalls
+        const currentCallKey = `${active.id || active.number}_${tvMillis(active.calledAt) || active.number}`;
+
+        if (lastCalledTokenKey !== currentCallKey) {
+          lastCalledTokenKey = currentCallKey;
+          handlePatientCallAudio(active.number, '', counterLabel);
+        }
+      } else {
+        document.getElementById('tvActiveNum').textContent = '—';
+        document.getElementById('tvActivePatient').textContent = 'Waiting for next token…';
+        document.getElementById('tvActiveDoctor').textContent = 'Consultation Desk Ready';
+      }
+
+      // Render upcoming queue list
+      renderWaitingList(waiting);
+    }
+
+    // Functions mode: poll the sanitized TV feed (no PII, no client reads).
+    function startTvFeedPolling(slug) {
+      if (unsubTvTokens) { unsubTvTokens(); unsubTvTokens = null; }
+      const tick = async () => {
+        try {
+          const board = await window.TokSpotAPI.getTvFeed({ slug });
+          const called = (board.serving || []).map(s => ({
+            ...s,
+            id: `tv-${s.number}-${s.calledAt || 0}`,
+          }));
+          renderTvBoard(called, board.waiting || []);
+        } catch (e) {
+          console.error('TV feed error:', e);
+        }
+      };
+      tick();
+      if (tvPollTimer) clearInterval(tvPollTimer);
+      tvPollTimer = setInterval(tick, 3000);
     }
 
     function renderWaitingList(waiting) {

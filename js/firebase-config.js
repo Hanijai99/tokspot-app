@@ -26,3 +26,14 @@ window.FB_CONFIG = {
 
 // Default hospital slug used when none is chosen in the URL ?h=slug
 window.DEFAULT_HOSPITAL = "demo";
+
+// ------------------------------------------------------------------
+//  Web Push (FCM) — "Your turn!" notifications.
+//  Leave empty until you complete the console setup:
+//    1. Firebase Console → your project → Cloud Messaging
+//    2. Copy the "Web configuration → Web push certificates → Key pair"
+//    3. Paste it here (keep it client-side; it is a public key).
+//  The pass page only registers device tokens when this is set AND the
+//  app runs in functions mode (registerPushToken callable).
+// ------------------------------------------------------------------
+window.TOKSPOT_VAPID_KEY = "";

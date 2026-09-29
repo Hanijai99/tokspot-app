@@ -22,19 +22,24 @@ node --test tests\queue-domain.test.cjs tests\firestore-rules.test.cjs
 
 ## Migration switch (prototype → trusted backend)
 
-All write paths on `book.html`, `frontdesk.html` and `doctor.html` now go
-through `js/api.js` (`window.TokSpotAPI`). It has one runtime switch:
+All write paths on `book.html`, `frontdesk.html` and `doctor.html` go
+through `js/api.js` (`window.TokSpotAPI`). Reading the queue is migrated
+too — `track.html`, `token.html` and `display.html` poll the sanitized
+callables (`getTokenStatus`, `getTvFeed`) in functions mode, fall back to
+snapshots in prototype mode. It has one runtime switch:
 
 - **default = `prototype`** — identical behaviour to the old inline
   Firestore transactions (counter inside a transaction, unguessable
   `crypto.randomUUID()` token ids, lock-enforced transitions via
-  `js/queue-domain.js`). The demo keeps working unchanged.
-- **`window.TOKSPOT_API_MODE = 'functions'`** — every write path instantly
-  switches to the trusted callables (`issueToken`, `transitionToken`,
-  `cancelToken`). The read paths (`track.html`, `token.html`,
-  `display.html`) intentionally stay on Firestore snapshots in prototype
-  mode; in functions mode switch them to `getTokenStatus` / `getDoctorQueue`
-  / `getTvFeed` (the adapter fails loudly until you do).
+  `js/queue-domain.js`). The demo keeps working unchanged. Browser-originated
+  `sms_queue` writes are still enqueued in this mode (legacy behaviour).
+- **`window.TOKSPOT_API_MODE = 'functions'`** — every write path switches to
+  the trusted callables (`issueToken` with idempotency keys + SMS outbox
+  enqueue, `transitionToken` with rate limits, `cancelToken`), and the read
+  paths switch to sanitized polling. Number-only lookups now require a
+  hospital code (server-scoped `getTokenByNumber`); the TV launch and doctor
+  login resolve codes via `resolveHospitalByCode`. In this mode `sms_queue`
+  rows are created only by the server — the browser never enqueues SMS.
 
 Domain integrity is guarded by `tests/domain-sync.test.cjs`: the client
 matrix (`js/queue-domain.js`) must match the server matrix
@@ -44,14 +49,24 @@ matrix (`js/queue-domain.js`) must match the server matrix
 
 - `firestore.rules` — default-deny, tenant-isolated ruleset (the target). Do
   NOT deploy it on top of the un-migrated static site; migrate the pages to
-  the Functions callables first (`issueToken`, `transitionToken`,
-  `getTokenStatus`, `getDoctorQueue`, `getTvFeed`, `cancelToken`,
-  `provisionDoctor`, `revokeDoctor`, `registerPushToken`).
-- `functions/` — Firebase Functions reference API (`firebase deploy --only functions`).
+  the Functions callables first.
+- `functions/` — Firebase Functions reference API. Includes rate limiting on
+  every callable, idempotent `issueToken`, timezone-safe "today"
+  (`hospitals/{slug}.timezone`, default `Asia/Kolkata`), server-side SMS
+  outbox enqueue + `flushSmsOutbox` admin drain, `listAuditEvents`
+  (admin-only), `getMyDoctorProfile` (self-service), `resolveHospitalByCode`,
+  `getTokenByNumber` (code-scoped), and a daily `retentionRunner` scheduled
+  job (tokens 90 days / audit 365 / sms 30).
+- `firestore.indexes.json` — composite indexes required by the app queries
+  (deployed with `firebase deploy --only firestore`).
 - `firebase.json` + root `package.json` — emulator config and tooling
   (`npm install && npm run emulators`).
 - `scripts/migrate-legacy-data.js` — Admin-SDK cleanup of legacy
   pin/recovery/notes fields and `serving` status (dry-run by default).
+- `scripts/seed-demo.js` — emulator demo hospital (`HOSP-DEMO`, 3 doctors,
+  day queue + locks + audit trail). Dry-run by default; pass `--commit`.
+- `.github/workflows/ci.yml` — CI runs the unit suites + emulator rules
+  suite on every push/PR.
 
 Run the security-rules suite against the emulator:
 
@@ -76,11 +91,12 @@ skip cleanly):
 node --test tests\queue-domain.test.cjs tests\domain-sync.test.cjs tests\api-adapter.test.cjs tests\firestore-rules.test.cjs
 ```
 
-Emulator-backed full run (everything green, last verified 2026-09-29: 24/24):
+Emulator-backed full run (everything green, last verified 2026-09-29:
+18 unit + 11 rules = 29 tests, plus seed-demo — see below):
 
 ```powershell
 $env:Path = "C:\Program Files\Android\Android Studio\jbr\bin;" + $env:Path
 npx firebase emulators:exec --project tokspot-rules-test --only firestore (
-  "set FIRESTORE_EMULATOR_HOST=127.0.0.1:8080&& node --test tests/queue-domain.test.cjs tests/domain-sync.test.cjs tests/api-adapter.test.cjs tests/firestore-rules.test.cjs"
+  "set FIRESTORE_EMULATOR_HOST=127.0.0.1:8080&& node --test tests/queue-domain.test.cjs tests/domain-sync.test.cjs tests/api-adapter.test.cjs tests/firestore-rules.test.cjs && node scripts/seed-demo.js --commit"
 )
 ```

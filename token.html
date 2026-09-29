@@ -90,6 +90,20 @@
       <a href="index.html" class="btn btn-green mt-16" style="text-decoration:none;"><i class="fa-solid fa-arrow-left"></i> Return Home</a>
     </div>
 
+    <!-- Secure-mode: hospital code required for number-only lookups -->
+    <div id="codePrompt" class="card hidden" style="text-align:center;padding:24px 16px;">
+      <div style="font-weight:900;font-size:1.1rem;color:var(--ink);">Find your token</div>
+      <p class="muted" style="font-size:0.85rem;margin:8px 0 14px;">
+        Enter the <b>hospital code</b> from your booking screen to locate token
+        #<b id="codeNumberLabel" style="color:#2A835F;">—</b>.
+      </p>
+      <input id="codeInput" class="form-control" placeholder="e.g. HOSP-1234"
+        style="text-transform:uppercase;text-align:center;font-weight:800;padding:12px;border-radius:12px;border:1px solid var(--line);" />
+      <div style="margin-top:14px;">
+        <a href="#" id="codeSearchBtn" class="btn btn-green"><i class="fa-solid fa-magnifying-glass"></i> Locate Token</a>
+      </div>
+    </div>
+
     <!-- Live Ticket View -->
     <div id="ticketCard" class="token-ticket hidden">
       
@@ -146,9 +160,13 @@
   <script src="js/firebase-config.js"></script>
   <script src="js/app.js"></script>
   <script src="js/firebase.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/push.js"></script>
   <script>
     if (window.hk && hk.applyDark) hk.applyDark();
 
+    const FUNC = window.TokSpotAPI && window.TokSpotAPI.mode() === 'functions';
+    let pollTimer = null;
     let unsubscribeToken = null;
     let unsubscribeQueue = null;
     let prevStatus = null;
@@ -163,13 +181,98 @@
       const hospitalSlug = params.get('h');
 
       if (tokenId && hospitalSlug) {
-        initTokenListener(hospitalSlug, tokenId);
+        if (FUNC) startTokenStatusPolling(hospitalSlug, tokenId);
+        else initTokenListener(hospitalSlug, tokenId);
       } else if (tokenNumberQuery) {
-        findTokenByNumber(tokenNumberQuery);
+        if (FUNC) showCodePrompt(tokenNumberQuery);
+        else findTokenByNumber(tokenNumberQuery);
       } else {
         showError('No valid token ID or number provided in URL.');
       }
     });
+
+    // ---- Functions mode: secure lookup by hospital code + number ----
+    function showCodePrompt(number) {
+      document.getElementById('loaderCard').classList.add('hidden');
+      document.getElementById('errorCard').classList.add('hidden');
+      document.getElementById('codeNumberLabel').textContent = number;
+      document.getElementById('codePrompt').classList.remove('hidden');
+      const inp = document.getElementById('codeInput');
+      inp.focus();
+      const doSearch = async () => {
+        const code = inp.value.trim();
+        if (!code) return showError('Enter the hospital code to continue.');
+        try {
+          const res = await window.TokSpotAPI.getTokenByNumber({ code, number });
+          startTokenStatusPolling(res.slug, res.tokenId);
+        } catch (e) {
+          showError(e.message || 'Could not find this token.');
+        }
+      };
+      document.getElementById('codeSearchBtn').addEventListener('click', (ev) => { ev.preventDefault(); doSearch(); });
+      inp.addEventListener('keydown', (ev) => { if (ev.key === 'Enter') { ev.preventDefault(); doSearch(); } });
+    }
+
+    // ---- Functions mode: sanitized status polling (no client reads) ----
+    async function pollTokenStatusOnce(slug, tokenId) {
+      try {
+        const st = await window.TokSpotAPI.getTokenStatus({ slug, tokenId });
+        renderFunctionsStatus(st);
+      } catch (e) {
+        showError(e.message || 'Live tracking failed.');
+        if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+      }
+    }
+
+    function startTokenStatusPolling(slug, tokenId) {
+      document.getElementById('loaderCard').classList.add('hidden');
+      document.getElementById('errorCard').classList.add('hidden');
+      document.getElementById('codePrompt').classList.add('hidden');
+      document.getElementById('ticketCard').classList.remove('hidden');
+      document.getElementById('subActions').classList.remove('hidden');
+      if (window.TokSpotPush) window.TokSpotPush.init({ slug, tokenId });
+      pollTokenStatusOnce(slug, tokenId);
+      if (pollTimer) clearInterval(pollTimer);
+      pollTimer = setInterval(() => pollTokenStatusOnce(slug, tokenId), 4000);
+    }
+
+    function setBanner(className, html) {
+      document.getElementById('statusInstruction').className = 'arrival-banner ' + className;
+      document.getElementById('instructionText').innerHTML = html;
+    }
+
+    function renderFunctionsStatus(st) {
+      document.getElementById('tNumber').textContent = `#${st.number}`;
+      document.getElementById('tDate').textContent = st.date || '--';
+      document.getElementById('tStatusTag').textContent = st.status || 'waiting';
+      document.getElementById('tHospitalName').textContent = st.hospitalName || 'Hospital';
+      document.getElementById('tHospitalCode').textContent = st.hospitalCode || 'HOSPITAL PASS';
+      document.getElementById('tDoctorName').textContent = st.doctorName || 'Consultation';
+      document.getElementById('tServing').textContent = st.nowServing > 0 ? `#${st.nowServing}` : 'Ready';
+      document.getElementById('tAhead').textContent = st.aheadCount;
+
+      const myNum = Number(st.number || 0);
+      const serving = st.nowServing || 0;
+      const ahead = st.aheadCount || 0;
+
+      if (st.status === 'called') {
+        setBanner('banner-called', '<i class="fa-solid fa-bell"></i> <b>It is your turn now!</b> Please enter the doctor room immediately.');
+        playAlert();
+      } else if (st.status === 'completed') {
+        setBanner('banner-ready', '<i class="fa-solid fa-check"></i> Consultation completed. Thank you!');
+      } else if (st.status === 'skipped') {
+        setBanner('banner-wait', '<i class="fa-solid fa-user-xmark"></i> You were skipped / on hold. Please check with the front desk.');
+      } else if (st.status === 'canceled') {
+        setBanner('banner-wait', '<i class="fa-solid fa-circle-xmark"></i> This token was canceled.');
+      } else if (ahead === 0 && serving < myNum) {
+        setBanner('banner-ready', '<i class="fa-solid fa-person-walking"></i> <b>You are NEXT!</b> Please wait right outside the doctor door.');
+        playAlert();
+      } else if (ahead <= 2) {
+        setBanner('banner-ready', '<i class="fa-solid fa-car-side"></i> <b>Please arrive now.</b> You are almost next in line (2 people ahead).');
+      } else {
+        setBanner('banner-wait', `<i class="fa-solid fa-hourglass-half"></i> <b>Please wait.</b> ${ahead} people are ahead of you. A reliable time estimate is not available.`);
+      }
+    }
 
     // Query by token number if patient typed it on home page
     async function findTokenByNumber(num) {
