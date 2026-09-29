@@ -62,3 +62,18 @@ test('client and server compute the same token numbers and wait analytics', () =
   ];
   assert.equal(client.averageWaitMinutes(samples), server.averageWaitMinutes(samples));
 });
+
+test('client and server estimate wait minutes identically', () => {
+  const cases = [
+    { waitingCount: 0, avgServeMinutes: null },
+    { waitingCount: 3, avgServeMinutes: null },
+    { waitingCount: 5, avgServeMinutes: 7 },
+    { waitingCount: 1.5, avgServeMinutes: 10 },
+    { waitingCount: -1, avgServeMinutes: 8 },
+    { waitingCount: '4', avgServeMinutes: '6' },
+    { waitingCount: NaN, avgServeMinutes: null },
+  ];
+  for (const c of cases) {
+    assert.equal(client.estimateWaitMinutes(c), server.estimateWaitMinutes(c), `estimateWaitMinutes(${JSON.stringify(c)}) drifted`);
+  }
+});

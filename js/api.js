@@ -245,6 +245,43 @@
     return callFunction('listDoctorsPublic', { slug });
   }
 
+  // Doctor/admin break toggle — reflects on the TV board + desk feeds.
+  async function setDoctorBreak(opts) {
+    const { slug, doctorId, onBreak, breakNote } = opts || {};
+    if (!slug || !doctorId) throw new Error('slug + doctorId required.');
+    if (apiMode() !== 'functions') return readNeedsFunctions('setDoctorBreak');
+    return callFunction('setDoctorBreak', { slug, doctorId, onBreak: Boolean(onBreak), breakNote: breakNote || '' });
+  }
+
+  // Advance appointments (functions mode).
+  async function listAvailableSlots(opts) {
+    const { slug, doctorId, date } = opts || {};
+    if (!slug || !doctorId || !date) throw new Error('slug + doctorId + date required.');
+    if (apiMode() !== 'functions') return readNeedsFunctions('listAvailableSlots');
+    return callFunction('listAvailableSlots', { slug, doctorId, date });
+  }
+
+  async function createAppointment(opts) {
+    const { slug, doctorId, date, slotStart, name, phone } = opts || {};
+    if (!slug || !doctorId || !date || !slotStart) throw new Error('slug + doctorId + date + slotStart required.');
+    if (apiMode() !== 'functions') return readNeedsFunctions('createAppointment');
+    return callFunction('createAppointment', { slug, doctorId, date, slotStart, name, phone });
+  }
+
+  async function listTodayAppointments(opts) {
+    const { code, doctorId } = opts || {};
+    if (!code || !doctorId) throw new Error('code + doctorId required.');
+    if (apiMode() !== 'functions') return readNeedsFunctions('listTodayAppointments');
+    return callFunction('listTodayAppointments', { code, doctorId });
+  }
+
+  async function checkInAppointment(opts) {
+    const { code, appointmentId } = opts || {};
+    if (!code || !appointmentId) throw new Error('code + appointmentId required.');
+    if (apiMode() !== 'functions') return readNeedsFunctions('checkInAppointment');
+    return callFunction('checkInAppointment', { code, appointmentId });
+  }
+
   // Admin accountability feed.
   async function listAuditEvents(opts) {
     const { slug, limit } = opts || {};
@@ -284,6 +321,14 @@
     return callFunction('flushSmsOutbox', { slug });
   }
 
+  // Admin — drain the pending WhatsApp outbox (channel === 'whatsapp').
+  async function flushWhatsAppOutbox(opts) {
+    const { slug } = opts || {};
+    if (!slug) throw new Error('slug required.');
+    if (apiMode() !== 'functions') return readNeedsFunctions('flushWhatsAppOutbox');
+    return callFunction('flushWhatsAppOutbox', { slug });
+  }
+
   return {
     mode: apiMode,
     newTokenId,
@@ -294,6 +339,11 @@
     getTokenStatus,
     getDoctorQueue,
     getDeskQueue,
+    setDoctorBreak,
+    listAvailableSlots,
+    createAppointment,
+    listTodayAppointments,
+    checkInAppointment,
     getTvFeed,
     getTokenByNumber,
     resolveHospitalByCode,
@@ -303,5 +353,6 @@
     provisionDoctor,
     revokeDoctor,
     flushSmsOutbox,
+    flushWhatsAppOutbox,
   };
 });

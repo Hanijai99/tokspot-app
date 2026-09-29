@@ -90,6 +90,16 @@ test('analytics averages only valid measured create-to-call intervals', () => {
   assert.equal(queue.averageWaitMinutes([{ createdAt: new Date(0) }]), null);
 });
 
+test('estimateWaitMinutes uses measured avg serve when present, default otherwise', () => {
+  assert.equal(queue.estimateWaitMinutes({ waitingCount: 0 }), 0);
+  assert.equal(queue.estimateWaitMinutes({ waitingCount: 3 }), 24);            // 3 x default 8
+  assert.equal(queue.estimateWaitMinutes({ waitingCount: 5, avgServeMinutes: 7 }), 35);
+  assert.equal(queue.estimateWaitMinutes({ waitingCount: 0.5, avgServeMinutes: 10 }), 5);
+  assert.equal(queue.estimateWaitMinutes({ waitingCount: 4, avgServeMinutes: -2 }), 32); // bad avg -> default
+  assert.equal(queue.estimateWaitMinutes({ waitingCount: -1 }), null);
+  assert.equal(queue.estimateWaitMinutes({ waitingCount: NaN }), null);
+});
+
 test('admin ownership requires the exact Firebase UID, not matching email', () => {
   const hospital = { adminUid: 'uid-owner', adminEmail: 'owner@example.test' };
   assert.equal(queue.isHospitalAdmin({ uid: 'uid-owner', email: 'other@example.test' }, hospital), true);

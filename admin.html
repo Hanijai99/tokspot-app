@@ -283,7 +283,9 @@
   <script src="js/app.js"></script>
   <script src="js/firebase.js"></script>
   <script src="js/api.js"></script>
+  <script src="js/i18n.js"></script>
   <script>
+    if (window.I18N) I18N.init();
     // Robust Global Toast Failsafe
     window.showToast = window.showToast || function(msg, isErr, ms) {
       let w = document.getElementById('hkToastWrap');
@@ -313,6 +315,7 @@
     let assignedHospitalSlug = null;
     let currentHospitalCode = '';
     let editDoctorId = null;
+    let scheduleDoctorId = null;
     const FUNC = window.TokSpotAPI && window.TokSpotAPI.mode() === 'functions';
     let targetResetDoctorId = null;
     let qrInstance = null;
@@ -657,9 +660,11 @@
               <div style="flex:1;min-width:200px;">
                 <div style="font-weight:700;color:var(--ink);">${escHtml(doc.name || docId)} ${statusBadge} ${pinBadge} ${roomBadge}</div>
                 <div class="muted" style="font-size:.82rem;margin-top:2px;">${escHtml(doc.department || 'General')} ${doc.email ? '· ' + escHtml(doc.email) : ''}</div>
+                <div class="muted" style="font-size:.78rem;margin-top:2px;"><i class="fa-solid fa-clock"></i> ${scheduleSummary(doc.schedule)}</div>
               </div>
               <div style="display:flex;gap:6px;flex-wrap:wrap;">
                 <button class="btn btn-sm btn-slate" onclick="editDoctor('${docId}')" title="Edit Doctor Details"><i class="fa-solid fa-pen"></i> Edit</button>
+                <button class="btn btn-sm btn-slate" onclick="openScheduleEditor('${docId}')" title="Set weekly consultation hours"><i class="fa-solid fa-calendar-week"></i> Schedule</button>
                 <button class="btn btn-sm btn-danger" onclick="revokeDoctorAccess('${docId}', '${escHtml(doc.name || 'Doctor')}', '${escHtml(doc.email || '')}')" title="Relieve & Permanently Revoke Access" style="background:#fee2e2;color:#b91c1c;border:1px solid #fca5a5;font-weight:700;">
                   <i class="fa-solid fa-user-xmark"></i> Relieve / Revoke
                 </button>
@@ -734,6 +739,91 @@
     function cancelDoctorEdit() { 
       document.getElementById('doctorForm').classList.add('hidden'); 
       editDoctorId = null; 
+    }
+
+    const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+    function scheduleSummary(schedule) {
+      if (!Array.isArray(schedule) || !schedule.length) return 'No weekly schedule set — defaults apply';
+      return schedule.map((s) => `${WEEKDAYS[Number(s.day) % 7] || s.day} ${s.start}–${s.end}`).join(' · ');
+    }
+
+    function openScheduleEditor(doctorId) {
+      scheduleDoctorId = doctorId;
+      const body = document.getElementById('scheduleModalBody');
+      const overlay = document.getElementById('scheduleModal');
+      if (!overlay) {
+        const wrap = document.createElement('div');
+        wrap.id = 'scheduleModal';
+        wrap.style.cssText = 'position:fixed;inset:0;background:rgba(2,6,23,0.7);display:flex;align-items:center;justify-content:center;z-index:1000;';
+        wrap.innerHTML = `
+          <div style="background:#fff;border-radius:16px;max-width:520px;width:92%;padding:22px;box-shadow:0 24px 60px rgba(0,0,0,0.35);color:#0f172a;">
+            <div style="font-weight:800;font-size:1.05rem;margin-bottom:14px;"><i class="fa-solid fa-calendar-week"></i> Weekly Consultation Schedule</div>
+            <div class="muted" style="font-size:.82rem;margin-bottom:14px;color:#64748b;">Patients book advanced slots only inside these windows. First window of each selected day.</div>
+            <div id="scheduleModalBody"></div>
+            <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;">
+              <button class="btn btn-sm btn-slate" onclick="closeScheduleEditor()">Cancel</button>
+              <button class="btn btn-sm btn-green" onclick="saveSchedule()"><i class="fa-solid fa-check"></i> Save Schedule</button>
+            </div>
+          </div>`;
+        document.body.appendChild(wrap);
+      } else {
+        overlay.classList.remove('hidden');
+        overlay.style.display = 'flex';
+      }
+
+      body.innerHTML = '<div class="muted">Loading…</div>';
+      window._fs.getDoc(window._fs.doc(window._db, 'hospitals', assignedHospitalSlug, 'doctors', doctorId)).then((snap) => {
+        const schedule = snap.data().schedule || [];
+        const byDay = {};
+        schedule.forEach((s) => { byDay[Number(s.day)] = s; });
+        body.innerHTML = `
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;">
+            <label style="font-size:.82rem;font-weight:700;">Start time <input type="time" id="schedStart" style="width:100%;padding:8px;border:1px solid #cbd5e1;border-radius:8px;margin-top:4px;" value="${(byDay[0] && byDay[0].start) || '09:00'}" /></label>
+            <label style="font-size:.82rem;font-weight:700;">End time <input type="time" id="schedEnd" style="width:100%;padding:8px;border:1px solid #cbd5e1;border-radius:8px;margin-top:4px;" value="${(byDay[0] && byDay[0].end) || '13:00'}" /></label>
+          </div>
+          <div style="font-size:.82rem;font-weight:700;margin-bottom:6px;">Days (repeat weekly)</div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;">${WEEKDAYS.map((w, i) => `
+            <label style="display:flex;align-items:center;gap:5px;border:1px solid #cbd5e1;border-radius:8px;padding:6px 10px;font-size:.8rem;font-weight:600;cursor:pointer;">
+              <input type="checkbox" value="${i}" ${byDay[i] ? 'checked' : ''} /> ${w}
+            </label>`).join('')}
+          </div>`;
+      }).catch((e) => {
+        body.innerHTML = '<div class="muted">' + escHtml(e.message) + '</div>';
+      });
+    }
+
+    function closeScheduleEditor() {
+      const overlay = document.getElementById('scheduleModal');
+      if (overlay) overlay.style.display = 'none';
+      scheduleDoctorId = null;
+    }
+
+    async function saveSchedule() {
+      if (!scheduleDoctorId) return;
+      const start = document.getElementById('schedStart').value;
+      const end = document.getElementById('schedEnd').value;
+      if (!start || !end) return showToast('Select start and end time.', true);
+      if (start >= end) return showToast('End time must be after start time.', true);
+
+      const checked = Array.from(document.querySelectorAll('#scheduleModal input[type=checkbox]:checked')).map((c) => Number(c.value));
+      if (!checked.length) return showToast('Select at least one day.', true);
+
+      const schedule = checked.map((day) => ({ day, start, end }));
+      const btn = document.querySelector('#scheduleModal .btn-green');
+      btn.disabled = true;
+      try {
+        await window._fs.updateDoc(
+          window._fs.doc(window._db, 'hospitals', assignedHospitalSlug, 'doctors', scheduleDoctorId),
+          { schedule, updatedAt: window._fs.serverTimestamp ? window._fs.serverTimestamp() : new Date().toISOString() }
+        );
+        showToast('Schedule saved. Patients can book advanced slots inside these hours.');
+        closeScheduleEditor();
+        loadDoctorList();
+      } catch (e) {
+        btn.disabled = false;
+        showToast('Could not save schedule: ' + e.message, true);
+      }
     }
 
     async function editDoctor(id) {

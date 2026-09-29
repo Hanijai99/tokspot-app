@@ -36,11 +36,11 @@
     <div class="meta-grid">
       <div class="meta-box">
         <div class="meta-val" id="nowServing" style="color: #2563eb;">—</div>
-        <div class="meta-lbl">Now Serving</div>
+        <div class="meta-lbl" data-i18n="token.nowServing">Now Serving</div>
       </div>
       <div class="meta-box">
         <div class="meta-val" id="peopleAhead">—</div>
-        <div class="meta-lbl">People Ahead</div>
+        <div class="meta-lbl" data-i18n="token.ahead">People Ahead</div>
       </div>
     </div>
 
@@ -58,7 +58,9 @@
   <script src="js/app.js"></script>
   <script src="js/firebase.js"></script>
   <script src="js/api.js"></script>
+  <script src="js/i18n.js"></script>
   <script>
+    if (window.I18N) I18N.init();
     const params = new URLSearchParams(window.location.search);
     const hospitalId = params.get('h');
     const tokenId = params.get('t');
@@ -146,9 +148,10 @@
       const ahead = st.aheadCount || 0;
       document.getElementById('nowServing').textContent = st.nowServing || '—';
       document.getElementById('peopleAhead').textContent = ahead;
+      const ewt = Number.isFinite(st.waitEstimateMinutes) ? st.waitEstimateMinutes : null;
       document.getElementById('estWait').textContent = ahead === 0
         ? 'No one is ahead of you'
-        : `${ahead} people ahead; no reliable time estimate`;
+        : (ewt > 0 ? `${ahead} people ahead · ~${ewt} min estimated` : `${ahead} people ahead; no reliable time estimate`);
     }
 
     function startStatusPolling() {
@@ -179,19 +182,25 @@
         (snap) => {
           let currentCalled = '—';
           let aheadCount = 0;
-          
+          const served = [];
+
           snap.docs.forEach(d => {
             const t = d.data();
-            if (t.status === 'called') currentCalled = t.number;
+            if (t.status === 'called') { currentCalled = t.number; if (t.createdAt && t.calledAt) served.push(t); }
             if (t.status === 'waiting' && String(t.number) < String(myNumber)) aheadCount++;
           });
 
           document.getElementById('nowServing').textContent = currentCalled;
           document.getElementById('peopleAhead').textContent = aheadCount;
-          
+
+          let ewt = null;
+          if (window.TokspotQueue) {
+            const avg = window.TokspotQueue.averageWaitMinutes(served);
+            ewt = window.TokspotQueue.estimateWaitMinutes({ waitingCount: aheadCount, avgServeMinutes: avg });
+          }
           document.getElementById('estWait').textContent = aheadCount === 0
             ? 'No one is ahead of you'
-            : `${aheadCount} people ahead; no reliable time estimate`;
+            : (ewt > 0 ? `${aheadCount} people ahead · ~${ewt} min estimated` : `${aheadCount} people ahead; no reliable time estimate`);
         }
       );
     }

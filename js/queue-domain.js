@@ -50,6 +50,20 @@
     return Math.round(waits.reduce((total, minutes) => total + minutes, 0) / waits.length);
   }
 
+  // Default average per-patient service time (minutes) used when the
+  // measured average is not yet available (e.g. brand-new doctor/day).
+  const DEFAULT_AVG_SERVE_MIN = 8;
+
+  function estimateWaitMinutes({ waitingCount, avgServeMinutes = null }) {
+    const waiting = Number(waitingCount);
+    if (!Number.isFinite(waiting) || waiting < 0) return null;
+    if (waiting === 0) return 0;
+    const serve = Number.isFinite(Number(avgServeMinutes)) && Number(avgServeMinutes) > 0
+      ? Number(avgServeMinutes)
+      : DEFAULT_AVG_SERVE_MIN;
+    return Math.max(1, Math.round(waiting * serve));
+  }
+
   function isHospitalAdmin(user, hospital) {
     return Boolean(user && hospital && hospital.adminUid && user.uid === hospital.adminUid);
   }
@@ -100,5 +114,5 @@
     });
   }
 
-  return { canTransition, nextTokenNumber, averageWaitMinutes, isHospitalAdmin, transitionToken, normalizeStatus };
+  return { canTransition, nextTokenNumber, averageWaitMinutes, estimateWaitMinutes, isHospitalAdmin, transitionToken, normalizeStatus };
 });

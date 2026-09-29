@@ -33,7 +33,26 @@ const auth = getAuth();
 
 // Queue domain — single source of truth shared with the client build
 // (js/queue-domain.js); tests/domain-sync.test.cjs fails on drift.
-const { ALLOWED_TRANSITIONS, normalizeStatus, canTransition } = require('./queue-domain');
+const { ALLOWED_TRANSITIONS, normalizeStatus, canTransition, averageWaitMinutes, estimateWaitMinutes } = require('./queue-domain');
+
+// Measured + estimate wait stats for a set of day rows.
+function queueStats(rows) {
+  const waitingCount = rows.filter((r) => r.status === 'waiting').length;
+  const served = rows.filter((r) => r.status === 'called' || r.status === 'completed' || r.status === 'skipped');
+  const avgServeMinutes = averageWaitMinutes(served);
+  return {
+    waitingCount,
+    avgServeMinutes,
+    waitEstimateMinutes: estimateWaitMinutes({ waitingCount, avgServeMinutes }),
+  };
+}
+
+// Doctor display status derived from its doc fields.
+function doctorDisplayStatus(doc) {
+  if (doc.status === 'closed') return 'closed';
+  if (doc.onBreak) return 'break';
+  return 'open';
+}
 
 // ------------------------------------------------------------------
 //  Operation-scoped rate limits (abuse/bot guard per caller)
@@ -52,6 +71,10 @@ const RL = {
   smsFlush: { maxCalls: 5, periodSeconds: 60 },
   provision: { maxCalls: 5, periodSeconds: 60 },
   codeResolve: { maxCalls: 30, periodSeconds: 60 },
+  listSlots: { maxCalls: 60, periodSeconds: 60 },
+  createAppt: { maxCalls: 20, periodSeconds: 60 },
+  deskAppts: { maxCalls: 60, periodSeconds: 60 },
+  apptCheckIn: { maxCalls: 60, periodSeconds: 60 },
 };
 
 // ------------------------------------------------------------------
@@ -135,24 +158,40 @@ function sanitizeNumber(input) {
 }
 
 // ------------------------------------------------------------------
-//  SMS outbox (server-side; consumers plug a provider, see
-//  flushSmsOutbox / smsRetention). The browser never writes rows here.
+//  Notification outbox (server-side; consumers plug a provider — see
+//  flushSmsOutbox / flushWhatsAppOutbox / smsRetention). The browser
+//  never writes rows here. Each row carries `channel`: 'sms' or
+//  'whatsapp' so two independent provider adapters can drain the same
+//  queue.
 // ------------------------------------------------------------------
-async function enqueueSms(slug, phone, body) {
+async function enqueueNotify(slug, phone, body, channel) {
   if (!phone) return;
   try {
     await db.collection('sms_queue').add({
       slug,
       phone: String(phone).replace(/\D/g, '').slice(-10),
       body,
+      channel: channel === 'whatsapp' ? 'whatsapp' : 'sms',
       status: 'pending',
       provider: null,
       attempts: 0,
       createdAt: new Date(),
     });
   } catch (err) {
-    console.error('sms enqueue failed', slug, err.message);
+    console.error(`${channel || 'sms'} enqueue failed`, slug, err.message);
   }
+}
+
+// Enqueue every channel the hospital has enabled (default: SMS only).
+// `hospital.notifyChannels` is set by the admin, e.g. ['sms','whatsapp'].
+function channelsFor(hospital) {
+  const list = Array.isArray(hospital && hospital.notifyChannels) ? hospital.notifyChannels : ['sms'];
+  return list.length ? list : ['sms'];
+}
+
+async function notifyPatient(slug, hospital, phone, body) {
+  const channels = channelsFor(hospital);
+  await Promise.all(channels.map((ch) => enqueueNotify(slug, phone, body, ch === 'whatsapp' ? 'whatsapp' : 'sms')));
 }
 
 // ------------------------------------------------------------------
@@ -236,7 +275,7 @@ exports.issueToken = onCall({ maxInstances: 10, rateLimiting: RL.issue }, async 
   if (!reused) {
     await audit(request.auth.uid, slug, 'issue', tokenId, 'ok', { number, source });
     if (cleanPhone) {
-      await enqueueSms(slug, cleanPhone,
+      await notifyPatient(slug, hospital, cleanPhone,
         `Your token #${number} at ${hospital.name || slug} is booked. Wait for your turn — you will be notified when called.`);
     }
   }
@@ -315,7 +354,7 @@ exports.transitionToken = onCall({ maxInstances: 10, rateLimiting: RL.transition
 
   await audit(actorUid, slug, `transition:${nextStatus}`, tokenId, 'ok', outcome);
   if (nextStatus === 'called' && outcome.phone) {
-    await enqueueSms(slug, outcome.phone,
+    await notifyPatient(slug, hospital, outcome.phone,
       `Good news! Token #${outcome.number} is now called. Please proceed to ${changes && changes.counter ? changes.counter : 'your doctor'}.`);
   }
   return { from: outcome.from, nextStatus };
@@ -370,7 +409,38 @@ exports.getDoctorQueue = onCall({ rateLimiting: RL.doctorQueue }, async (request
     });
   });
   rows.sort((a, b) => Number(a.number) - Number(b.number));
-  return { rows };
+  return { rows, stats: queueStats(rows) };
+});
+
+// ------------------------------------------------------------------
+//  setDoctorBreak — doctor self-service or admin: toggles onBreak on
+//  the doctor doc so the TV board + desk show the break state.
+// ------------------------------------------------------------------
+exports.setDoctorBreak = onCall({ rateLimiting: RL.myProfile }, async (request) => {
+  const { slug, doctorId, onBreak, breakNote } = request.data || {};
+  if (!slug || !doctorId) throw new HttpsError('invalid-argument', 'slug + doctorId required.');
+  const uid = request.auth && request.auth.uid;
+  if (!uid) throw new HttpsError('unauthenticated', 'Sign in required.');
+
+  const hospital = await loadHospital(slug);
+  if (!hospital) throw new HttpsError('not-found', 'Hospital not found.');
+
+  // Admin of the hospital can set any doctor; a doctor can set themselves.
+  const isAdmin = hospital.adminUid === uid;
+  const dSnap = await db.doc(`hospitals/${slug}/doctors/${doctorId}`).get();
+  if (!dSnap.exists) throw new HttpsError('not-found', 'Doctor not found.');
+  if (!isAdmin && dSnap.data().authUid !== uid) {
+    throw new HttpsError('permission-denied', 'Not authorized for this doctor.');
+  }
+
+  const update = {
+    onBreak: Boolean(onBreak),
+    breakNote: String(breakNote || '').slice(0, 200),
+    breakUpdatedAt: new Date().toISOString(),
+  };
+  await db.doc(`hospitals/${slug}/doctors/${doctorId}`).update(update);
+  await audit(uid, slug, onBreak ? 'doctor:break-on' : 'doctor:break-off', doctorId, 'ok', { breakNote: update.breakNote });
+  return { ok: true, onBreak: update.onBreak };
 });
 
 // ------------------------------------------------------------------
@@ -412,7 +482,7 @@ exports.getDeskQueue = onCall({ rateLimiting: RL.doctorQueue }, async (request) 
     });
   });
   rows.sort((a, b) => Number(a.number) - Number(b.number));
-  return { rows, slug };
+  return { rows, slug, stats: queueStats(rows) };
 });
 
 // ------------------------------------------------------------------
@@ -441,12 +511,20 @@ exports.getTokenStatus = onCall({ rateLimiting: RL.tokenStatus }, async (request
     .where('doctorId', '==', t.doctorId).where('date', '==', today).get();
   let ahead = 0;
   let serving = 0;
+  const dayRows = [];
   docs.forEach((d) => {
     const s = normalizeStatus(d.data().status);
     const n = Number(d.data().number || 0);
+    dayRows.push({
+      status: s,
+      number: n,
+      createdAt: d.data().createdAt ? d.data().createdAt.toMillis() : null,
+      calledAt: d.data().calledAt ? d.data().calledAt.toMillis() : null,
+    });
     if (s === 'called') serving = Math.max(serving, n);
     if (s === 'waiting' && n < Number(t.number || 0)) ahead += 1;
   });
+  const stats = queueStats(dayRows);
   return {
     slug,
     tokenId,
@@ -462,6 +540,8 @@ exports.getTokenStatus = onCall({ rateLimiting: RL.tokenStatus }, async (request
     completedAt: t.completedAt ? t.completedAt.toMillis() : null,
     aheadCount: ahead,
     nowServing: serving || 0,
+    avgServeMinutes: stats.avgServeMinutes,
+    waitEstimateMinutes: estimateWaitMinutes({ waitingCount: ahead, avgServeMinutes: stats.avgServeMinutes }),
   };
 });
 
@@ -494,7 +574,42 @@ exports.getTvFeed = onCall({ rateLimiting: RL.tvFeed }, async (request) => {
   });
   board.waiting.sort((a, b) => Number(a.number) - Number(b.number));
   board.serving.sort((a, b) => (b.calledAt || 0) - (a.calledAt || 0));
-  return board;
+
+  // Hall-level measured/estimate wait stats (all doctors, today).
+  const hallRows = [];
+  docs.forEach((d) => {
+    const t = d.data();
+    hallRows.push({
+      status: normalizeStatus(t.status),
+      createdAt: t.createdAt ? t.createdAt.toMillis() : null,
+      calledAt: t.calledAt ? t.calledAt.toMillis() : null,
+    });
+  });
+  const hallStats = queueStats(hallRows);
+
+  // Doctor roster so the board can show break/closed state per doctor.
+  const docSnap = await db.collection(`hospitals/${slug}/doctors`).get();
+  const doctors = [];
+  docSnap.forEach((d) => {
+    const doc = d.data();
+    if (doc.status === 'closed') return;
+    doctors.push({
+      id: d.id,
+      name: doc.name || 'Doctor',
+      department: doc.department || '',
+      counter: doc.counter || doc.room || '',
+      onBreak: Boolean(doc.onBreak),
+      breakNote: doc.breakNote || '',
+      displayStatus: doctorDisplayStatus(doc),
+    });
+  });
+
+  return {
+    ...board,
+    waitEstimateMinutes: hallStats.waitEstimateMinutes,
+    avgServeMinutes: hallStats.avgServeMinutes,
+    doctors,
+  };
 });
 
 // ------------------------------------------------------------------
@@ -583,10 +698,228 @@ exports.listDoctorsPublic = onCall({ rateLimiting: RL.codeResolve }, async (requ
       department: doc.department || 'Consultation',
       room: doc.room || doc.counter || '',
       status: doc.status || 'active',
+      onBreak: Boolean(doc.onBreak),
+      breakNote: doc.breakNote || '',
+      displayStatus: doctorDisplayStatus(doc),
     });
   });
   doctors.sort((a, b) => a.name.localeCompare(b.name));
   return { doctors };
+});
+
+// ------------------------------------------------------------------
+//  Advance appointments — public slot browsing/booking + desk check-in.
+//  Slots are 15-minute windows derived from the doctor's weekly
+//  `schedule` (admin-set); names/phones never leave the trusted side.
+// ------------------------------------------------------------------
+const SLOT_MINUTES = 15;
+const DEFAULT_APPT_WINDOWS = [{ start: '09:00', end: '13:00' }];
+
+function appointmentWindows(doctorDoc, dateStr) {
+  const schedule = Array.isArray(doctorDoc && doctorDoc.schedule) ? doctorDoc.schedule : null;
+  if (!schedule || !schedule.length) return DEFAULT_APPT_WINDOWS;
+  const day = new Date(dateStr + 'T00:00:00Z').getUTCDay();
+  const hits = schedule.filter((s) => Number(s.day) === day);
+  if (!hits.length) return [];
+  return hits
+    .map((s) => ({ start: s.start || '09:00', end: s.end || '13:00' }))
+    .filter((w) => w.start < w.end);
+}
+
+function minutesOf(timeStr) {
+  const m = /^(\d{1,2}):(\d{2})$/.exec(String(timeStr || ''));
+  if (!m) return null;
+  return Number(m[1]) * 60 + Number(m[2]);
+}
+
+function fmtMinutes(total) {
+  return String(Math.floor(total / 60)).padStart(2, '0') + ':' + String(total % 60).padStart(2, '0');
+}
+
+function slotsForWindows(windows) {
+  const out = [];
+  for (const w of windows) {
+    let cur = minutesOf(w.start);
+    const end = minutesOf(w.end);
+    if (cur === null || end === null) continue;
+    while (cur + SLOT_MINUTES <= end) {
+      out.push(fmtMinutes(cur));
+      cur += SLOT_MINUTES;
+    }
+  }
+  return out;
+}
+
+exports.listAvailableSlots = onCall({ rateLimiting: RL.listSlots }, async (request) => {
+  const { slug, doctorId, date } = request.data || {};
+  if (!slug || !doctorId || !date) throw new HttpsError('invalid-argument', 'slug + doctorId + date required.');
+  const hospital = await loadHospital(slug);
+  if (!hospital) throw new HttpsError('not-found', 'Hospital not found.');
+  const dSnap = await db.doc(`hospitals/${slug}/doctors/${doctorId}`).get();
+  if (!dSnap.exists) throw new HttpsError('not-found', 'Doctor not found.');
+  if (dSnap.data().status === 'closed') {
+    throw new HttpsError('failed-precondition', 'Doctor is not accepting bookings right now.');
+  }
+
+  const windows = appointmentWindows(dSnap.data(), date);
+  const taken = new Set();
+  const appts = await db.collection(`hospitals/${slug}/appointments`)
+    .where('doctorId', '==', doctorId).where('date', '==', date).get();
+  appts.forEach((d) => {
+    const a = d.data();
+    if (a.status === 'booked' || a.status === 'arrived') taken.add(a.slotStart);
+  });
+  return {
+    date,
+    slots: slotsForWindows(windows).map((start) => ({ start, taken: taken.has(start) })),
+  };
+});
+
+exports.createAppointment = onCall({ rateLimiting: RL.createAppt }, async (request) => {
+  const { slug, doctorId, date, slotStart, name, phone } = request.data || {};
+  if (!slug || !doctorId || !date || !slotStart) {
+    throw new HttpsError('invalid-argument', 'slug + doctorId + date + slotStart required.');
+  }
+  const hospital = await loadHospital(slug);
+  if (!hospital) throw new HttpsError('not-found', 'Hospital not found.');
+  const cleanName = String(name || '').trim().slice(0, 60);
+  const cleanPhone = String(phone || '').replace(/\D/g, '').slice(-10);
+  if (!cleanName) throw new HttpsError('invalid-argument', 'Patient name required.');
+  if (!cleanPhone || cleanPhone.length < 10) throw new HttpsError('invalid-argument', 'Valid 10-digit phone required.');
+
+  const tz = getHospitalTz(hospital);
+  const today = todayInZone(tz);
+  const maxDate = new Date(new Date(today + 'T00:00:00Z').getTime() + 14 * 86400000).toISOString().slice(0, 10);
+  if (date < today || date > maxDate) {
+    throw new HttpsError('invalid-argument', 'Date must be within the next 14 days.');
+  }
+
+  const dSnap = await db.doc(`hospitals/${slug}/doctors/${doctorId}`).get();
+  if (!dSnap.exists) throw new HttpsError('not-found', 'Doctor not found.');
+  const slots = slotsForWindows(appointmentWindows(dSnap.data(), date));
+  if (!slots.includes(slotStart)) throw new HttpsError('invalid-argument', 'Slot is outside the doctor\'s consultation hours.');
+
+  const apptId = db.collection(`hospitals/${slug}/appointments`).doc().id;
+  await db.runTransaction(async (tx) => {
+    const conflict = await tx.get(db.collection(`hospitals/${slug}/appointments`)
+      .where('doctorId', '==', doctorId).where('date', '==', date).where('slotStart', '==', slotStart));
+    const conflictRows = [];
+    conflict.forEach((d) => conflictRows.push(d));
+    if (conflictRows.length) throw new HttpsError('conflict', 'That time slot was just booked. Please pick another.');
+
+    const quota = await tx.get(db.collection(`hospitals/${slug}/appointments`)
+      .where('phone', '==', cleanPhone).where('date', '==', date));
+    const quotaCount = quota.docs ? quota.docs.length : quota.size;
+    if (quotaCount >= 5) throw new HttpsError('resource-exhausted', 'Phone number reached its 5-booking daily limit.');
+
+    tx.set(db.doc(`hospitals/${slug}/appointments/${apptId}`), {
+      id: apptId,
+      doctorId,
+      doctorName: dSnap.data().name || doctorId,
+      date,
+      slotStart,
+      patientName: cleanName,
+      phone: cleanPhone,
+      status: 'booked',
+      tokenId: null,
+      createdBy: 'patient',
+      createdAt: new Date(),
+    });
+  });
+  await audit(request.auth && request.auth.uid, slug, 'appointment:create', apptId, 'ok', { doctorId, slotStart });
+  return { ok: true, appointmentId: apptId, slotStart };
+});
+
+exports.listTodayAppointments = onCall({ rateLimiting: RL.deskAppts }, async (request) => {
+  const { code, doctorId } = request.data || {};
+  if (!code || !doctorId) throw new HttpsError('invalid-argument', 'code + doctorId required.');
+  const hospitals = await db.collection('hospitals').get();
+  let slug = null;
+  hospitals.forEach((h) => {
+    if (normalizeHospitalCode(h.data().hospitalCode) === normalizeHospitalCode(code)) slug = h.id;
+  });
+  if (!slug) throw new HttpsError('permission-denied', 'Invalid hospital code.');
+  const hospital = await loadHospital(slug);
+  const today = todayInZone(getHospitalTz(hospital));
+  const docs = await db.collection(`hospitals/${slug}/appointments`)
+    .where('doctorId', '==', doctorId).where('date', '==', today).get();
+  const rows = [];
+  docs.forEach((d) => {
+    const a = d.data();
+    rows.push({
+      id: d.id,
+      slotStart: a.slotStart || '',
+      patientName: a.patientName || '',
+      phone: a.phone || '',
+      status: a.status || 'booked',
+      tokenId: a.tokenId || null,
+    });
+  });
+  rows.sort((x, y) => String(x.slotStart).localeCompare(String(y.slotStart)));
+  return { rows, slug };
+});
+
+exports.checkInAppointment = onCall({ rateLimiting: RL.apptCheckIn }, async (request) => {
+  const { code, appointmentId } = request.data || {};
+  if (!code || !appointmentId) throw new HttpsError('invalid-argument', 'code + appointmentId required.');
+  const hospitals = await db.collection('hospitals').get();
+  let slug = null;
+  hospitals.forEach((h) => {
+    if (normalizeHospitalCode(h.data().hospitalCode) === normalizeHospitalCode(code)) slug = h.id;
+  });
+  if (!slug) throw new HttpsError('permission-denied', 'Invalid hospital code.');
+  const hospital = await loadHospital(slug);
+  const today = todayInZone(getHospitalTz(hospital));
+
+  let tokenId = '';
+  let number = '';
+  let phone = '';
+  await db.runTransaction(async (tx) => {
+    const aSnap = await tx.get(db.doc(`hospitals/${slug}/appointments/${appointmentId}`));
+    if (!aSnap.exists) throw new HttpsError('not-found', 'Appointment not found.');
+    const a = aSnap.data();
+    if (a.date !== today || a.status !== 'booked') {
+      throw new HttpsError('failed-precondition', 'This appointment is not check-in-able today (already checked in or completed).');
+    }
+    phone = String(a.phone || '');
+
+    // Number uniqueness: the same daily counter the desk uses.
+    const counterRef = db.doc(`hospitals/${slug}/counters/${today}`);
+    const cSnap = await tx.get(counterRef);
+    const next = (cSnap.exists ? Number(cSnap.data().count || 0) : 0) + 1;
+    if (!Number.isSafeInteger(next)) throw new Error('Counter overflow.');
+    tx.set(counterRef, { count: next }, { merge: true });
+
+    tokenId = db.collection(`hospitals/${slug}/tokens`).doc().id;
+    number = String(next).padStart(3, '0');
+    tx.set(db.doc(`hospitals/${slug}/tokens/${tokenId}`), {
+      id: tokenId,
+      number,
+      patientName: a.patientName,
+      phone,
+      doctorId: a.doctorId,
+      hospitalId: slug,
+      date: today,
+      status: 'waiting',
+      source: 'appointment',
+      priority: false,
+      counter: 'Counter A',
+      appointmentId,
+      createdAt: new Date(),
+    });
+    tx.update(db.doc(`hospitals/${slug}/appointments/${appointmentId}`), {
+      status: 'arrived',
+      tokenId,
+      checkedInAt: new Date(),
+    });
+  });
+
+  await audit(null, slug, 'appointment:checkin', appointmentId, 'ok', { tokenId, number });
+  if (phone) {
+    await notifyPatient(slug, hospital, phone,
+      `You checked in at ${hospital.name || slug}. Your token #${number} is in queue — you will be notified when called.`);
+  }
+  return { ok: true, slug, tokenId, number };
 });
 
 // ------------------------------------------------------------------
@@ -710,19 +1043,46 @@ exports.flushSmsOutbox = onCall({ rateLimiting: RL.smsFlush }, async (request) =
   const { slug } = request.data || {};
   await assertAdmin(request, slug);
   const pending = await db.collection('sms_queue')
-    .where('slug', '==', slug).where('status', '==', 'pending').limit(20).get();
+    .where('slug', '==', slug).where('status', '==', 'pending').limit(30).get();
+  const smsRows = pending.docs.filter((d) => (d.data().channel || 'sms') === 'sms').slice(0, 20);
   let sent = 0;
   // NOTE: provider adapter goes here (validate/format phone, call API,
   // record provider message id). The console stub keeps the pipeline
   // testable end-to-end without external credentials.
-  pending.forEach((d) => {
+  smsRows.forEach((d) => {
     const row = d.data();
     console.log('[sms-outbox:stub] would send', row.phone, '=>', row.body);
   });
-  await Promise.all(pending.docs.map((d) =>
+  await Promise.all(smsRows.map((d) =>
     d.ref.update({ status: 'sent', provider: 'console-stub', sentAt: new Date(), attempts: (d.data().attempts || 0) + 1 })));
-  sent = pending.size;
+  sent = smsRows.length;
   await audit(request.auth.uid, slug, 'sms:flush', null, 'ok', { sent });
+  return { sent };
+});
+
+// ------------------------------------------------------------------
+//  flushWhatsAppOutbox — admin-triggered processing of pending
+//  WhatsApp rows (channel === 'whatsapp'). Plug a Meta Cloud API /
+//  Twilio WhatsApp adapter into the loop below; until then rows are
+//  marked sent with a console log. Hospital enables the channel via
+//  `notifyChannels: ['sms','whatsapp']`.
+// ------------------------------------------------------------------
+exports.flushWhatsAppOutbox = onCall({ rateLimiting: RL.smsFlush }, async (request) => {
+  const { slug } = request.data || {};
+  await assertAdmin(request, slug);
+  const pending = await db.collection('sms_queue')
+    .where('slug', '==', slug).where('status', '==', 'pending').where('channel', '==', 'whatsapp').limit(20).get();
+  let sent = 0;
+  // NOTE: Meta Cloud API adapter goes here (to: 91XXXXXXXXXX, template:
+  // token number + hospital + room). Console stub keeps it testable.
+  pending.forEach((d) => {
+    const row = d.data();
+    console.log('[whatsapp-outbox:stub] would send', row.phone, '=>', row.body);
+  });
+  await Promise.all(pending.docs.map((d) =>
+    d.ref.update({ status: 'sent', provider: 'whatsapp-console-stub', sentAt: new Date(), attempts: (d.data().attempts || 0) + 1 })));
+  sent = pending.size;
+  await audit(request.auth.uid, slug, 'whatsapp:flush', null, 'ok', { sent });
   return { sent };
 });
 

@@ -83,6 +83,7 @@
         <div style="font-size:0.82rem;color:#94a3b8;" id="hospNameDisplay">—</div>
       </div>
       <span class="badge green" id="stationStatusBadge">Active Desk</span>
+      <button class="sec-btn" id="btnBreakToggle" onclick="toggleBreak()" style="display:none;background:#7c3aed;color:#fff;border:none;padding:8px 14px;border-radius:10px;font-weight:800;cursor:pointer;"><i class="fa-solid fa-mug-hot"></i> <span id="btnBreakLabel">Start Break</span></button>
     </div>
 
     <!-- Active Consultation Card -->
@@ -114,7 +115,10 @@
     <div class="queue-list">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;padding:0 6px;">
         <span style="font-weight:800;color:#94a3b8;font-size:0.85rem;letter-spacing:1px;text-transform:uppercase;">Waiting In Queue</span>
-        <span style="font-weight:800;color:#8BBB92;font-size:0.85rem;" id="queueCount">0 Waiting</span>
+        <span style="display:flex;align-items:center;gap:10px;">
+          <span style="font-weight:800;color:#8BBB92;font-size:0.85rem;" id="waitEstimateChip"></span>
+          <span style="font-weight:800;color:#8BBB92;font-size:0.85rem;" id="queueCount">0 Waiting</span>
+        </span>
       </div>
       <div id="queueRows"></div>
     </div>
@@ -129,7 +133,9 @@
   <script src="js/firebase.js"></script>
   <script src="js/queue-domain.js"></script>
   <script src="js/api.js"></script>
+  <script src="js/i18n.js"></script>
   <script>
+    if (window.I18N) I18N.init();
     window.escHtml = window.escHtml || function (s) {
       return String(s == null ? '' : s)
         .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
@@ -158,6 +164,8 @@
     let unsubQueue = null;
     let unsubSecurity = null;
     let queuePollTimer = null;
+    let doctorStats = null;
+    let doctorOnBreak = false;
     const FUNC = window.TokSpotAPI && window.TokSpotAPI.mode() === 'functions';
 
     window.addEventListener('load', async () => {
@@ -216,6 +224,10 @@
       document.getElementById('docNameDisplay').textContent = activeDoctorProfile.name ? `Dr. ${activeDoctorProfile.name.replace(/^Dr\.?\s*/i, '')}` : 'Doctor Desk';
       document.getElementById('hospNameDisplay').textContent = `${activeDoctorProfile.hospitalName || currentHospitalSlug} · ${activeDoctorProfile.department || 'Consultation Room'}`;
 
+      // Break state (from the live doctor doc merged into the profile)
+      doctorOnBreak = Boolean(activeDoctorProfile.onBreak);
+      refreshBreakUI();
+
       // Start Security Listener & Queue Listener
       listenDoctorSecurity();
       listenDoctorQueue();
@@ -236,8 +248,49 @@
           alert('ACCESS REVOKED: Your credentials have been decoupled from this hospital by the administrator. You are now logged out.');
           window.location.replace('doctor-login.html');
         }
+        // Live break-state sync (admin or another desk set it)
+        const onBreak = Boolean(docSnap.data().onBreak);
+        if (onBreak !== doctorOnBreak) {
+          doctorOnBreak = onBreak;
+          refreshBreakUI();
+        }
       }, (err) => {
         console.warn('Security watcher note:', err);
+      });
+    }
+
+    function toggleBreak() {
+      const next = !doctorOnBreak;
+      let note = '';
+      if (next) {
+        try {
+          note = window.prompt('Break note (shown on TV board, optional):') || '';
+        } catch (e) { note = ''; }
+        note = String(note).slice(0, 200);
+        if (note && !confirm(`Mark yourself On Break${note ? ' — "' + note + '"' : ''}?`)) return;
+      }
+      const was = doctorOnBreak;
+      doctorOnBreak = next;
+      refreshBreakUI();
+      const request = async () => {
+        if (FUNC) {
+          await window.TokSpotAPI.setDoctorBreak({
+            slug: currentHospitalSlug,
+            doctorId: activeDoctorProfile.id,
+            onBreak: next,
+            breakNote: next ? note : '',
+          });
+        } else {
+          await window._fs.updateDoc(
+            window._fs.doc(window._db, 'hospitals', currentHospitalSlug, 'doctors', activeDoctorProfile.id),
+            { onBreak: next, breakNote: next ? note : '', breakUpdatedAt: new Date().toISOString() }
+          );
+        }
+      };
+      request().then(() => showToast(next ? 'On break — TV board updated' : 'Back online')).catch((e) => {
+        doctorOnBreak = was;
+        refreshBreakUI();
+        showToast('Break toggle failed: ' + e.message, true);
       });
     }
 
@@ -303,6 +356,39 @@
 
     // Shared render step for both snapshot (prototype) and polled
     // (functions) queue data.
+    function refreshBreakUI() {
+      const badge = document.getElementById('stationStatusBadge');
+      const btn = document.getElementById('btnBreakToggle');
+      const label = document.getElementById('btnBreakLabel');
+      const t = (key, fb) => (window.I18N ? window.I18N.t(key) : fb);
+      if (btn) {
+        btn.style.display = 'inline-flex';
+        label.textContent = doctorOnBreak ? t('doctor.breakOff', 'Resume') : t('doctor.breakOn', 'Start Break');
+      }
+      if (badge) {
+        badge.textContent = doctorOnBreak ? t('doctor.onBreak', 'On Break') : t('doctor.active', 'Active Desk');
+        badge.className = 'badge ' + (doctorOnBreak ? 'amber' : 'green');
+      }
+    }
+
+    function renderQueueMeta() {
+      const n = waitingTokens.length;
+      const chip = document.getElementById('waitEstimateChip');
+      if (chip) {
+        let ewt = null;
+        if (doctorStats && Number.isFinite(doctorStats.waitEstimateMinutes)) {
+          ewt = doctorStats.waitEstimateMinutes;
+        } else if (!FUNC && window.TokspotQueue) {
+          const served = waitingTokens.concat(currentActiveToken ? [currentActiveToken] : []).filter((t) => t.calledAt && t.createdAt && t.status !== 'waiting');
+          const avg = window.TokspotQueue.averageWaitMinutes(served);
+          ewt = window.TokspotQueue.estimateWaitMinutes({ waitingCount: n, avgServeMinutes: avg });
+        }
+        chip.textContent = (ewt !== null && ewt > 0) ? `~${ewt} min wait` : '';
+        chip.style.color = ewt && ewt > 10 ? '#fbbf24' : '#8BBB92';
+      }
+      document.getElementById('queueCount').textContent = `${n} Waiting`;
+    }
+
     function finalizeDoctorQueue() {
       waitingTokens.sort((a, b) => {
         if (b.priority && !a.priority) return 1;
@@ -326,9 +412,9 @@
       }
 
       renderQueueRows();
+      refreshBreakUI();
+      renderQueueMeta();
     }
-
-    // Functions mode: poll the server-filtered day queue (no client
     // token reads — the target rules deny those for doctor roles).
     function startDoctorQueuePolling() {
       if (unsubQueue) { unsubQueue(); unsubQueue = null; }
@@ -338,6 +424,7 @@
             slug: currentHospitalSlug,
             doctorId: activeDoctorProfile.id,
           });
+          doctorStats = res.stats || null;
           waitingTokens = [];
           currentActiveToken = null;
           (res.rows || []).forEach((t) => {

@@ -221,7 +221,7 @@
       <!-- Overview Stats -->
       <h2 style="font-size:1.05rem;font-weight:800;margin:22px 0 12px;">Today's Overview</h2>
       <div class="stats" style="grid-template-columns: repeat(4, 1fr);">
-        <div class="stat"><div class="n amber" id="stWaiting">0</div><div class="k">Waiting</div></div>
+        <div class="stat"><div class="n amber" id="stWaiting">0</div><div class="k">Waiting</div><div class="k" id="waitEstimate" style="color:#d97706;font-size:0.72rem;"></div></div>
         <div class="stat"><div class="n" id="stCalled">0</div><div class="k">Called</div></div>
         <div class="stat"><div class="n red" id="stSkipped" style="color:#dc2626;">0</div><div class="k">Skipped</div></div>
         <div class="stat"><div class="n green" id="stDone">0</div><div class="k">Served</div></div>
@@ -231,6 +231,11 @@
       <h2 style="font-size:1.05rem;font-weight:800;margin:22px 0 12px;">Waiting Queue</h2>
       <div id="queueList"></div>
       <div class="empty hidden" id="queueEmpty"><div class="e-ic"><i class="fa-regular fa-clock"></i></div><div class="e-t">No tokens waiting</div><div class="e-s">Issue a token to get started.</div></div>
+
+      <!-- Today's Appointments -->
+      <h2 style="font-size:1.05rem;font-weight:800;margin:22px 0 12px;">Today's Appointments <span class="badge green" id="apptCount">0</span></h2>
+      <div id="apptList"></div>
+      <div class="empty hidden" id="apptEmpty"><div class="e-ic"><i class="fa-regular fa-calendar-check"></i></div><div class="e-t">No advanced bookings for today</div><div class="e-s">Patients booking on the website appear here for check-in.</div></div>
 
       <!-- Absent / Skipped Patients Recovery Section -->
       <div id="skippedSection" class="hidden mt-24">
@@ -276,7 +281,9 @@
   <script src="js/firebase.js"></script>
   <script src="js/queue-domain.js"></script>
   <script src="js/api.js"></script>
+  <script src="js/i18n.js"></script>
   <script>
+    if (window.I18N) I18N.init();
     window.escHtml = window.escHtml || function(s) {
       return String(s == null ? '' : s)
         .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
@@ -328,6 +335,8 @@
     let currentlyServingToken = null;
     let firstWaitingToken = null;
     let deskPollTimer = null;
+    let lastDeskStats = null;
+    let apptRows = [];
     // Row cache so print/notify/announce/loadHistory work without
     // client token reads (denied to anonymous desk users in functions mode).
     const lastKnownTokenData = {};
@@ -489,6 +498,7 @@
       
       setupQueueListener();
       loadHistory();
+      loadAppointments();
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
 
@@ -526,6 +536,7 @@
             doctorId: currentDoctor,
           });
           const waiting = [], called = [], skipped = [];
+          lastDeskStats = res.stats || null;
           (res.rows || []).forEach(t => {
             if (t.status === 'waiting') waiting.push(t);
             else if (t.status === 'called') called.push(t);
@@ -579,6 +590,19 @@
       document.getElementById('stWaiting').textContent = waiting.length;
       document.getElementById('stCalled').textContent = called.length;
       document.getElementById('stSkipped').textContent = skipped.length;
+
+      // Estimated wait for the next waiting patient (functions: server
+      // stats; prototype: computed from this day's served rows).
+      const estEl = document.getElementById('waitEstimate');
+      if (estEl) {
+        let ewt = lastDeskStats && Number.isFinite(lastDeskStats.waitEstimateMinutes) ? lastDeskStats.waitEstimateMinutes : null;
+        if (ewt === null && !FUNC && window.TokspotQueue) {
+          const served = [...called, ...skipped].filter((t) => t.calledAt && t.createdAt);
+          const avg = window.TokspotQueue.averageWaitMinutes(served);
+          ewt = window.TokspotQueue.estimateWaitMinutes({ waitingCount: waiting.length, avgServeMinutes: avg });
+        }
+        estEl.textContent = (ewt !== null && ewt > 0) ? `~${ewt} min wait` : '';
+      }
 
       called.sort((a, b) => {
         const timeA = a.calledAt?.toMillis() || a.updatedAt?.toMillis() || 0;
@@ -728,6 +752,93 @@
       } catch (err) {
         console.warn('Quota check fallback:', err);
         return { allowed: true };
+      }
+    }
+
+    async function loadAppointments() {
+      const list = document.getElementById('apptList');
+      const empty = document.getElementById('apptEmpty');
+      const count = document.getElementById('apptCount');
+      try {
+        let rows = [];
+        if (FUNC) {
+          const res = await window.TokSpotAPI.listTodayAppointments({ code: currentHospitalCode, doctorId: currentDoctor });
+          rows = res.rows || [];
+        } else {
+          await ensureAuth();
+          const today = window.todayStr ? window.todayStr() : new Date().toISOString().slice(0, 10);
+          const snap = await window._fs.getDocs(window._fs.query(
+            window._fs.collection(window._db, 'hospitals', currentHospital, 'appointments'),
+            window._fs.where('doctorId', '==', currentDoctor),
+            window._fs.where('date', '==', today)
+          ));
+          rows = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+          rows.sort((a, b) => String(a.slotStart || '').localeCompare(String(b.slotStart || '')));
+        }
+        apptRows = rows;
+        const pending = rows.filter(r => r.status === 'booked').length;
+        count.textContent = pending;
+        if (!rows.length) {
+          empty.classList.remove('hidden');
+          list.innerHTML = '';
+          return;
+        }
+        empty.classList.add('hidden');
+        list.innerHTML = rows.map(a => {
+          const isBooked = a.status === 'booked';
+          const arrived = a.status === 'arrived';
+          const badge = arrived
+            ? '<span class="badge green">Checked in</span>'
+            : (isBooked ? '<span class="badge amber">Booked</span>' : '<span class="badge slate">' + escHtml(a.status || '') + '</span>');
+          const numStyle = isBooked ? 'background:#e0e7ff;color:#4338ca;' : (arrived ? 'background:#dcfce7;color:#166534;' : '');
+          return `
+          <div class="qrow" style="${isBooked ? 'border-color:#c7d2fe;' : (arrived ? 'border-color:#86efac;' : '')}">
+            <div class="qnum" style="${numStyle}">${escHtml(a.slotStart || '--:--')}</div>
+            <div class="qbody">
+              <div class="qname">${escHtml(a.patientName || 'Patient')} <span class="badge blue">${escHtml(a.phone || '')}</span> ${badge}</div>
+              <div class="qmeta">Advanced booking${a.createdBy ? ' · ' + a.createdBy : ''}${a.tokenId ? ' · Token issued' : ''}</div>
+              <div class="btn-row mt-12">
+                ${isBooked ? `<button class="btn btn-sm btn-green" onclick="checkInAppt('${a.id}')"><i class="fa-solid fa-user-check"></i> Check-in → Token</button>` : ''}
+              </div>
+            </div>
+          </div>`;
+        }).join('');
+      } catch (e) {
+        console.error('Appointments load error:', e);
+        count.textContent = '0';
+      }
+    }
+
+    async function checkInAppt(apptId) {
+      const appt = apptRows.find(a => a.id === apptId);
+      if (!appt) return;
+      if (!confirm(`Check in ${appt.patientName || 'patient'} (${appt.slotStart || ''}) and issue a walk-in token now?`)) return;
+      try {
+        await ensureAuth();
+        if (FUNC) {
+          const res = await window.TokSpotAPI.checkInAppointment({ code: currentHospitalCode, appointmentId: apptId });
+          showToast(`Checked in → Token #${res.number}`);
+        } else {
+          const issued = await window.TokSpotAPI.issueToken({
+            slug: currentHospital,
+            doctorId: currentDoctor,
+            doctorName: currentDoctorName,
+            name: appt.patientName || 'Patient',
+            phone: appt.phone || '',
+            priority: false,
+            counter: 'Counter A',
+            source: 'appointment'
+          });
+          await window._fs.updateDoc(
+            window._fs.doc(window._db, 'hospitals', currentHospital, 'appointments', apptId),
+            { status: 'arrived', tokenId: issued.tokenId, checkedInAt: window._fs.serverTimestamp ? window._fs.serverTimestamp() : new Date() }
+          );
+          showToast(`Checked in → Token #${issued.tokenNum}`);
+          lastIssuedTokenId = issued.tokenId;
+        }
+        loadAppointments();
+      } catch (e) {
+        showToast('Check-in failed: ' + e.message, true);
       }
     }
 

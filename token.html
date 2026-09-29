@@ -97,10 +97,10 @@
         Enter the <b>hospital code</b> from your booking screen to locate token
         #<b id="codeNumberLabel" style="color:#2A835F;">—</b>.
       </p>
-      <input id="codeInput" class="form-control" placeholder="e.g. HOSP-1234"
+      <input id="codeInput" class="form-control" data-i18n-ph="token.codeHint" placeholder="e.g. HOSP-1234"
         style="text-transform:uppercase;text-align:center;font-weight:800;padding:12px;border-radius:12px;border:1px solid var(--line);" />
       <div style="margin-top:14px;">
-        <a href="#" id="codeSearchBtn" class="btn btn-green"><i class="fa-solid fa-magnifying-glass"></i> Locate Token</a>
+        <a href="#" id="codeSearchBtn" class="btn btn-green"><i class="fa-solid fa-magnifying-glass"></i> <span data-i18n="token.search">Locate Token</span></a>
       </div>
     </div>
 
@@ -120,12 +120,16 @@
         <!-- Live Queue Metrics -->
         <div class="status-grid">
           <div class="stat-pill">
-            <div class="stat-lbl">Now Serving</div>
+            <div class="stat-lbl" data-i18n="token.nowServing">Now Serving</div>
             <div class="stat-val" id="tServing">#--</div>
           </div>
           <div class="stat-pill">
-            <div class="stat-lbl">People Ahead</div>
+            <div class="stat-lbl" data-i18n="token.ahead">People Ahead</div>
             <div class="stat-val" id="tAhead">--</div>
+          </div>
+          <div class="stat-pill">
+            <div class="stat-lbl" data-i18n="token.estWait">Estimated Wait</div>
+            <div class="stat-val" id="tEstWait">--</div>
           </div>
         </div>
 
@@ -162,7 +166,9 @@
   <script src="js/firebase.js"></script>
   <script src="js/api.js"></script>
   <script src="js/push.js"></script>
+  <script src="js/i18n.js"></script>
   <script>
+    if (window.I18N) I18N.init();
     if (window.hk && hk.applyDark) hk.applyDark();
 
     const FUNC = window.TokSpotAPI && window.TokSpotAPI.mode() === 'functions';
@@ -251,6 +257,12 @@
       document.getElementById('tServing').textContent = st.nowServing > 0 ? `#${st.nowServing}` : 'Ready';
       document.getElementById('tAhead').textContent = st.aheadCount;
 
+      const estEl = document.getElementById('tEstWait');
+      if (estEl) {
+        const ewt = Number.isFinite(st.waitEstimateMinutes) ? st.waitEstimateMinutes : null;
+        estEl.textContent = ewt === 0 ? 'Now' : (ewt > 0 ? `~${ewt} min` : '—');
+      }
+
       const myNum = Number(st.number || 0);
       const serving = st.nowServing || 0;
       const ahead = st.aheadCount || 0;
@@ -270,7 +282,8 @@
       } else if (ahead <= 2) {
         setBanner('banner-ready', '<i class="fa-solid fa-car-side"></i> <b>Please arrive now.</b> You are almost next in line (2 people ahead).');
       } else {
-        setBanner('banner-wait', `<i class="fa-solid fa-hourglass-half"></i> <b>Please wait.</b> ${ahead} people are ahead of you. A reliable time estimate is not available.`);
+        const ewt = Number.isFinite(st.waitEstimateMinutes) ? st.waitEstimateMinutes : null;
+        setBanner('banner-wait', `<i class="fa-solid fa-hourglass-half"></i> <b>Please wait.</b> ${ahead} people are ahead of you.${ewt > 0 ? ` Estimated wait ~${ewt} min.` : ' A reliable time estimate is not available.'}`);
       }
     }
 
@@ -339,11 +352,13 @@
       unsubscribeQueue = window._fs.onSnapshot(qTokens, (snap) => {
         let currentServing = 0;
         let aheadCount = 0;
+        const served = [];
 
         snap.docs.forEach(d => {
           const t = d.data();
           if (t.status === 'called' || t.status === 'serving') {
             if (t.number > currentServing) currentServing = t.number;
+            if (t.createdAt && t.calledAt) served.push(t);
           }
           if (t.status === 'waiting' && t.number < myTokenNum) {
             aheadCount++;
@@ -353,11 +368,19 @@
         document.getElementById('tServing').textContent = currentServing > 0 ? `#${currentServing}` : 'Ready';
         document.getElementById('tAhead').textContent = aheadCount;
 
-        updateArrivalInstruction(aheadCount, myTokenNum, currentServing);
+        let ewt = null;
+        if (window.TokspotQueue) {
+          const avg = window.TokspotQueue.averageWaitMinutes(served);
+          ewt = window.TokspotQueue.estimateWaitMinutes({ waitingCount: aheadCount, avgServeMinutes: avg });
+        }
+        const estEl = document.getElementById('tEstWait');
+        if (estEl) estEl.textContent = ewt === 0 ? 'Now' : (ewt > 0 ? `~${ewt} min` : '—');
+
+        updateArrivalInstruction(aheadCount, myTokenNum, currentServing, ewt);
       });
     }
 
-    function updateArrivalInstruction(ahead, myNum, serving) {
+    function updateArrivalInstruction(ahead, myNum, serving, ewt) {
       const banner = document.getElementById('statusInstruction');
       const text = document.getElementById('instructionText');
 
@@ -374,7 +397,7 @@
         text.innerHTML = '<i class="fa-solid fa-car-side"></i> <b>Please arrive now.</b> You are almost next in line (2 people ahead).';
       } else {
         banner.className = 'arrival-banner banner-wait';
-        text.innerHTML = `<i class="fa-solid fa-hourglass-half"></i> <b>Please wait.</b> ${ahead} people are ahead of you. A reliable time estimate is not available.`;
+        text.innerHTML = `<i class="fa-solid fa-hourglass-half"></i> <b>Please wait.</b> ${ahead} people are ahead of you.${ewt > 0 ? ` Estimated wait ~${ewt} min.` : ' A reliable time estimate is not available.'}`;
       }
     }
 

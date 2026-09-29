@@ -395,13 +395,13 @@
           <div class="ac-header">
             <div class="ac-icon"><i class="fa-solid fa-ticket"></i></div>
             <div>
-              <div class="ac-title">Book a Consultation Token</div>
+              <div class="ac-title" data-i18n="index.cta.book">Book a Consultation Token</div>
               <div class="ac-sub">Choose your hospital, doctor &amp; get your live digital pass.</div>
             </div>
           </div>
         </div>
         <a href="book.html" class="btn btn-green btn-block btn-lg" style="margin-top:14px;text-decoration:none;">
-          <i class="fa-solid fa-calendar-check"></i> Book Online Token
+          <i class="fa-solid fa-calendar-check"></i> <span data-i18n="index.cta.book">Book Online Token</span>
         </a>
       </div>
 
@@ -411,7 +411,7 @@
           <div class="ac-header">
             <div class="ac-icon"><i class="fa-solid fa-clock-rotate-left"></i></div>
             <div>
-              <div class="ac-title">Track My Token Status</div>
+              <div class="ac-title" data-i18n="index.cta.track">Track My Token Status</div>
               <div class="ac-sub">See your waiting position and doctor progress live.</div>
             </div>
           </div>
@@ -427,7 +427,7 @@
 
     <!-- How it works explanation -->
     <div class="how-it-works">
-      <div class="hiw-title">How TokSpot Saves Patient &amp; Doctor Time</div>
+      <div class="hiw-title" data-i18n="index.how.title">How TokSpot Saves Patient &amp; Doctor Time</div>
       <div class="hiw-grid">
         <div class="hiw-step">
           <i class="fa-solid fa-mobile-screen"></i>
@@ -512,7 +512,9 @@
 
   <script src="js/firebase-config.js"></script>
   <script src="js/app.js"></script>
+  <script src="js/i18n.js"></script>
   <script>
+    if (window.I18N) I18N.init();
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => navigator.serviceWorker.register('/sw.js').catch(()=>{}));
     }

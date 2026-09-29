@@ -72,6 +72,23 @@
     .tv-chip-num { font-size: 1.8rem; font-weight: 900; color: #f8fafc; }
     .tv-chip-doc { font-size: 0.88rem; font-weight: 700; color: #94a3b8; }
 
+    /* Doctor status strip (Open / On Break / Closed) */
+    .tv-doctor-strip {
+      display: flex; flex-wrap: wrap; gap: 10px; padding: 4px 0 14px;
+    }
+    .tv-doc-chip {
+      display: flex; align-items: center; gap: 8px;
+      background: #0f172a; border: 1px solid #334155; border-radius: 30px;
+      padding: 7px 14px; font-size: 0.82rem; font-weight: 700; color: #cbd5e1;
+    }
+    .tv-doc-chip .dot { width: 9px; height: 9px; border-radius: 50%; }
+    .tv-doc-chip.dot-open { border-color: #2A835F; }
+    .tv-doc-chip .dot-open { background: #34d399; }
+    .tv-doc-chip.dot-break { border-color: #d97706; background: rgba(217,119,6,0.08); }
+    .tv-doc-chip .dot-break { background: #f59e0b; }
+    .tv-doc-chip.dot-closed { border-color: #64748b; opacity: 0.65; }
+    .tv-doc-chip .dot-closed { background: #64748b; }
+
     /* Audio Enable Banner (Fixes Autoplay Restrictions) */
     .audio-banner {
       position: fixed; top: 12px; left: 50%; transform: translateX(-50%);
@@ -119,14 +136,18 @@
       <div style="display:flex;align-items:center;gap:12px;">
         <span class="tv-hospital-name" id="tvHospName">Hospital Name</span>
         <span style="background:rgba(139,187,146,0.15);color:#8BBB92;font-size:0.82rem;font-weight:800;padding:4px 10px;border-radius:8px;" id="tvHospCode">HOSP-CODE</span>
+        <span id="tvWaitChip" class="hidden" style="background:rgba(251,191,36,0.12);color:#fbbf24;font-size:0.82rem;font-weight:800;padding:4px 10px;border-radius:8px;"><i class="fa-solid fa-clock"></i> <span id="tvWaitChipLabel">~15 min wait</span></span>
       </div>
       <div class="tv-clock" id="tvLiveClock">--:--:--</div>
     </div>
 
+    <!-- Doctor status strip (Open / On Break / Closed per room) -->
+    <div class="tv-doctor-strip" id="tvDoctorStrip"></div>
+
     <div class="tv-body">
       <!-- Currently Called Hero Card -->
       <div class="hero-box">
-        <span class="hero-badge"><i class="fa-solid fa-bullhorn"></i> Now Calling</span>
+        <span class="hero-badge"><i class="fa-solid fa-bullhorn"></i> <span data-i18n="display.calling">Now Calling</span></span>
         <div class="hero-token" id="tvActiveNum">—</div>
         <div class="hero-patient" id="tvActivePatient">Waiting for next token…</div>
         <div class="hero-meta" id="tvActiveDoctor">Doctor Consultation</div>
@@ -134,7 +155,7 @@
 
       <!-- Upcoming Queue List -->
       <div class="queue-box">
-        <div class="queue-title"><i class="fa-solid fa-hourglass-half"></i> Next in Line (Waiting)</div>
+        <div class="queue-title"><i class="fa-solid fa-hourglass-half"></i> <span data-i18n="display.next">Next in Line (Waiting)</span></div>
         <div class="waiting-list" id="tvWaitingList">
           <div style="color:#64748b;font-weight:600;padding:20px;">No patients waiting in line.</div>
         </div>
@@ -156,8 +177,11 @@
   <script src="js/app.js"></script>
   <script src="js/firebase.js"></script>
   <script src="js/api.js"></script>
+  <script src="js/i18n.js"></script>
   <script>
     // Inline failsafes to guarantee zero ReferenceError crashes
+    // I18N.init may be called again safely after DOM is ready:
+    try { if (window.I18N) I18N.init(); } catch (e) {}
     window.escHtml = window.escHtml || function(s) {
       return String(s == null ? '' : s)
         .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
@@ -181,6 +205,7 @@
 
     let activeHospitalSlug = null;
     let unsubTvTokens = null;
+    let unsubTvDoctors = null;
     let lastCalledTokenKey = null;
     let tvPollTimer = null;
     const FUNC = window.TokSpotAPI && window.TokSpotAPI.mode() === 'functions';
@@ -310,6 +335,7 @@
       if (!confirm('Disconnect this TV display from the current hospital?')) return;
       localStorage.removeItem('tokspot_tv_hospital_code');
       if (unsubTvTokens) { unsubTvTokens(); unsubTvTokens = null; }
+      if (unsubTvDoctors) { unsubTvDoctors(); unsubTvDoctors = null; }
       if (tvPollTimer) { clearInterval(tvPollTimer); tvPollTimer = null; }
       activeHospitalSlug = null;
       document.getElementById('tvDashboard').classList.add('hidden');
@@ -328,6 +354,7 @@
     function startTvRealtimeSync(slug) {
       if (FUNC) { startTvFeedPolling(slug); return; }
       if (unsubTvTokens) unsubTvTokens();
+      if (unsubTvDoctors) unsubTvDoctors();
       const today = window.todayStr ? window.todayStr() : new Date().toISOString().slice(0, 10);
 
       const tokensRef = window._fs.collection(window._db, 'hospitals', slug, 'tokens');
@@ -351,10 +378,52 @@
           }
         });
 
-        renderTvBoard(called, waiting);
+        renderTvBoard(called, waiting, computeTvExtra(waiting, called));
       }, (err) => {
         console.error('Realtime sync error:', err);
       });
+
+      // Prototype doctor strip: live status (open / on break / closed)
+      const docsRef = window._fs.collection(window._db, 'hospitals', slug, 'doctors');
+      unsubTvDoctors = window._fs.onSnapshot(docsRef, (snap) => {
+        const doctors = snap.docs.map((d) => ({
+          name: d.data().name || 'Doctor',
+          department: d.data().department || '',
+          counter: d.data().counter || d.data().room || '',
+          onBreak: Boolean(d.data().onBreak),
+          breakNote: d.data().breakNote || '',
+          displayStatus: d.data().status === 'closed' ? 'closed' : (d.data().onBreak ? 'break' : 'open'),
+        })).filter((doc) => doc.displayStatus !== 'closed');
+        renderTvDoctorStrip(doctors);
+      }, (err) => {
+        console.error('Doctor strip sync error:', err);
+      });
+    }
+
+    function computeTvExtra(waiting, called) {
+      if (!window.TokspotQueue) return { waitEstimateMinutes: null, doctors: [] };
+      const served = called.filter((t) => t.calledAt && t.createdAt);
+      const avg = window.TokspotQueue.averageWaitMinutes(served);
+      const ewt = window.TokspotQueue.estimateWaitMinutes({ waitingCount: waiting.length, avgServeMinutes: avg });
+      return { waitEstimateMinutes: ewt, doctors: [] };
+    }
+
+    function renderTvDoctorStrip(doctors) {
+      const strip = document.getElementById('tvDoctorStrip');
+      if (!doctors || !doctors.length) {
+        strip.innerHTML = '';
+        strip.classList.add('hidden');
+        return;
+      }
+      strip.innerHTML = doctors.map((doc) => {
+        const st = doc.displayStatus || 'open';
+        const label = st === 'break' ? 'On Break' : (st === 'closed' ? 'Closed' : 'Open');
+        const note = doc.breakNote ? ` · ${escHtml(doc.breakNote)}` : '';
+        return `<span class="tv-doc-chip dot-${st}" title="${escHtml(doc.name || 'Doctor')}${note}">
+          <span class="dot dot-${st}"></span>${escHtml(doc.name || 'Doctor')} · ${label}${note}
+        </span>`;
+      }).join('');
+      strip.classList.remove('hidden');
     }
 
     // Shared board rendering (normalizes Firestore Timestamps and
@@ -367,7 +436,7 @@
       return 0;
     }
 
-    function renderTvBoard(called, waiting) {
+    function renderTvBoard(called, waiting, extra) {
       // Sort called tokens by calledAt timestamp (latest called takes Hero card)
       called.sort((a, b) => {
         return tvMillis(b.calledAt) - tvMillis(a.calledAt);
@@ -404,6 +473,33 @@
 
       // Render upcoming queue list
       renderWaitingList(waiting);
+
+      // Hall-level measured/estimate wait chip
+      const waitChip = document.getElementById('tvWaitChip');
+      const waitLabel = document.getElementById('tvWaitChipLabel');
+      if (extra && Number.isFinite(extra.waitEstimateMinutes) && extra.waitEstimateMinutes > 0) {
+        waitChip.classList.remove('hidden');
+        waitLabel.textContent = `~${extra.waitEstimateMinutes} min wait for next slot`;
+      } else {
+        waitChip.classList.add('hidden');
+      }
+
+      // Doctor status strip
+      const strip = document.getElementById('tvDoctorStrip');
+      if (extra && Array.isArray(extra.doctors) && extra.doctors.length) {
+        strip.innerHTML = extra.doctors.map((doc) => {
+          const st = doc.displayStatus || (doc.onBreak ? 'break' : (doc.status === 'closed' ? 'closed' : 'open'));
+          const label = st === 'break' ? 'On Break' : (st === 'closed' ? 'Closed' : 'Open');
+          const note = doc.breakNote ? ` · ${escHtml(doc.breakNote)}` : '';
+          return `<span class="tv-doc-chip dot-${st}" title="${escHtml(doc.name || 'Doctor')}${note}">
+            <span class="dot dot-${st}"></span>${escHtml(doc.name || 'Doctor')} · ${label}${note}
+          </span>`;
+        }).join('');
+        strip.classList.remove('hidden');
+      } else {
+        strip.innerHTML = '';
+        strip.classList.add('hidden');
+      }
     }
 
     // Functions mode: poll the sanitized TV feed (no PII, no client reads).
@@ -416,7 +512,10 @@
             ...s,
             id: `tv-${s.number}-${s.calledAt || 0}`,
           }));
-          renderTvBoard(called, board.waiting || []);
+          renderTvBoard(called, board.waiting || [], {
+            waitEstimateMinutes: board.waitEstimateMinutes,
+            doctors: board.doctors || [],
+          });
         } catch (e) {
           console.error('TV feed error:', e);
         }

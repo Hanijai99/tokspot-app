@@ -97,23 +97,33 @@
 
       <!-- Select Doctor -->
       <div class="field">
-        <label class="label"><i class="fa-solid fa-user-doctor"></i> Select Consultation Doctor</label>
+        <label class="label"><i class="fa-solid fa-user-doctor"></i> <span data-i18n="book.step.doctor">Select Consultation Doctor</span></label>
         <div id="doctorOptionsList" style="margin-top: 8px;"></div>
+      </div>
+
+      <!-- Advanced Appointment (optional) -->
+      <div class="field mt-16">
+        <label class="label"><i class="fa-solid fa-calendar-check"></i> <span data-i18n="book.appt.title">Book Advanced Appointment</span> <span class="muted" style="font-weight:600;font-size:.78rem;" data-i18n="book.appt.sub">(optional — skip for a walk-in token)</span></label>
+        <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap;" id="apptDateRow"></div>
+        <div id="apptSlotsWrap" class="hidden" style="margin-top:10px;background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:12px;">
+          <div class="muted" style="font-size:.8rem;margin-bottom:8px;"><span data-i18n="book.appt.pick">Pick a time slot</span> (<span id="apptSlotsDateLabel">—</span>)</div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;" id="apptSlotsRow"><div class="muted" style="font-size:.8rem;">Loading slots…</div></div>
+        </div>
       </div>
 
       <!-- Patient Information -->
       <div class="field mt-16">
-        <label class="label">Patient Full Name <span class="req">*</span></label>
+        <label class="label"><span data-i18n="book.step.name">Patient Full Name</span> <span class="req">*</span></label>
         <input class="input" id="patName" type="text" placeholder="e.g. Rahul Sharma" />
       </div>
 
       <div class="field">
-        <label class="label">Mobile Number <span class="req">*</span> <span class="muted">(for live queue alerts)</span></label>
+        <label class="label"><span data-i18n="book.step.phone">Mobile Number</span> <span class="req">*</span> <span class="muted" data-i18n="book.step.phone.sub">(for live queue alerts)</span></label>
         <input class="input" id="patPhone" type="tel" maxlength="10" placeholder="10-digit mobile number" />
       </div>
 
       <button class="btn btn-green btn-block btn-lg mt-20" id="btnSubmitToken" onclick="generatePatientToken()">
-        <i class="fa-solid fa-ticket"></i> Confirm &amp; Get Live Token
+        <i class="fa-solid fa-ticket"></i> <span data-i18n="book.cta.token">Confirm &amp; Get Live Token</span>
       </button>
 
       <button class="btn btn-slate btn-block mt-10" onclick="resetHospitalSelection()" style="background:transparent;border:none;">
@@ -128,7 +138,9 @@
   <script src="js/firebase.js"></script>
   <script src="js/queue-domain.js"></script>
   <script src="js/api.js"></script>
+  <script src="js/i18n.js"></script>
   <script>
+    if (window.I18N) I18N.init();
     window.escHtml = window.escHtml || function(s) {
       return String(s == null ? '' : s)
         .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
@@ -158,6 +170,9 @@
     let selectedDoctorId = null;
     let selectedDoctorName = 'Doctor';
     let hospitalDirectory = [];
+    let apptDate = null;
+    let apptSlot = null;
+    let apptSlotsCache = null;
     const FUNC = window.TokSpotAPI && window.TokSpotAPI.mode() === 'functions';
     const resolvedHospitalCache = {};
 
@@ -374,7 +389,7 @@
         } else {
           await ensureAuth();
           const snap = await window._fs.getDocs(window._fs.collection(window._db, 'hospitals', slug, 'doctors'));
-          doctors = snap.docs.map(d => ({ id: d.id, status: d.data().status, name: d.data().name, department: d.data().department }));
+          doctors = snap.docs.map(d => ({ id: d.id, status: d.data().status, onBreak: Boolean(d.data().onBreak), breakNote: d.data().breakNote || '', name: d.data().name, department: d.data().department }));
         }
 
         list.innerHTML = '';
@@ -389,6 +404,11 @@
         doctors.forEach(doc => {
           if (doc.status === 'closed') return;
 
+          const onBreak = Boolean(doc.onBreak) || doc.displayStatus === 'break';
+          const availability = onBreak
+            ? `<span style="font-size:0.8rem;font-weight:800;color:#d97706;"><i class="fa-solid fa-mug-hot"></i> On Break${doc.breakNote ? ' — ' + escHtml(doc.breakNote) : ''}</span>`
+            : `<span style="font-size:0.8rem;font-weight:800;color:var(--green);"><i class="fa-solid fa-circle-check"></i> Available</span>`;
+
           const div = document.createElement('div');
           div.className = `doc-radio ${isFirst ? 'selected' : ''}`;
           div.onclick = () => selectDoctor(doc.id, doc.name || 'Doctor', div);
@@ -399,7 +419,7 @@
               <div style="font-weight:700;font-size:0.95rem;color:var(--ink);">${escHtml(doc.name || 'Doctor')}</div>
               <div class="muted" style="font-size:0.8rem;">${escHtml(doc.department || 'Consultation')}</div>
             </div>
-            <span style="font-size:0.8rem;font-weight:800;color:var(--green);"><i class="fa-solid fa-circle-check"></i> Available</span>
+            ${availability}
           `;
           list.appendChild(div);
 
@@ -419,6 +439,135 @@
       selectedDoctorName = docName;
       document.querySelectorAll('.doc-radio').forEach(el => el.classList.remove('selected'));
       element.classList.add('selected');
+      resetApptPicker();
+      renderApptDates();
+    }
+
+    // ---- Advanced appointment picker ----
+    function resetApptPicker() {
+      apptDate = null;
+      apptSlot = null;
+      apptSlotsCache = null;
+      document.getElementById('apptSlotsWrap').classList.add('hidden');
+    }
+
+    function apptSlotWindows(schedule, dateStr) {
+      const windows = [];
+      if (Array.isArray(schedule) && schedule.length) {
+        const day = new Date(dateStr + 'T00:00:00Z').getUTCDay();
+        schedule.forEach((s) => {
+          if (Number(s.day) === day && s.start < s.end) windows.push({ start: s.start, end: s.end });
+        });
+      } else {
+        windows.push({ start: '09:00', end: '13:00' });
+      }
+      return windows;
+    }
+
+    function allApptSlots(windows) {
+      const out = [];
+      const mins = (t) => { const m = /^(\d{1,2}):(\d{2})$/.exec(String(t)); return m ? Number(m[1]) * 60 + Number(m[2]) : null; };
+      const fmt = (t) => String(Math.floor(t / 60)).padStart(2, '0') + ':' + String(t % 60).padStart(2, '0');
+      for (const w of windows) {
+        let cur = mins(w.start);
+        const end = mins(w.end);
+        if (cur === null || end === null) continue;
+        while (cur + 15 <= end) { out.push(fmt(cur)); cur += 15; }
+      }
+      return out;
+    }
+
+    function renderApptDates() {
+      const row = document.getElementById('apptDateRow');
+      if (!row) return;
+      const today = window.todayStr ? window.todayStr() : new Date().toISOString().slice(0, 10);
+      const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+      row.innerHTML = '';
+      apptDate = null;
+      apptSlot = null;
+      document.getElementById('apptSlotsWrap').classList.add('hidden');
+
+      for (let i = 0; i < 7; i++) {
+        const d = new Date(new Date(today + 'T00:00:00Z').getTime() + i * 86400000);
+        const iso = d.toISOString().slice(0, 10);
+        const label = i === 0 ? (window.I18N ? I18N.t('book.appt.today') : 'Today')
+          : i === 1 ? (window.I18N ? I18N.t('book.appt.tomorrow') : 'Tomorrow')
+          : dayNames[d.getUTCDay()] + ' ' + String(d.getUTCDate()).padStart(2, '0');
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'btn btn-sm btn-slate';
+        btn.style.cssText = 'border-radius:10px;font-weight:800;font-size:.8rem;';
+        btn.textContent = label;
+        btn.onclick = () => {
+          apptDate = iso;
+          apptSlot = null;
+          row.querySelectorAll('button').forEach(b => b.style.borderColor = '');
+          btn.style.borderColor = 'var(--green)';
+          loadApptSlots(iso);
+        };
+        row.appendChild(btn);
+      }
+    }
+
+    async function loadApptSlots(iso) {
+      const wrap = document.getElementById('apptSlotsWrap');
+      const box = document.getElementById('apptSlotsRow');
+      const dateLabel = document.getElementById('apptSlotsDateLabel');
+      wrap.classList.remove('hidden');
+      box.innerHTML = '<div class="muted" style="font-size:.8rem;">Loading slots…</div>';
+      const parts = iso.split('-');
+      dateLabel.textContent = `${parts[2]}/${parts[1]}/${parts[0]}`;
+
+      try {
+        let slots = [];
+        const takenSet = new Set();
+        if (FUNC) {
+          const res = await window.TokSpotAPI.listAvailableSlots({ slug: targetHospitalSlug, doctorId: selectedDoctorId, date: iso });
+          (res.slots || []).forEach((s) => {
+            slots.push(s.start);
+            if (s.taken) takenSet.add(s.start);
+          });
+        } else {
+          await ensureAuth();
+          const doctorSnap = await window._fs.getDoc(window._fs.doc(window._db, 'hospitals', targetHospitalSlug, 'doctors', selectedDoctorId));
+          const schedule = doctorSnap.exists() ? (doctorSnap.data().schedule || null) : null;
+          slots = allApptSlots(apptSlotWindows(schedule, iso));
+          const apptSnap = await window._fs.getDocs(window._fs.query(
+            window._fs.collection(window._db, 'hospitals', targetHospitalSlug, 'appointments'),
+            window._fs.where('doctorId', '==', selectedDoctorId),
+            window._fs.where('date', '==', iso)
+          ));
+          apptSnap.docs.forEach((d) => {
+            const a = d.data();
+            if (a.status === 'booked' || a.status === 'arrived') takenSet.add(a.slotStart);
+          });
+        }
+
+        if (!slots.length) {
+          box.innerHTML = '<div class="muted" style="font-size:.8rem;">No consultation windows on this date for this doctor.</div>';
+          return;
+        }
+        apptSlotsCache = { date: iso, slots, takenSet };
+        box.innerHTML = '';
+        slots.forEach((s) => {
+          const taken = takenSet.has(s);
+          const btn = document.createElement('button');
+          btn.type = 'button';
+          btn.className = 'btn btn-sm ' + (taken ? 'btn-slate' : 'btn-green');
+          btn.style.cssText = 'border-radius:10px;font-weight:800;font-size:.8rem;' + (taken ? 'opacity:.45;text-decoration:line-through;cursor:not-allowed;' : '');
+          btn.textContent = s;
+          btn.disabled = taken;
+          btn.onclick = () => {
+            apptSlot = s;
+            box.querySelectorAll('button').forEach(b => b.style.outline = '');
+            btn.style.outline = '3px solid var(--ink)';
+          };
+          box.appendChild(btn);
+        });
+      } catch (e) {
+        console.error('Slot load error:', e);
+        box.innerHTML = '<div class="muted" style="font-size:.8rem;">Could not load slots: ' + escHtml(e.message) + '</div>';
+      }
     }
 
     function resetHospitalSelection() {
@@ -439,7 +588,61 @@
       if (!phone || phone.length !== 10) return showToast('Please enter a valid 10-digit mobile number.', true);
       if (!selectedDoctorId) return showToast('Please select a doctor.', true);
 
+      const isAppointment = Boolean(apptDate && apptSlot);
+
       btn.disabled = true;
+
+      if (isAppointment) {
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Booking Appointment Slot...';
+        try {
+          await ensureAuth();
+          if (FUNC) {
+            await window.TokSpotAPI.createAppointment({
+              slug: targetHospitalSlug,
+              doctorId: selectedDoctorId,
+              date: apptDate,
+              slotStart: apptSlot,
+              name,
+              phone,
+            });
+          } else {
+            await window._fs.addDoc(
+              window._fs.collection(window._db, 'hospitals', targetHospitalSlug, 'appointments'),
+              {
+                doctorId: selectedDoctorId,
+                doctorName: selectedDoctorName || 'Doctor',
+                date: apptDate,
+                slotStart: apptSlot,
+                patientName: name,
+                phone,
+                status: 'booked',
+                tokenId: null,
+                createdBy: 'patient',
+                createdAt: window._fs.serverTimestamp ? window._fs.serverTimestamp() : new Date(),
+              }
+            );
+          }
+          const parts = apptDate.split('-');
+          const niceDate = `${parts[2]}/${parts[1]}/${parts[0]}`;
+          showToast(`Appointment booked for ${niceDate} at ${apptSlot}!`);
+          setTimeout(() => {
+            document.getElementById('stepDetails').classList.add('hidden');
+            document.getElementById('stepCode').classList.remove('hidden');
+            document.getElementById('patName').value = '';
+            document.getElementById('patPhone').value = '';
+            resetApptPicker();
+            document.getElementById('hospitalSearchInput').value = '';
+          }, 350);
+          return;
+        } catch (err) {
+          console.error('Appointment Booking Error:', err);
+          showToast('Appointment booking failed: ' + err.message, true);
+          btn.disabled = false;
+          btn.innerHTML = '<i class="fa-solid fa-ticket"></i> Confirm &amp; Get Live Token';
+          return;
+        }
+      }
+
       btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Generating Token...';
 
       try {
