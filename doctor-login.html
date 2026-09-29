@@ -21,7 +21,7 @@
     .divider::before, .divider::after { content: ''; flex: 1; border-bottom: 1px solid var(--line); }
     .divider span { padding: 0 12px; }
     .pin-box { text-align: center; letter-spacing: 8px; font-size: 1.4rem; font-weight: 800; }
-    body.dark { background: var(--night-bg); }
+    body.dark { background: #092328; }
     body.dark .auth-card { background: #12544F; border-color: #1E5C50; }
     body.dark .form-control { background: #092328; border-color: #1E5C50; color: #f8fafc; }
     body.dark .auth-title { color: #f8fafc; }
@@ -41,7 +41,7 @@
   <div class="auth-wrapper">
     <div class="auth-card card">
       <div class="auth-title"><i class="fa-solid fa-user-doctor" style="color:var(--green)"></i> Doctor Portal</div>
-      <div class="auth-sub">Secure consultation desk authentication</div>
+      <div class="auth-sub">Doctor access is unavailable until Firebase Auth accounts and server-enforced roles are provisioned.</div>
 
       <!-- Station Credentials -->
       <div class="form-group">
@@ -52,7 +52,7 @@
       <!-- Method 1: Fast 4-Digit Room PIN -->
       <div class="form-group">
         <label style="text-align:center;">Doctor 4-Digit PIN <span class="req">*</span></label>
-        <input type="password" maxlength="4" id="stationPin" class="form-control pin-box" placeholder="••••" />
+        <input type="password" maxlength="4" id="stationPin" class="form-control pin-box" placeholder="PIN sign-in disabled" disabled />
       </div>
       <button id="btnPinLogin" class="btn btn-submit btn-green mt-8" onclick="doctorPinLogin()">
         <i class="fa-solid fa-door-open"></i> Open Doctor Station
@@ -64,11 +64,11 @@
       <div>
         <div class="form-group">
           <label>Doctor Email or Name</label>
-          <input type="text" id="loginEmail" class="form-control" placeholder="doctor@hospital.com" />
+          <input type="text" id="loginEmail" class="form-control" placeholder="Firebase Auth provisioning required" disabled />
         </div>
         <div class="form-group">
           <label>Assigned Room PIN</label>
-          <input type="password" maxlength="4" id="loginPinAlt" class="form-control pin-box" placeholder="••••" />
+          <input type="password" maxlength="4" id="loginPinAlt" class="form-control pin-box" placeholder="PIN sign-in disabled" disabled />
         </div>
         <button id="btnEmailLogin" class="btn btn-submit btn-slate" onclick="doctorEmailPinLogin()">
           <i class="fa-solid fa-id-badge"></i> Sign In with Email & PIN
@@ -108,190 +108,16 @@
       if (savedHosp) document.getElementById('hospCode').value = savedHosp.toUpperCase();
     });
 
-    async function ensureAuth() {
-      if (!window._auth.currentUser) {
-        try { await window._useAuth.signInAnonymously(window._auth); } catch(e){}
-      }
-    }
-
-    // Checks PIN against both SHA-256 hashed and legacy plain text
-    function checkPinMatch(storedPin, inputRaw, inputHashed) {
-      if (!storedPin) return false;
-      const cleanStored = String(storedPin).trim();
-      return cleanStored === inputHashed || cleanStored === inputRaw;
-    }
-
     // 1. Fast PIN Login
     async function doctorPinLogin() {
-      const hospInput = document.getElementById('hospCode').value.trim().toUpperCase();
-      const rawPin = document.getElementById('stationPin').value.trim();
-      const btn = document.getElementById('btnPinLogin');
-
-      if (!hospInput) return showToast('Please enter Hospital Code.', true);
-      if (rawPin.length !== 4) return showToast('Enter 4-digit PIN.', true);
-
-      btn.disabled = true;
-      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Checking...';
-
-      try {
-        await ensureAuth();
-
-        const hashedPin = await (window.hashPin ? window.hashPin(rawPin) : rawPin);
-
-        const hospSnap = await window._fs.getDocs(window._fs.collection(window._db, 'hospitals'));
-        if (hospSnap.empty) {
-          alert('No hospitals found in database! Please check Admin dashboard.');
-          return;
-        }
-
-        const cleanInput = hospInput.replace(/^HOSP-?/i, '');
-        const targetHospDoc = hospSnap.docs.find(d => {
-          const data = d.data();
-          const c = (data.hospitalCode || data.code || '').toUpperCase();
-          return c === hospInput || c.replace(/^HOSP-?/i, '') === cleanInput || d.id.toUpperCase() === hospInput;
-        });
-
-        if (!targetHospDoc) {
-          alert(`Hospital Code "${hospInput}" not found! Check your code in Admin page.`);
-          return;
-        }
-
-        const hospSlug = targetHospDoc.id;
-        const hospData = targetHospDoc.data();
-
-        const docSnap = await window._fs.getDocs(
-          window._fs.collection(window._db, 'hospitals', hospSlug, 'doctors')
-        );
-
-        let matchedDoc = null;
-        if (!docSnap.empty) {
-          matchedDoc = docSnap.docs.find(d => checkPinMatch(d.data().pin, rawPin, hashedPin));
-        }
-
-        // Fallback root search
-        if (!matchedDoc) {
-          try {
-            const rootDocSnap = await window._fs.getDocs(window._fs.collection(window._db, 'doctors'));
-            matchedDoc = rootDocSnap.docs.find(d => {
-              const dData = d.data();
-              return checkPinMatch(dData.pin, rawPin, hashedPin) && (dData.hospitalSlug === hospSlug || !dData.hospitalSlug);
-            });
-          } catch(e) {}
-        }
-
-        if (!matchedDoc) {
-          alert(`Invalid PIN! No active doctor found with PIN "${rawPin}" in ${hospData.name || hospSlug}.`);
-          return;
-        }
-
-        completeDoctorLogin(matchedDoc.id, matchedDoc.data(), hospSlug, hospData);
-
-      } catch (err) {
-        console.error('Login error details:', err);
-        alert('Firebase Error: ' + err.message);
-      } finally {
-        btn.disabled = false;
-        btn.innerHTML = '<i class="fa-solid fa-door-open"></i> Open Doctor Station';
-      }
+      showToast('Doctor PIN sign-in is disabled until Firebase Auth accounts and server-enforced doctor roles are provisioned.', true, 5000);
     }
 
     // 2. Email & PIN Login
     async function doctorEmailPinLogin() {
-      const hospInput = document.getElementById('hospCode').value.trim().toUpperCase();
-      const emailOrName = document.getElementById('loginEmail').value.trim().toLowerCase();
-      const rawPin = document.getElementById('loginPinAlt').value.trim();
-      const btn = document.getElementById('btnEmailLogin');
-
-      if (!hospInput) return showToast('Please enter Hospital Code.', true);
-      if (!emailOrName) return showToast('Enter doctor email or name.', true);
-      if (rawPin.length !== 4) return showToast('Enter 4-digit PIN.', true);
-
-      btn.disabled = true;
-      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Checking...';
-
-      try {
-        await ensureAuth();
-
-        const hashedPin = await (window.hashPin ? window.hashPin(rawPin) : rawPin);
-
-        const hospSnap = await window._fs.getDocs(window._fs.collection(window._db, 'hospitals'));
-        const cleanInput = hospInput.replace(/^HOSP-?/i, '');
-        const targetHospDoc = hospSnap.docs.find(d => {
-          const data = d.data();
-          const c = (data.hospitalCode || data.code || '').toUpperCase();
-          return c === hospInput || c.replace(/^HOSP-?/i, '') === cleanInput || d.id.toUpperCase() === hospInput;
-        });
-
-        if (!targetHospDoc) {
-          alert(`Hospital Code "${hospInput}" not found!`);
-          return;
-        }
-
-        const hospSlug = targetHospDoc.id;
-        const hospData = targetHospDoc.data();
-
-        const docSnap = await window._fs.getDocs(
-          window._fs.collection(window._db, 'hospitals', hospSlug, 'doctors')
-        );
-
-        let matchedDoc = null;
-        if (!docSnap.empty) {
-          matchedDoc = docSnap.docs.find(d => {
-            const doc = d.data();
-            const dEmail = (doc.email || '').toLowerCase().trim();
-            const dName = (doc.name || '').toLowerCase().trim();
-            const emailMatch = dEmail === emailOrName || dName.includes(emailOrName);
-            return emailMatch && checkPinMatch(doc.pin, rawPin, hashedPin);
-          });
-        }
-
-        if (!matchedDoc) {
-          try {
-            const rootDocSnap = await window._fs.getDocs(window._fs.collection(window._db, 'doctors'));
-            matchedDoc = rootDocSnap.docs.find(d => {
-              const doc = d.data();
-              const dEmail = (doc.email || '').toLowerCase().trim();
-              const dName = (doc.name || '').toLowerCase().trim();
-              const emailMatch = dEmail === emailOrName || dName.includes(emailOrName);
-              return emailMatch && checkPinMatch(doc.pin, rawPin, hashedPin);
-            });
-          } catch(e) {}
-        }
-
-        if (!matchedDoc) {
-          alert('Doctor Email/Name or PIN does not match any record.');
-          return;
-        }
-
-        completeDoctorLogin(matchedDoc.id, matchedDoc.data(), hospSlug, hospData);
-
-      } catch (err) {
-        console.error('Email Login Error:', err);
-        alert('Error: ' + err.message);
-      } finally {
-        btn.disabled = false;
-        btn.innerHTML = '<i class="fa-solid fa-id-badge"></i> Sign In with Email & PIN';
-      }
+      showToast('Email + PIN sign-in is disabled until Firebase Auth accounts and server-enforced doctor roles are provisioned.', true, 5000);
     }
 
-    function completeDoctorLogin(docId, docData, hospSlug, hospData) {
-      const activeDoctor = {
-        id: docId,
-        ...docData,
-        hospitalSlug: hospSlug,
-        hospitalName: hospData.name || hospSlug,
-        hospitalCode: hospData.hospitalCode || hospData.code || hospSlug
-      };
-
-      sessionStorage.setItem('activeDoctor', JSON.stringify(activeDoctor));
-      sessionStorage.setItem('tokmark_frontdesk_hospital', activeDoctor.hospitalCode);
-
-      showToast(`Welcome Dr. ${docData.name || ''}!`);
-
-      setTimeout(() => {
-        window.location.href = `doctor.html?code=${encodeURIComponent(activeDoctor.hospitalCode)}&did=${encodeURIComponent(docId)}`;
-      }, 350);
-    }
   </script>
 </body>
 </html>

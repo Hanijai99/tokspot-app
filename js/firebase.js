@@ -19,7 +19,7 @@
     try {
       const { initializeApp } = await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js');
       const { 
-        getFirestore, doc, getDoc, setDoc, updateDoc, deleteDoc,
+        getFirestore, doc, getDoc, setDoc, updateDoc, deleteDoc, deleteField,
         collection, query, where, orderBy, limit, onSnapshot,
         addDoc, getDocs, serverTimestamp, increment, runTransaction 
       } = await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js');
@@ -43,7 +43,7 @@
       
       // Expose all firestore methods including runTransaction
       window._fs = {
-        doc, getDoc, setDoc, updateDoc, deleteDoc,
+        doc, getDoc, setDoc, updateDoc, deleteDoc, deleteField,
         collection, query, where, orderBy, limit, onSnapshot,
         addDoc, getDocs, serverTimestamp, increment, runTransaction
       };

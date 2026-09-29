@@ -28,19 +28,13 @@
   --shadow-md:0 8px 24px rgba(9,35,40,.08);
   --shadow-lg:0 16px 48px rgba(9,35,40,.12);
   --ease:.22s cubic-bezier(.4,0,.2,1);
-
-  /* Night gradient background — 60/30/10 (color order preserved) */
-  --night-bg: linear-gradient(180deg,#093C5D 0%,#093C5D 60%,#3B7597 90%,#6FD1D7 97%,#5DF8D8 100%);
-
-  /* Day (light) gradient background — cream base + brand colors in order */
-  --day-bg: linear-gradient(180deg,#F4F0E4 0%,#F4F0E4 60%,#3B7597 90%,#6FD1D7 96%,#5DF8D8 100%);
 }
 
 * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
 html { scroll-behavior:smooth; }
 body {
   font-family:'Inter','Segoe UI',system-ui,-apple-system,sans-serif;
-  background:var(--day-bg); color:var(--ink);
+  background:var(--bg); color:var(--ink);
   min-height:100vh; -webkit-font-smoothing:antialiased;
   padding:0 16px calc(24px + env(safe-area-inset-bottom));
 }
@@ -260,7 +254,7 @@ select.input { appearance:none; cursor:pointer; background-image:url("data:image
 /* =============================================================
    DARK MODE
    ============================================================= */
-body.dark { background:var(--night-bg); color:#e2e8f0; }
+body.dark { background:#092328; color:#e2e8f0; }
 body.dark .card, body.dark .mgmt-card, body.dark .stat { background:#12544F; border-color:#1E5C50; }
 body.dark .input { background:#0f172a; border-color:#2A6A5E; color:#f1f5f9; }
 body.dark .input:focus { border-color:#8BBB92; box-shadow:0 0 0 4px rgba(139,187,146,.14); }
@@ -279,37 +273,4 @@ body.dark .divider { background:#1E5C50; }
 body.dark .theme-toggle { background:#12544F; }
 body.dark .empty { color:#94a3b8; }
 body.dark .chip.gray, body.dark .slot.off, body.dark .badge.gray { background:#1E5C50; color:#cbd5e1; }
-
-/* =============================================================
-   RESPONSIVE — MOBILE
-   ============================================================= */
-@media (max-width: 640px) {
-  body { padding:0 14px calc(20px + env(safe-area-inset-bottom)); }
-  .topbar { gap:8px; height:56px; }
-  .topbar .brand { font-size:1.05rem; }
-  .topbar .brand .logomark { width:32px; height:32px; }
-  .card { padding:16px; }
-  .stat { padding:13px 8px; }
-  .stat .n { font-size:1.45rem; }
-  .qrow { padding:12px; gap:10px; }
-  .qrow .qnum { width:44px; height:44px; font-size:1.1rem; }
-  .toast-wrap { width:calc(100% - 28px); }
-  .theme-toggle { width:44px; height:44px; right:12px; bottom:14px; font-size:1.05rem; }
-}
-
-@media (max-width: 560px) {
-  .stats { grid-template-columns:repeat(2,1fr) !important; }
-  .steps { gap:5px; }
-  .step .lbl { font-size:.74rem; }
-  .stepper { width:22px; height:22px; font-size:.68rem; }
-  .btn-row > .btn { padding:14px 12px; }
-  .htitle { font-size:1.3rem; }
-}
-
-@media (max-width: 390px) {
-  .stats { grid-template-columns:1fr !important; }
-  .token-hero .t-num { font-size:4rem; letter-spacing:3px; }
-  .token-ticket .big { font-size:3.4rem; letter-spacing:2px; }
-  .card { padding:14px; }
-}
 

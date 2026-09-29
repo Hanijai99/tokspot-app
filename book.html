@@ -12,7 +12,7 @@
   <link rel="apple-touch-icon" href="logo.png" />
 
   <style>
-    body { background: var(--day-bg); color: var(--ink); font-family: system-ui, -apple-system, sans-serif; }
+    body { background: #f8fafc; color: var(--ink); font-family: system-ui, -apple-system, sans-serif; }
     .book-container { max-width: 480px; margin: 30px auto; padding: 0 16px; }
     .step-card {
       background: #ffffff; border: 1px solid var(--line); border-radius: 20px;
@@ -44,7 +44,7 @@
     .search-item:hover { background: #f1f5f9; }
     .search-item:last-child { border-bottom: none; }
     
-    body.dark { background: var(--night-bg); }
+    body.dark { background: #092328; }
     body.dark .step-card { background: #12544F; border-color: #1E5C50; }
     body.dark .doc-radio { border-color: #1E5C50; background: #0f172a; }
     body.dark .doc-radio.selected { border-color: var(--green); background: #12544F; }
@@ -126,6 +126,8 @@
   <script src="js/firebase-config.js"></script>
   <script src="js/app.js"></script>
   <script src="js/firebase.js"></script>
+  <script src="js/queue-domain.js"></script>
+  <script src="js/api.js"></script>
   <script>
     window.escHtml = window.escHtml || function(s) {
       return String(s == null ? '' : s)
@@ -403,47 +405,21 @@
 
       try {
         await ensureAuth();
-        const today = window.todayStr ? window.todayStr() : new Date().toISOString().slice(0, 10);
-        const counterRef = window._fs.doc(window._db, 'hospitals', targetHospitalSlug, 'counters', today);
-
-        let createdTokenId = '';
-        const tokenNum = await window._fs.runTransaction(window._db, async (transaction) => {
-          const counterDoc = await transaction.get(counterRef);
-          let nextCount = 1;
-          if (counterDoc.exists()) {
-            nextCount = (counterDoc.data().count || 0) + 1;
-            transaction.update(counterRef, { count: nextCount });
-          } else {
-            transaction.set(counterRef, { count: 1 });
-          }
-
-          const tNum = pad3(nextCount);
-          const tokenId = `${today}-${selectedDoctorId}-${nextCount}`;
-          createdTokenId = tokenId;
-
-          const tokenDocRef = window._fs.doc(window._db, 'hospitals', targetHospitalSlug, 'tokens', tokenId);
-
-          transaction.set(tokenDocRef, {
-            id: tokenId,
-            number: tNum,
-            patientName: name,
-            phone: phone,
-            doctorId: selectedDoctorId,
-            doctorName: selectedDoctorName,
-            hospitalId: targetHospitalSlug,
+        const { tokenNum, tokenId } = await window.TokSpotAPI.issueToken({
+          slug: targetHospitalSlug,
+          doctorId: selectedDoctorId,
+          doctorName: selectedDoctorName,
+          name,
+          phone,
+          priority: false,
+          counter: 'Counter A',
+          source: 'self',
+          extra: {
             hospitalSlug: targetHospitalSlug,
-            date: today,
-            department: 'consultation',
-            status: 'waiting',
-            source: 'self',
-            bookedFrom: 'online',
-            createdAt: window._fs.serverTimestamp(),
-            priority: false,
-            counter: 'Counter A'
-          });
-
-          return tNum;
+            bookedFrom: 'online'
+          }
         });
+        const createdTokenId = tokenId;
 
         showToast(`Token #${tokenNum} booked successfully!`);
         setTimeout(() => {

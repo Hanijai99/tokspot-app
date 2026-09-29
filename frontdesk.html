@@ -82,11 +82,6 @@
         grid-template-columns: 1fr 1fr;
       }
     }
-    @media (max-width: 400px) {
-      .command-bar {
-        grid-template-columns: 1fr;
-      }
-    }
   </style>
 </head>
 <body>
@@ -279,6 +274,8 @@
   <script src="js/firebase-config.js"></script>
   <script src="js/app.js"></script>
   <script src="js/firebase.js"></script>
+  <script src="js/queue-domain.js"></script>
+  <script src="js/api.js"></script>
   <script>
     window.escHtml = window.escHtml || function(s) {
       return String(s == null ? '' : s)
@@ -558,8 +555,6 @@
               <div class="qmeta">${t.phone?('<i class="fa-solid fa-phone"></i> '+escHtml(t.phone)):''}${t.source?' · '+t.source:''}</div>
               <div class="btn-row mt-12" style="flex-wrap:wrap;">
                 <button class="btn btn-green btn-sm" onclick="setStatus('${t.id}','called')"><i class="fa-solid fa-bullhorn"></i> Call</button>
-                <button class="btn btn-mint btn-sm" onclick="setStatus('${t.id}','completed')"><i class="fa-solid fa-check"></i> Done</button>
-                <button class="btn btn-slate btn-sm" onclick="setStatus('${t.id}','skipped')" style="color:#b91c1c;"><i class="fa-solid fa-user-xmark"></i> Skip / Absent</button>
                 <button class="btn btn-slate btn-sm" onclick="printSingleSlip('${t.id}')"><i class="fa-solid fa-print"></i> Print</button>
                 <button class="btn btn-slate btn-sm" onclick="notifyPatient('${t.id}','sms')"><i class="fa-solid fa-message"></i> SMS</button>
                 <button class="btn btn-slate btn-sm" onclick="notifyPatient('${t.id}','wa')"><i class="fa-brands fa-whatsapp"></i> WA</button>
@@ -621,10 +616,14 @@
 
     async function recoverPatient(id) {
       try {
-        await window._fs.updateDoc(window._fs.doc(window._db, 'hospitals', currentHospital, 'tokens', id), {
-          status: 'waiting',
-          priority: true,
-          recoveredAt: window._fs.serverTimestamp()
+        await window.TokSpotAPI.transition({
+          slug: currentHospital,
+          tokenId: id,
+          nextStatus: 'waiting',
+          changes: {
+            priority: true,
+            recoveredAt: window._fs.serverTimestamp()
+          }
         });
         showToast('Patient restored to queue with priority!');
       } catch (e) { showToast('Recovery failed: ' + e.message, true); }
@@ -697,47 +696,24 @@
 
       const isPriority = document.getElementById('newPriority').checked;
       const counter = document.getElementById('newCounter').value;
-      const counterRef = window._fs.doc(window._db, 'hospitals', currentHospital, 'counters', today);
 
       try {
         await ensureAuth();
         let createdTokenId = '';
         
-        const tokenNum = await window._fs.runTransaction(window._db, async (transaction) => {
-          const counterDoc = await transaction.get(counterRef);
-          let nextCount = 1;
-          if (counterDoc.exists()) {
-            nextCount = (counterDoc.data().count || 0) + 1;
-            transaction.update(counterRef, { count: nextCount });
-          } else {
-            transaction.set(counterRef, { count: 1 });
-          }
-          
-          const tNum = pad3(nextCount);
-          const tokenId = `${today}-${currentDoctor}-${nextCount}`;
-          createdTokenId = tokenId;
-          lastIssuedTokenId = tokenId;
-          
-          const tokenDocRef = window._fs.doc(window._db, 'hospitals', currentHospital, 'tokens', tokenId);
-
-          transaction.set(tokenDocRef, {
-            id: tokenId,
-            number: tNum,
-            patientName: name,
-            phone: phone || '',
-            doctorId: currentDoctor,
-            doctorName: currentDoctorName,
-            hospitalId: currentHospital,
-            date: today,
-            department: 'consultation',
-            status: 'waiting',
-            source: mode,
-            createdAt: window._fs.serverTimestamp(),
-            priority: isPriority,
-            counter: counter
-          });
-          return tNum;
+        const issued = await window.TokSpotAPI.issueToken({
+          slug: currentHospital,
+          doctorId: currentDoctor,
+          doctorName: currentDoctorName,
+          name,
+          phone,
+          priority: isPriority,
+          counter,
+          source: mode
         });
+        const tokenNum = issued.tokenNum;
+        createdTokenId = issued.tokenId;
+        lastIssuedTokenId = issued.tokenId;
 
         document.getElementById('newName').value = '';
         document.getElementById('newPhone').value = '';
@@ -788,11 +764,7 @@
 
     async function setStatus(id, status) {
       try {
-        await window._fs.updateDoc(window._fs.doc(window._db, 'hospitals', currentHospital, 'tokens', id), { 
-          status, 
-          calledAt: status === 'called' ? window._fs.serverTimestamp() : null,
-          updatedAt: window._fs.serverTimestamp() 
-        });
+        await window.TokSpotAPI.transition({ slug: currentHospital, tokenId: id, nextStatus: status });
 
         if (status === 'called') { 
           playBeep(); 

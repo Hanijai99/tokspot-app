@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+  
   <script src="js/loader.js"></script>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
@@ -29,7 +30,7 @@
       --primary-dark: #1F6B4C;
       --teal: #2A835F;
     }
-    body { background: var(--day-bg); color: var(--ink); margin: 0; padding-bottom: 20px; font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
+    body { background: #f8fafc; color: var(--ink); margin: 0; padding-bottom: 20px; font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
 
     /* Topbar Navigation */
     .landing-nav {
@@ -266,7 +267,7 @@
     .footer-links a:hover { color: var(--primary); }
 
     /* Dark Mode */
-    body.dark { background: var(--night-bg); }
+    body.dark { background: #092328; }
     body.dark .landing-nav { background: rgba(9, 35, 40, 0.9); border-color: #1E5C50; }
     body.dark .brand-logo { color: #f8fafc; }
     body.dark .main-title { color: #f1f5f9; }
@@ -285,28 +286,6 @@
       .portals-grid { grid-template-columns: 1fr 1fr; }
       .main-title { font-size: 2.1rem; }
       .landing-footer { flex-direction: column; text-align: center; }
-      .hiw-grid { grid-template-columns: 1fr; gap: 18px; }
-    }
-
-    @media (max-width: 640px) {
-      .landing-nav { padding: 12px 14px; gap: 8px; flex-wrap: wrap; }
-      .nav-actions { gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
-      .nav-actions .btn-sm { padding: 9px 11px; font-size: 0.82rem; }
-      .portals-grid { grid-template-columns: 1fr 1fr; gap: 8px; }
-      .portal-link { padding: 14px 6px; font-size: 0.82rem; }
-      .hero-container { padding: 28px 14px 12px; }
-    }
-
-    @media (max-width: 480px) {
-      .nav-actions a[onclick*="togglePrivacyModal"] { display: none; }
-      .brand-logo { font-size: 1.1rem; }
-      .main-title { font-size: 1.85rem; }
-      .main-subtitle { font-size: 0.95rem; }
-      .cta-row .btn-lg { padding: 14px 16px; font-size: 0.95rem; }
-      .brand-badge { width: 56px; height: 56px; }
-      .preview-box { padding: 16px; }
-      .preview-token { padding: 16px; }
-      .preview-num { font-size: 3.2rem; }
     }
   </style>
 </head>
@@ -505,19 +484,19 @@
         <h3 style="color:var(--ink, #0f172a);margin:14px 0 6px;">1. Information We Collect</h3>
         <p>TokSpot collects minimal required information solely to facilitate outpatient (OPD) queueing and doctor consultation calling:</p>
         <ul>
-          <li><b>Patient Details:</b> Name and contact number provided during walk-in or self-booking for queue SMS notifications and display board identification.</li>
-          <li><b>Doctor &amp; Staff Data:</b> Doctor name, room/counter designation, email address, and hashed authentication PINs.</li>
+          <li><b>Patient Details:</b> Name and contact number may be collected for staff queue operations and notifications. Patient names are not shown on the waiting-room display or token pass.</li>
+          <li><b>Doctor &amp; Staff Data:</b> Doctor name, room/counter designation, and email address. PIN sign-in is disabled while secure Firebase Auth provisioning is implemented.</li>
           <li><b>Hospital Information:</b> Hospital name, station branch city, and unique routing identifiers (Hospital Code).</li>
         </ul>
 
         <h3 style="color:var(--ink, #0f172a);margin:14px 0 6px;">2. How Data Is Used</h3>
-        <p>All collected queue tokens are utilized exclusively for real-time synchronization between waiting room smart TVs, receptionist desks, and doctor consultation rooms via secure Google Firestore cloud databases.</p>
+        <p>Queue records currently synchronize through Firebase Firestore. Hospital data isolation depends on deployed Firestore rules and server-side authorization; this repository does not yet provide those production controls.</p>
 
         <h3 style="color:var(--ink, #0f172a);margin:14px 0 6px;">3. Data Security &amp; Encryption</h3>
-        <p>Doctor PIN credentials are encrypted and hashed before cloud persistence. We do not sell, rent, or lease patient phone numbers or clinical consultation notes to third parties or advertising brokers.</p>
+        <p>Do not enter clinical notes or other sensitive medical information. The current app is not production-ready for real patient data until Firestore rules, server-side role checks, audit logging, and retention controls are deployed. Legacy doctor PIN fields require migration and deletion.</p>
 
         <h3 style="color:var(--ink, #0f172a);margin:14px 0 6px;">4. Retention &amp; Auto-Expiry</h3>
-        <p>OPD daily token records are associated with that business date and are archived or marked expired upon the close of the daily clinical shift by hospital administrators.</p>
+        <p>Queue records include a business date, but automatic archival and deletion are not implemented in this repository. Hospitals must not rely on automatic expiry until a retention job and deletion policy are deployed.</p>
 
         <h3 style="color:var(--ink, #0f172a);margin:14px 0 6px;">5. Contact Us</h3>
         <p>For administrative data inquiries or hospital profile de-registration, contact your healthcare provider desk or write to our support desk.</p>
@@ -547,7 +526,7 @@
         else alert('Please enter your token or hospital code');
         return;
       }
-      window.location.href = `book.html?code=${encodeURIComponent(num)}`;
+      window.location.href = `token.html?t=${encodeURIComponent(num)}`;
     }
 
     function togglePrivacyModal(show) {

@@ -8,7 +8,7 @@
   <link rel="stylesheet" href="css/style.css" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
   <style>
-    body { background: var(--day-bg); font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    body { background: #f8fafc; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
     .tracker-card { max-width: 440px; margin: 24px auto; background: #fff; border-radius: 20px; box-shadow: 0 10px 25px rgba(0,0,0,0.05); padding: 24px; text-align: center; }
     .token-badge { display: inline-block; background: #D7EBE0; color: #2A835F; padding: 6px 16px; border-radius: 99px; font-weight: 700; font-size: 0.85rem; }
     .hero-number { font-size: 4.5rem; font-weight: 900; color: #0f172a; margin: 12px 0 4px; letter-spacing: -2px; }
@@ -21,13 +21,6 @@
     .meta-box { background: #f8fafc; border-radius: 12px; padding: 14px 10px; }
     .meta-val { font-size: 1.4rem; font-weight: 800; color: #0f172a; }
     .meta-lbl { font-size: 0.75rem; color: #64748b; font-weight: 600; text-transform: uppercase; margin-top: 2px; }
-
-    @media (max-width: 420px) {
-      .tracker-card { margin: 12px auto; padding: 18px 14px; }
-      .hero-number { font-size: 3.4rem; }
-      .meta-grid { gap: 8px; }
-      .meta-box { padding: 12px 8px; }
-    }
   </style>
 </head>
 <body>
@@ -53,7 +46,7 @@
 
     <div class="meta-box mt-16" style="margin-top:12px;background:#ECF6EF;border:1px solid #D3E9DB;">
       <div class="meta-val" id="estWait" style="font-size:1.15rem;color:#1F6B4C;">Calculating…</div>
-      <div class="meta-lbl" style="color:#2A835F;">Approx Wait Time</div>
+      <div class="meta-lbl" style="color:#2A835F;">Queue Update</div>
     </div>
 
     <div id="calledAlert" class="hidden" style="margin-top: 16px; padding: 14px; border-radius: 12px; background: #fee2e2; border: 1px solid #f87171; color: #b91c1c; font-weight: 700;">
@@ -136,8 +129,9 @@
           document.getElementById('nowServing').textContent = currentCalled;
           document.getElementById('peopleAhead').textContent = aheadCount;
           
-          const estMinutes = aheadCount * 5; // avg 5 mins per patient
-          document.getElementById('estWait').textContent = aheadCount === 0 ? 'Any minute now!' : `~${estMinutes} mins (${aheadCount} ahead)`;
+          document.getElementById('estWait').textContent = aheadCount === 0
+            ? 'No one is ahead of you'
+            : `${aheadCount} people ahead; no reliable time estimate`;
         }
       );
     }

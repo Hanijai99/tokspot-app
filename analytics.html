@@ -101,6 +101,7 @@
   <script src="js/firebase-config.js"></script>
   <script src="js/app.js"></script>
   <script src="js/firebase.js"></script>
+  <script src="js/queue-domain.js"></script>
   <script>
     let currentTokensCache = [];
     let currentHospitalSlug = '';
@@ -109,16 +110,24 @@
     window.addEventListener('load', async () => {
       hk.applyDark();
       await initFirebase();
-      await loadHospitals();
+      await waitForFB();
+      const user = await new Promise((resolve) => {
+        window._useAuth.onAuthStateChanged(window._auth, resolve);
+      });
+      if (!user) {
+        window.location.replace('admin.html');
+        return;
+      }
+      await loadHospitals(user);
     });
 
-    async function loadHospitals() {
+    async function loadHospitals(user) {
       await waitForFB();
       if (!window._FB_READY) return;
       try {
         const snap = await window._fs.getDocs(window._fs.collection(window._db, 'hospitals'));
         const sel = document.getElementById('hospitalSelect');
-        snap.docs.forEach(d => { 
+        snap.docs.filter(d => window.TokspotQueue.isHospitalAdmin(user, d.data())).forEach(d => {
           const h = d.data(); 
           const o = document.createElement('option'); 
           o.value = d.id; 
@@ -126,6 +135,11 @@
           o.textContent = (h.name || d.id) + (h.city ? ' — ' + h.city : ''); 
           sel.appendChild(o); 
         });
+        const requestedHospital = new URLSearchParams(window.location.search).get('h');
+        if (requestedHospital && [...sel.options].some(option => option.value === requestedHospital)) {
+          sel.value = requestedHospital;
+          await loadAnalytics();
+        }
       } catch (e) { showToast('Failed to load: ' + e.message, true); }
     }
 
@@ -145,6 +159,10 @@
 
       const today = window.todayStr();
       try {
+        const selectedHospital = await window._fs.getDoc(window._fs.doc(window._db, 'hospitals', currentHospitalSlug));
+        if (!selectedHospital.exists() || !window.TokspotQueue.isHospitalAdmin(window._auth.currentUser, selectedHospital.data())) {
+          throw new Error('You are not authorized to view this hospital report.');
+        }
         const snap = await window._fs.getDocs(window._fs.query(
           window._fs.collection(window._db, 'hospitals', currentHospitalSlug, 'tokens'),
           window._fs.where('date', '==', today)
@@ -176,7 +194,8 @@
         document.getElementById('kWait').textContent = wait;
         document.getElementById('kSkip').textContent = skip;
         document.getElementById('kCanc').textContent = canc;
-        document.getElementById('kAvg').textContent = done > 0 ? (Math.round((total / done) * 0.8) || 1) + 'm' : '—';
+        const avgWait = window.TokspotQueue.averageWaitMinutes(currentTokensCache);
+        document.getElementById('kAvg').textContent = avgWait === null ? '—' : `${avgWait}m`;
         
         renderChart(counts);
 

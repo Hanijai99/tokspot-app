@@ -10,7 +10,7 @@
   <link rel="manifest" href="manifest.json" />
   <link rel="icon" type="image/png" href="logo.png" />
   <style>
-    body { background: var(--day-bg); color: var(--ink); margin: 0; padding-bottom: 40px; }
+    body { background: #f8fafc; color: var(--ink); margin: 0; padding-bottom: 40px; }
     .pass-container { max-width: 440px; margin: 30px auto; padding: 0 16px; }
 
     /* Digital Boarding Pass */
@@ -56,17 +56,11 @@
       100% { transform: scale(1); }
     }
 
-    body.dark { background: var(--night-bg); }
+    body.dark { background: #092328; }
     body.dark .token-ticket { background: #12544F; border-color: #1E5C50; }
     body.dark .stat-pill { background: #0f172a; border-color: #1E5C50; }
     body.dark .stat-val { color: #f1f5f9; }
     body.dark .token-big-num { color: #8BBB92; }
-
-    @media (max-width: 420px) {
-      .pass-container { margin: 16px auto; }
-      .token-big-num { font-size: 3.8rem; }
-      .stat-pill { padding: 10px 12px; }
-    }
   </style>
 </head>
 <body>
@@ -109,8 +103,6 @@
       <div class="ticket-body">
         <div class="muted" style="font-size:0.75rem;font-weight:800;text-transform:uppercase;letter-spacing:1px;">Your Token Number</div>
         <div class="token-big-num" id="tNumber">--</div>
-        <div style="font-weight:700;font-size:1rem;color:var(--ink);" id="tPatientName">—</div>
-
         <!-- Live Queue Metrics -->
         <div class="status-grid">
           <div class="stat-pill">
@@ -184,24 +176,26 @@
       const today = window.todayStr ? window.todayStr() : new Date().toISOString().slice(0,10);
       try {
         const hospitalsSnap = await window._fs.getDocs(window._fs.collection(window._db, 'hospitals'));
-        let found = null;
+        const normalizedNumber = String(num).replace(/^0+/, '') || '0';
+        const matches = [];
 
         for (const hDoc of hospitalsSnap.docs) {
           const tSnap = await window._fs.getDocs(
             window._fs.query(
               window._fs.collection(window._db, 'hospitals', hDoc.id, 'tokens'),
-              window._fs.where('number', '==', isNaN(num) ? num : Number(num)),
               window._fs.where('date', '==', today)
             )
           );
-          if (!tSnap.empty) {
-            found = { slug: hDoc.id, id: tSnap.docs[0].id };
-            break;
-          }
+          tSnap.docs.forEach((tokenDoc) => {
+            const tokenNumber = String(tokenDoc.data().number || '').replace(/^0+/, '') || '0';
+            if (tokenNumber === normalizedNumber) matches.push({ slug: hDoc.id, id: tokenDoc.id });
+          });
         }
 
-        if (found) {
-          initTokenListener(found.slug, found.id);
+        if (matches.length === 1) {
+          initTokenListener(matches[0].slug, matches[0].id);
+        } else if (matches.length > 1) {
+          showError('That token number exists at more than one hospital. Use the private tracking link from your token pass.');
         } else {
           showError(`No active token found matching "${num}" for today.`);
         }
@@ -276,9 +270,8 @@
         banner.className = 'arrival-banner banner-ready';
         text.innerHTML = '<i class="fa-solid fa-car-side"></i> <b>Please arrive now.</b> You are almost next in line (2 people ahead).';
       } else {
-        const estMinutes = ahead * 6;
         banner.className = 'arrival-banner banner-wait';
-        text.innerHTML = `<i class="fa-solid fa-couch"></i> <b>Relax at home.</b> ${ahead} people ahead of you (~${estMinutes} mins wait).`;
+        text.innerHTML = `<i class="fa-solid fa-hourglass-half"></i> <b>Please wait.</b> ${ahead} people are ahead of you. A reliable time estimate is not available.`;
       }
     }
 
@@ -289,7 +282,6 @@
       document.getElementById('subActions').classList.remove('hidden');
 
       document.getElementById('tNumber').textContent = `#${t.number}`;
-      document.getElementById('tPatientName').textContent = t.patientName || 'Patient';
       document.getElementById('tDate').textContent = t.date || '--';
       document.getElementById('tStatusTag').textContent = t.status || 'waiting';
 

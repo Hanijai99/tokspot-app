@@ -9,7 +9,7 @@
   <link rel="icon" type="image/png" href="logo.png?v=2" />
   <script src="js/loader.js"></script>
   <style>
-    body { background: var(--night-bg); color: #f8fafc; font-family: system-ui, -apple-system, sans-serif; line-height: 1.6; margin: 0; padding-bottom: 60px; }
+    body { background: #092328; color: #f8fafc; font-family: system-ui, -apple-system, sans-serif; line-height: 1.6; margin: 0; padding-bottom: 60px; }
     .privacy-container { max-width: 820px; margin: 40px auto; padding: 0 20px; }
     .header-box { border-bottom: 1px solid #1E5C50; padding-bottom: 24px; margin-bottom: 32px; }
     .brand-link { display: inline-flex; align-items: center; gap: 10px; color: #8BBB92; font-size: 1.3rem; font-weight: 900; text-decoration: none; margin-bottom: 16px; }
@@ -49,27 +49,26 @@
       <h2><i class="fa-solid fa-database"></i> 2. Information We Collect</h2>
       <ul>
         <li><strong>Station Administrative Data:</strong> Hospital or clinic name, branch city, primary administrator phone number, and official verified email address.</li>
-        <li><strong>Temporary Queue Data:</strong> Patient token sequence numbers, patient mobile numbers for queue tracking, and assigned consultation room IDs. (Tokens auto-archive after the day's session).</li>
-        <li><strong>Staff Profiles:</strong> Doctor names, department designations, and designated station passcodes.</li>
+        <li><strong>Queue Data:</strong> Token sequence numbers, patient names and mobile numbers, queue timestamps, and assigned room IDs. Automatic expiry is not implemented.</li>
+        <li><strong>Staff Profiles:</strong> Doctor names, email addresses, departments, and room assignments. PIN sign-in is disabled; legacy PIN fields must be removed through a controlled migration.</li>
       </ul>
     </div>
 
     <!-- Section 3: Doctor Credential & Transfer Isolation Policy -->
     <div class="policy-section" style="border-color: rgba(139, 187, 146, 0.3);">
       <h2><i class="fa-solid fa-user-shield"></i> 3. Doctor Departure & Station Decoupling <span class="badge-highlight">Critical</span></h2>
-      <p>To prevent cross-hospital data leakage and ensure clinic confidentiality:</p>
+      <p>Secure doctor access is not currently available. Do not use the doctor station with real patient data until Firebase Auth identities and server-enforced doctor roles are provisioned.</p>
       <ul>
-        <li><strong>Station-Scoped Access:</strong> A doctor's login credentials and room access are locked exclusively to the issuing hospital station code.</li>
-        <li><strong>Immediate Relieving / Revocation:</strong> When a doctor moves to another hospital or resigns, the station administrator has instant authority in <code>admin.html</code> to permanently revoke the doctor's access.</li>
-        <li><strong>Zero Residual Access:</strong> Once access is revoked, active sessions are immediately terminated. The doctor cannot view patient queues, upcoming appointments, or contact details of their previous clinic.</li>
-        <li><strong>Cross-Clinic Independence:</strong> If the doctor joins another clinic utilizing TokMark, they must be registered anew with isolated station permissions under the new clinic's administrator.</li>
+        <li>Browser storage and frontend checks are not access controls; the doctor desk now requires a Firebase Auth UID linked to the canonical doctor profile.</li>
+        <li>Administrative profile changes do not replace backend account revocation or forced session revocation.</li>
+        <li>Do not enter clinical notes; TokSpot is an OPD queue product, not an EHR.</li>
       </ul>
     </div>
 
     <!-- Section 4: Communication & Storage -->
     <div class="policy-section">
       <h2><i class="fa-solid fa-lock"></i> 4. Data Security & Storage</h2>
-      <p>All queue states and station records are stored on enterprise Google Cloud Firestore infrastructure with real-time TLS 1.3 encryption in transit and AES-256 at rest. Station tokens are isolated by strict security rules so no hospital can access another hospital's live OPD queues.</p>
+      <p>Data is stored in Firebase Firestore. This repository contains no Firestore rules or trusted backend, so tenant isolation, role authorization, audit logging, and retention are not yet production-enforced. Firestore's platform encryption does not replace those controls. Do not store real patient data until they are deployed and tested.</p>
     </div>
 
     <div class="btn-action-wrap">

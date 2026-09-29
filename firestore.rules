@@ -1,0 +1,129 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ============================================================
+    //  TokSpot secure Firestore rules (TARGET architecture)
+    // ============================================================
+    //  DEPLOYMENT PRECONDITION: the static pages must first migrate
+    //  their token/issuance/transition/tracking calls to the Cloud
+    //  Functions in /functions (issueToken, transitionToken,
+    //  getTokenStatus, cancelToken, registerPushToken, getTvFeed,
+    //  provisionDoctor, revokeDoctor). This ruleset DENIES the broad
+    //  client queries the prototype uses today (per-tenant scans,
+    //  anonymous token writes). Do NOT deploy these rules on top of
+    //  the un-migrated static site or it will stop working.
+    //
+    //  Design decisions (see PRODUCTION_READINESS.md):
+    //  - Default deny: every collection must opt in explicitly.
+    //  - Clients NEVER write tokens, counters, locks, or audit events;
+    //    those go through Admin-SDK Functions (rules bypass is not
+    //    needed there — Functions run with Admin credentials).
+    //  - Private fields (patientName, phone, doctorNotes) live only in
+    //    the private tokens collection. TV/pass feeds are served by the
+    //    sanitized getTvFeed / getTokenStatus callables.
+    //  - Administrators (email/password Firebase Auth users) keep direct
+    //    access to their own hospital doc + doctors/rooms subcollections,
+    //    gated by the adminUid/adminEmail stored on the hospital doc.
+    // ============================================================
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    // Users provisioned without an email claim (or logged in anonymously)
+    // never have `request.auth.token.email` — check the claim exists before
+    // reading it, otherwise rules evaluation throws instead of denying.
+    function callerEmail() {
+      return ('email' in request.auth.token) ? request.auth.token.email : null;
+    }
+
+    function isAdminOf(slug) {
+      return signedIn() && (
+        get(/databases/$(database)/documents/hospitals/$(slug)).data.adminUid == request.auth.uid ||
+        get(/databases/$(database)/documents/hospitals/$(slug)).data.adminEmail == callerEmail()
+      );
+    }
+
+    function isDoctorOf(slug, docId) {
+      return signedIn() && get(
+        /databases/$(database)/documents/hospitals/$(slug)/doctors/$(docId)
+      ).data.authUid == request.auth.uid;
+    }
+
+    // ---------- Hospitals ----------
+    // Admins manage their own hospital. Doctors and admin can read the
+    // (private) hospital doc; other visitors get data only via callables.
+    match /hospitals/{slug} {
+      allow read: if isAdminOf(slug);
+      allow create, update: if isAdminOf(slug);
+      allow delete: if isAdminOf(slug);
+    }
+
+    // ---------- Doctors ----------
+    // Doctor read access is bound to the doctor's Firebase Auth UID
+    // (authUid is set by provisionDoctor — never by the browser).
+    match /hospitals/{slug}/doctors/{docId} {
+      allow read: if isAdminOf(slug) || isDoctorOf(slug, docId);
+      allow create, update, delete: if isAdminOf(slug);
+    }
+
+    // ---------- Rooms ----------
+    // Read by admins only; doctors receive their counter assignment via
+    // the getDoctorQueue callable (no direct client reads here).
+    match /hospitals/{slug}/rooms/{roomId} {
+      allow read, write: if isAdminOf(slug);
+    }
+
+    // ---------- Tokens (private) ----------
+    // Doctors read the day's queue; admins read for reporting. All token
+    // WRITES (issue/call/skip/complete/cancel/requeue) go through the
+    // Functions layer so transition rules + the active-token lock cannot
+    // be bypassed by a modified client.
+    match /hospitals/{slug}/tokens/{tokenId} {
+      allow get, list: if isAdminOf(slug);
+      allow write: if false; // server-side API only
+    }
+
+    // ---------- Counters (number uniqueness) ----------
+    // Only the Functions issuance transaction may move counters.
+    match /hospitals/{slug}/counters/{date} {
+      allow read: if isAdminOf(slug);
+      allow write: if false; // handled inside issueToken
+    }
+
+    // ---------- queueState (active token lock) ----------
+    // Bookkeeping for the per-doctor/per-day active token lock.
+    // Written only inside the Functions transition transaction.
+    match /hospitals/{slug}/queueState/{lockId} {
+      allow read: if isAdminOf(slug);
+      allow write: if false; // server-side API only
+    }
+
+    // ---------- SMS outbox ----------
+    // Enqueued by the Functions layer only. A trusted worker (Cloud
+    // Task / Pub/Sub subscriber) consumes rows and records delivery.
+    match /sms_queue/{docId} {
+      allow read, write: if false; // Functions + worker only
+    }
+
+    // ---------- Push token registry ----------
+    // Patients register their device FCM token via registerPushToken
+    // (callable), which keyed them under their hospital.
+    match /hospitals/{slug}/pushTokens/{token} {
+      allow read, write: if false; // Functions only
+    }
+
+    // ---------- Audit log (append-only via Functions) ----------
+    function canReadAuditEvent(eventId) {
+      return (
+        exists(/databases/$(database)/documents/auditLog/$(eventId)) &&
+        isAdminOf(get(/databases/$(database)/documents/auditLog/$(eventId)).data.slug)
+      );
+    }
+    match /auditLog/{eventId} {
+      allow read: if canReadAuditEvent(eventId);
+      allow write: if false; // Functions only
+    }
+  }
+}

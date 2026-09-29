@@ -59,12 +59,6 @@
         padding-top: 40px;
       }
     }
-
-    @media (max-width: 600px) {
-      [style*="grid-template-columns:1fr 1fr"] { grid-template-columns:1fr !important; }
-      .key-box { padding: 12px; }
-      .key-box .badge-code, .key-box .badge-rcv { font-size: 0.72rem; }
-    }
   </style>
 </head>
 <body>
@@ -93,11 +87,6 @@
       </div>
       <button class="btn btn-green btn-block btn-lg" id="btnLogin" onclick="adminLogin()"><i class="fa-solid fa-right-to-bracket"></i> Sign In</button>
       
-      <div style="margin-top: 18px; font-size: 0.84rem;">
-        <a href="#" onclick="toggleRecoveryModal(true)" style="color:var(--slate-500);text-decoration:none;font-weight:600;">
-          <i class="fa-solid fa-key"></i> Forgot Hospital Code? Recover Here
-        </a>
-      </div>
     </section>
 
     <!-- 2. Isolated Admin Dashboard -->
@@ -165,8 +154,8 @@
               <input class="input" id="docEmail" type="email" placeholder="doctor@hospital.com" />
             </div>
             <div class="field">
-              <label class="label">4-Digit Room PIN <span class="req">*</span></label>
-              <input class="input" id="docPin" type="password" maxlength="4" placeholder="••••" style="letter-spacing:4px;font-weight:700;" />
+              <label class="label">Doctor PIN Login</label>
+              <input class="input" id="docPin" type="password" maxlength="4" placeholder="Disabled pending secure account provisioning" disabled />
             </div>
           </div>
 
@@ -290,13 +279,6 @@
         .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
     };
 
-    async function createSha256Pin(plainPin) {
-      const enc = new TextEncoder();
-      const hashBuffer = await crypto.subtle.digest('SHA-256', enc.encode(String(plainPin).trim()));
-      const hashArray = Array.from(new Uint8Array(hashBuffer));
-      return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-    }
-
     let activeAdminUser = null;
     let assignedHospitalSlug = null;
     let currentHospitalCode = '';
@@ -313,6 +295,12 @@
 
         window._useAuth.onAuthStateChanged(window._auth, async (u) => {
           if (u) {
+            if (!u.emailVerified) {
+              await window._useAuth.signOut(window._auth);
+              showLoggedOutState();
+              showToast('Verify your admin email before opening the hospital workspace.', true, 5000);
+              return;
+            }
             activeAdminUser = u;
             await resolveAdminHospital(u);
           } else {
@@ -418,7 +406,6 @@
       infoBox.innerHTML = '<div class="muted"><i class="fa-solid fa-spinner fa-spin"></i> Fetching hospital records...</div>';
 
       try {
-        const userEmail = (user.email || '').toLowerCase().trim();
         let matchedDoc = null;
 
         const snap = await window._fs.getDocs(window._fs.collection(window._db, 'hospitals'));
@@ -426,14 +413,9 @@
         if (!snap.empty) {
           matchedDoc = snap.docs.find(d => {
             const data = d.data();
-            const aEmail = (data.adminEmail || data.email || data.ownerEmail || '').toLowerCase().trim();
-            const aUid = data.adminUid || data.uid || '';
-            return aEmail === userEmail || aUid === user.uid;
+            const aUid = data.adminUid || '';
+            return aUid === user.uid;
           });
-
-          if (!matchedDoc && snap.docs.length === 1) {
-            matchedDoc = snap.docs[0];
-          }
         }
 
         if (!matchedDoc) {
@@ -454,17 +436,16 @@
         const hData = matchedDoc.data();
 
         const hCode = hData.hospitalCode || hData.code || ('HOSP-' + Math.floor(1000 + Math.random() * 9000));
-        const rKey = hData.recoveryKey || ('RCV-' + Math.random().toString(36).substring(2, 6).toUpperCase() + '-' + Math.random().toString(36).substring(2, 6).toUpperCase());
         currentHospitalCode = hCode;
 
-        renderHospitalHeader(assignedHospitalSlug, { ...hData, hospitalCode: hCode, recoveryKey: rKey });
+        renderHospitalHeader(assignedHospitalSlug, { ...hData, hospitalCode: hCode });
         generateHospitalBookingQr(assignedHospitalSlug, hData.name || assignedHospitalSlug, hCode);
         loadDoctorList();
 
-        if (!hData.hospitalCode || !hData.recoveryKey || !hData.adminEmail) {
+        if (!hData.hospitalCode || !hData.adminEmail || hData.recoveryKey) {
           window._fs.updateDoc(window._fs.doc(window._db, 'hospitals', assignedHospitalSlug), {
             hospitalCode: hCode,
-            recoveryKey: rKey,
+            recoveryKey: window._fs.deleteField(),
             adminEmail: user.email,
             adminUid: user.uid
           }).catch(() => {});
@@ -483,9 +464,6 @@
 
       const slug = name.toLowerCase().replace(/[^a-z0-9]/g, '-').replace(/-+/g, '-').slice(0, 30);
       const hCode = 'HOSP-' + Math.floor(1000 + Math.random() * 9000);
-      const p1 = Math.random().toString(36).substring(2, 6).toUpperCase();
-      const p2 = Math.random().toString(36).substring(2, 6).toUpperCase();
-      const rKey = `RCV-${p1}-${p2}`;
 
       try {
         await window._fs.setDoc(window._fs.doc(window._db, 'hospitals', slug), {
@@ -494,7 +472,6 @@
           adminUid: uid,
           adminEmail: email,
           hospitalCode: hCode,
-          recoveryKey: rKey,
           createdAt: window._fs.serverTimestamp()
         });
         showToast('Hospital created successfully!');
@@ -516,21 +493,13 @@
           <span class="badge green">Authorized Station</span>
         </div>
 
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:14px;">
+        <div style="display:grid;grid-template-columns:1fr;gap:12px;margin-top:14px;">
           <div class="key-box">
             <div>
               <div class="muted" style="font-size:0.75rem;font-weight:700;text-transform:uppercase;">Patient Booking Code</div>
               <div style="font-size:1.2rem;font-weight:900;color:var(--green);margin-top:2px;letter-spacing:1px;">${escHtml(data.hospitalCode)}</div>
             </div>
             <span class="badge-code">Share with Patients</span>
-          </div>
-
-          <div class="key-box">
-            <div>
-              <div class="muted" style="font-size:0.75rem;font-weight:700;text-transform:uppercase;">Private Recovery Key</div>
-              <div style="font-size:0.95rem;font-weight:800;color:#991b1b;margin-top:4px;">${escHtml(data.recoveryKey)}</div>
-            </div>
-            <span class="badge-rcv">Keep Secret</span>
           </div>
         </div>
       `;
@@ -591,7 +560,7 @@
           const doc = d.data();
           const docId = d.id;
           const statusBadge = doc.status === 'closed' ? '<span class="badge red">closed</span>' : '<span class="badge green">open</span>';
-          const pinBadge = (doc.pin || doc.pinHash) ? `<span class="badge" style="background:var(--green-050);color:var(--green);font-weight:700;"><i class="fa-solid fa-shield"></i> PIN Set</span>` : '';
+          const pinBadge = '';
           const roomBadge = doc.room ? `<span class="badge blue">${escHtml(doc.room)}</span>` : '';
 
           list.innerHTML += `<div class="mgmt-card" style="padding:14px;border-radius:12px;background:var(--bg);border:1px solid var(--line);margin-bottom:10px;">
@@ -602,9 +571,6 @@
               </div>
               <div style="display:flex;gap:6px;flex-wrap:wrap;">
                 <button class="btn btn-sm btn-slate" onclick="editDoctor('${docId}')" title="Edit Doctor Details"><i class="fa-solid fa-pen"></i> Edit</button>
-                <button class="btn btn-sm btn-slate" onclick="openDoctorResetModal('${docId}', '${escHtml(doc.name || 'Doctor')}', '${escHtml(doc.email || '')}')" title="Admin Quick Reset PIN" style="background:#D7EBE0;color:#1F6B4C;border:1px solid #8BBB92;font-weight:700;">
-                  <i class="fa-solid fa-key"></i> Reset PIN
-                </button>
                 <button class="btn btn-sm btn-danger" onclick="revokeDoctorAccess('${docId}', '${escHtml(doc.name || 'Doctor')}', '${escHtml(doc.email || '')}')" title="Relieve & Permanently Revoke Access" style="background:#fee2e2;color:#b91c1c;border:1px solid #fca5a5;font-weight:700;">
                   <i class="fa-solid fa-user-xmark"></i> Relieve / Revoke
                 </button>
@@ -647,7 +613,7 @@
         document.getElementById('docEmail').value = doc.email || '';
         document.getElementById('docEmail').disabled = true;
         document.getElementById('docPin').value = '';
-        document.getElementById('docPin').placeholder = 'Leave blank to keep current PIN';
+        document.getElementById('docPin').placeholder = 'Disabled pending secure account provisioning';
         document.getElementById('docRoom').value = doc.room || doc.counter || '';
         document.getElementById('docStatus').value = doc.status || 'open';
       } catch (e) { console.error(e); }
@@ -658,19 +624,13 @@
       const name = document.getElementById('docName').value.trim();
       const dept = document.getElementById('docDept').value.trim();
       const email = document.getElementById('docEmail').value.trim().toLowerCase();
-      const rawPin = document.getElementById('docPin').value.trim();
       const room = document.getElementById('docRoom').value.trim();
       const status = document.getElementById('docStatus').value;
       const btn = document.getElementById('btnSaveDoctor');
 
       if (!name) return showToast('Enter doctor name.', true);
       if (!assignedHospitalSlug) return showToast('No hospital assigned.', true);
-      if (!editDoctorId && (!email || rawPin.length !== 4)) {
-        return showToast('Enter doctor email & 4-digit PIN.', true);
-      }
-      if (editDoctorId && rawPin && rawPin.length !== 4) {
-        return showToast('PIN must be exactly 4 digits.', true);
-      }
+      if (!editDoctorId && !email) return showToast('Enter doctor email.', true);
 
       btn.disabled = true;
       btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Syncing to Cloud Database...';
@@ -693,14 +653,9 @@
 
         if (email) data.email = email;
 
-        // Dual Pin Security: Saves both plain PIN & SHA-256 Hash for native app compatibility
-        if (rawPin) {
-          const hashedPin = await createSha256Pin(rawPin);
-          data.pin = rawPin;
-          data.pinHash = hashedPin;
-        }
-
         if (editDoctorId) {
+          data.pin = window._fs.deleteField();
+          data.pinHash = window._fs.deleteField();
           // Update hospital sub-collection
           await window._fs.updateDoc(window._fs.doc(coll, editDoctorId), data);
 
@@ -711,7 +666,7 @@
             console.warn('Root sync note:', e);
           }
 
-          showToast('Doctor credentials synced across all devices!');
+          showToast('Doctor profile saved; secure doctor sign-in still requires server provisioning.');
         } else {
           data.createdAt = window._fs.serverTimestamp();
           
@@ -728,7 +683,7 @@
             console.warn('Root create mirror note:', e);
           }
 
-          showToast('Doctor onboarded & synced to cloud database!');
+          showToast('Doctor profile created; secure doctor sign-in still requires server provisioning.');
         }
 
         cancelDoctorEdit();
@@ -755,46 +710,8 @@
       document.getElementById('doctorResetModal').classList.add('hidden');
     }
 
-    // UPDATED PIN RESET PIPELINE: Guarantees immediate cloud update across Web & Tablet App
     async function executeDoctorPinReset() {
-      const rawPin = document.getElementById('newDoctorPin').value.trim();
-      const btn = document.getElementById('btnConfirmDoctorReset');
-
-      if (rawPin.length !== 4) return showToast('PIN must be exactly 4 digits.', true);
-
-      btn.disabled = true;
-      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Updating Cloud PIN...';
-
-      try {
-        const hashedPin = await createSha256Pin(rawPin);
-        const pinUpdatePayload = {
-          pin: rawPin,
-          pinHash: hashedPin,
-          updatedAt: window._fs.serverTimestamp()
-        };
-
-        // 1. Update hospital sub-collection
-        const docRef = window._fs.doc(window._db, 'hospitals', assignedHospitalSlug, 'doctors', targetResetDoctorId);
-        await window._fs.updateDoc(docRef, pinUpdatePayload);
-
-        // 2. Update root collection
-        try {
-          const rootDocRef = window._fs.doc(window._db, 'doctors', targetResetDoctorId);
-          await window._fs.updateDoc(rootDocRef, pinUpdatePayload);
-        } catch(e) {
-          console.warn('Root reset sync note:', e);
-        }
-
-        showToast('PIN successfully updated! Usable on all devices immediately.');
-        closeDoctorResetModal();
-        loadDoctorList();
-      } catch (err) {
-        console.error('Doctor reset error:', err);
-        showToast('Failed to reset PIN: ' + err.message, true);
-      } finally {
-        btn.disabled = false;
-        btn.innerHTML = '<i class="fa-solid fa-lock"></i> Update & Secure PIN';
-      }
+      showToast('PIN login is disabled. Provision doctor access through Firebase Auth before enabling this action.', true, 5000);
     }
 
     async function revokeDoctorAccess(id, name, email) {
@@ -848,44 +765,7 @@
     }
 
     async function executeRecovery() {
-      const email = document.getElementById('rcvEmail').value.trim();
-      const key = document.getElementById('rcvKey').value.trim().toUpperCase();
-      const resultBox = document.getElementById('recoveryResultBox');
-      const btn = document.getElementById('btnRecover');
-
-      if (!email || !key) return showToast('Enter both email and recovery key.', true);
-
-      btn.disabled = true;
-      try {
-        const snap = await window._fs.getDocs(
-          window._fs.query(
-            window._fs.collection(window._db, 'hospitals'),
-            window._fs.where('adminEmail', '==', email),
-            window._fs.where('recoveryKey', '==', key)
-          )
-        );
-
-        if (snap.empty) {
-          resultBox.className = 'empty red';
-          resultBox.textContent = 'No matching record found. Please verify your recovery key.';
-          resultBox.classList.remove('hidden');
-        } else {
-          const h = snap.docs[0].data();
-          resultBox.className = 'key-box';
-          resultBox.innerHTML = `
-            <div>
-              <div class="muted" style="font-size:0.75rem;font-weight:700;">Verified Hospital Code:</div>
-              <div style="font-size:1.2rem;font-weight:900;color:var(--green);">${escHtml(h.hospitalCode)}</div>
-            </div>
-            <span class="badge green">Recovered</span>
-          `;
-          resultBox.classList.remove('hidden');
-        }
-      } catch (err) {
-        showToast('Recovery error: ' + err.message, true);
-      } finally {
-        btn.disabled = false;
-      }
+      showToast('Recovery-key lookup is disabled until it can be handled by an authenticated server endpoint.', true, 5000);
     }
   </script>
 </body>
