@@ -206,6 +206,14 @@
     return callFunction('getDoctorQueue', { slug, doctorId });
   }
 
+  // Front-desk staff feed — hospital-code gated, no doctor auth needed.
+  async function getDeskQueue(opts) {
+    const { code, doctorId } = opts || {};
+    if (!code || !doctorId) throw new Error('code + doctorId required.');
+    if (apiMode() !== 'functions') return readNeedsFunctions('getDeskQueue');
+    return callFunction('getDeskQueue', { code, doctorId });
+  }
+
   async function getTvFeed(opts) {
     const { slug } = opts || {};
     if (!slug) throw new Error('slug required.');
@@ -227,6 +235,14 @@
     if (!code) throw new Error('code required.');
     if (apiMode() !== 'functions') return readNeedsFunctions('resolveHospitalByCode');
     return callFunction('resolveHospitalByCode', { code });
+  }
+
+  // Sanitized doctor options for the booking form / front desk.
+  async function listDoctorsPublic(opts) {
+    const { slug } = opts || {};
+    if (!slug) throw new Error('slug required.');
+    if (apiMode() !== 'functions') return readNeedsFunctions('listDoctorsPublic');
+    return callFunction('listDoctorsPublic', { slug });
   }
 
   // Admin accountability feed.
@@ -277,9 +293,11 @@
     cancelToken,
     getTokenStatus,
     getDoctorQueue,
+    getDeskQueue,
     getTvFeed,
     getTokenByNumber,
     resolveHospitalByCode,
+    listDoctorsPublic,
     listAuditEvents,
     getMyDoctorProfile,
     provisionDoctor,

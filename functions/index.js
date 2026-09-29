@@ -374,6 +374,48 @@ exports.getDoctorQueue = onCall({ rateLimiting: RL.doctorQueue }, async (request
 });
 
 // ------------------------------------------------------------------
+//  getDeskQueue — front-desk staff feed. The "door key" is the
+//  hospital code (as when authorizing the station). Returns the day's
+//  rows for one doctor so the desk can call/print/skip without any
+//  client token reads (the target rules deny those to anonymous desk
+//  users).
+// ------------------------------------------------------------------
+exports.getDeskQueue = onCall({ rateLimiting: RL.doctorQueue }, async (request) => {
+  const { code, doctorId } = request.data || {};
+  if (!code || !doctorId) throw new HttpsError('invalid-argument', 'code + doctorId required.');
+
+  const hospitals = await db.collection('hospitals').get();
+  let slug = null;
+  hospitals.forEach((h) => {
+    if (normalizeHospitalCode(h.data().hospitalCode) === normalizeHospitalCode(code)) slug = h.id;
+  });
+  if (!slug) throw new HttpsError('permission-denied', 'Invalid hospital code.');
+
+  const hospital = await loadHospital(slug);
+  const today = todayInZone(getHospitalTz(hospital));
+  const docs = await db.collection(`hospitals/${slug}/tokens`)
+    .where('doctorId', '==', doctorId).where('date', '==', today).get();
+  const rows = [];
+  docs.forEach((d) => {
+    const t = d.data();
+    rows.push({
+      id: d.id,
+      number: t.number,
+      patientName: t.patientName || '',
+      phone: t.phone || '',
+      status: normalizeStatus(t.status),
+      priority: Boolean(t.priority),
+      counter: t.counter || 'Counter A',
+      source: t.source || 'desk',
+      createdAt: t.createdAt ? t.createdAt.toMillis() : null,
+      calledAt: t.calledAt ? t.calledAt.toMillis() : null,
+    });
+  });
+  rows.sort((a, b) => Number(a.number) - Number(b.number));
+  return { rows, slug };
+});
+
+// ------------------------------------------------------------------
 //  getTokenStatus — sanitized patient pass feed (no names/phones)
 // ------------------------------------------------------------------
 exports.getTokenStatus = onCall({ rateLimiting: RL.tokenStatus }, async (request) => {
@@ -518,6 +560,33 @@ exports.resolveHospitalByCode = onCall({ rateLimiting: RL.codeResolve }, async (
   });
   if (!target) throw new HttpsError('not-found', 'No hospital matches this code.');
   return target;
+});
+
+// ------------------------------------------------------------------
+//  listDoctorsPublic — sanitized doctor options for the booking form /
+//  front desk. Returns id, name, department, room and status only —
+//  never authUid, email or PIN-era fields. Gates 'closed' doctors out.
+// ------------------------------------------------------------------
+exports.listDoctorsPublic = onCall({ rateLimiting: RL.codeResolve }, async (request) => {
+  const { slug } = request.data || {};
+  if (!slug) throw new HttpsError('invalid-argument', 'slug required.');
+  const hospital = await loadHospital(slug);
+  if (!hospital) throw new HttpsError('not-found', 'Hospital not found.');
+  const docs = await db.collection(`hospitals/${slug}/doctors`).get();
+  const doctors = [];
+  docs.forEach((d) => {
+    const doc = d.data();
+    if (doc.status === 'closed') return;
+    doctors.push({
+      id: d.id,
+      name: doc.name || 'Doctor',
+      department: doc.department || 'Consultation',
+      room: doc.room || doc.counter || '',
+      status: doc.status || 'active',
+    });
+  });
+  doctors.sort((a, b) => a.name.localeCompare(b.name));
+  return { doctors };
 });
 
 // ------------------------------------------------------------------

@@ -327,6 +327,11 @@
     let lastIssuedTokenId = null;
     let currentlyServingToken = null;
     let firstWaitingToken = null;
+    let deskPollTimer = null;
+    // Row cache so print/notify/announce/loadHistory work without
+    // client token reads (denied to anonymous desk users in functions mode).
+    const lastKnownTokenData = {};
+    const FUNC = window.TokSpotAPI && window.TokSpotAPI.mode() === 'functions';
 
     function getAppBaseUrl() {
       return window.location.origin;
@@ -378,14 +383,23 @@
       try {
         await ensureAuth();
 
-        const hospSnap = await window._fs.getDocs(window._fs.collection(window._db, 'hospitals'));
-        const cleanInput = codeInput.replace(/^HOSP-?/i, '');
+        let targetDoc = null;
 
-        const targetDoc = hospSnap.docs.find(d => {
-          const data = d.data();
-          const c = (data.hospitalCode || data.code || '').toUpperCase();
-          return c === codeInput || c.replace(/^HOSP-?/i, '') === cleanInput || d.id.toUpperCase() === codeInput;
-        });
+        // Functions mode: resolve the code via the trusted backend —
+        // the rules deny client hospital scans to anonymous desk users.
+        if (FUNC) {
+          const resolved = await window.TokSpotAPI.resolveHospitalByCode({ code: codeInput });
+          targetDoc = { id: resolved.id, data: () => resolved };
+        } else {
+          const hospSnap = await window._fs.getDocs(window._fs.collection(window._db, 'hospitals'));
+          const cleanInput = codeInput.replace(/^HOSP-?/i, '');
+
+          targetDoc = hospSnap.docs.find(d => {
+            const data = d.data();
+            const c = (data.hospitalCode || data.code || '').toUpperCase();
+            return c === codeInput || c.replace(/^HOSP-?/i, '') === cleanInput || d.id.toUpperCase() === codeInput;
+          });
+        }
 
         if (!targetDoc) {
           showToast('Invalid Hospital Code. Access denied.', true);
@@ -424,6 +438,7 @@
       currentHospitalCode = null;
       currentDoctor = null;
       if (unsubQueue) { unsubQueue(); unsubQueue = null; }
+      if (deskPollTimer) { clearInterval(deskPollTimer); deskPollTimer = null; }
       document.getElementById('desk').classList.add('hidden');
       document.getElementById('selectors').classList.add('hidden');
       document.getElementById('stationGate').classList.remove('hidden');
@@ -434,15 +449,21 @@
       const ds = document.getElementById('doctorSelect');
       ds.innerHTML = '<option value="">Select Doctor for this station…</option>';
       try {
-        const snap = await window._fs.getDocs(window._fs.collection(window._db, 'hospitals', hospitalSlug, 'doctors'));
-        snap.docs.forEach(d => {
-          const doc = d.data();
+        let doctors = [];
+        if (FUNC) {
+          const res = await window.TokSpotAPI.listDoctorsPublic({ slug: hospitalSlug });
+          doctors = res.doctors || [];
+        } else {
+          const snap = await window._fs.getDocs(window._fs.collection(window._db, 'hospitals', hospitalSlug, 'doctors'));
+          doctors = snap.docs.map(d => ({ id: d.id, status: d.data().status, name: d.data().name, department: d.data().department, counter: d.data().counter, room: d.data().room }));
+        }
+        doctors.forEach(doc => {
           if (doc.status === 'closed') return;
           const o = document.createElement('option');
-          o.value = d.id;
-          o.dataset.name = doc.name || d.id;
+          o.value = doc.id;
+          o.dataset.name = doc.name || doc.id;
           o.dataset.room = doc.department || doc.counter || doc.room || 'Counter A';
-          o.textContent = (doc.name || d.id) + (doc.department ? ' · ' + doc.department : '');
+          o.textContent = (doc.name || doc.id) + (doc.department ? ' · ' + doc.department : '');
           ds.appendChild(o);
         });
       } catch (e) {
@@ -477,9 +498,11 @@
       document.getElementById('selectors').classList.remove('hidden');
       document.getElementById('doctorSelect').value = '';
       if (unsubQueue) { unsubQueue(); unsubQueue = null; }
+      if (deskPollTimer) { clearInterval(deskPollTimer); deskPollTimer = null; }
     }
 
     function setupQueueListener() {
+      if (FUNC) { startDeskQueuePolling(); return; }
       if (unsubQueue) unsubQueue();
       const today = window.todayStr ? window.todayStr() : new Date().toISOString().slice(0, 10);
       
@@ -493,6 +516,31 @@
       });
     }
 
+    // Functions mode: poll the server-filtered doctor queue (code-gated).
+    function startDeskQueuePolling() {
+      if (unsubQueue) { unsubQueue(); unsubQueue = null; }
+      const tick = async () => {
+        try {
+          const res = await window.TokSpotAPI.getDeskQueue({
+            code: currentHospitalCode,
+            doctorId: currentDoctor,
+          });
+          const waiting = [], called = [], skipped = [];
+          (res.rows || []).forEach(t => {
+            if (t.status === 'waiting') waiting.push(t);
+            else if (t.status === 'called') called.push(t);
+            else if (t.status === 'skipped') skipped.push(t);
+          });
+          paintQueue(waiting, called, skipped);
+        } catch (e) {
+          console.error('Desk queue poll error:', e);
+        }
+      };
+      tick();
+      if (deskPollTimer) clearInterval(deskPollTimer);
+      deskPollTimer = setInterval(tick, 3000);
+    }
+
     function renderQueue(snap) {
       const waiting = [], called = [], skipped = [];
       
@@ -504,6 +552,21 @@
           if (t.status === 'waiting') waiting.push(t);
           else if (t.status === 'called') called.push(t);
           else if (t.status === 'skipped') skipped.push(t);
+        }
+      });
+
+      paintQueue(waiting, called, skipped);
+    }
+
+    // Shared painting for both snapshot (prototype) and polled
+    // (functions) queue data.
+    function paintQueue(waiting, called, skipped) {
+      // Stamp + keep every row in the cache (all statuses) so print,
+      // notify, announce and history need no direct token reads.
+      [...waiting, ...called, ...skipped].forEach(t => {
+        if (t && t.id) {
+          t.doctorId = t.doctorId || currentDoctor;
+          lastKnownTokenData[t.id] = t;
         }
       });
 
@@ -634,6 +697,10 @@
       const phone = String(rawPhone || '').replace(/\D/g, '').slice(-10);
       if (!phone) return { allowed: true };
 
+      // Functions mode enforces the daily quota inside the issueToken
+      // transaction — the client check is advisory and hidden behind rules.
+      if (FUNC) return { allowed: true };
+
       try {
         const tokensRef = window._fs.collection(window._db, 'hospitals', hospitalSlug, 'tokens');
         const q = window._fs.query(
@@ -754,10 +821,12 @@
 
     async function printSingleSlip(id) {
       try {
+        const t = lastKnownTokenData[id];
+        if (t) { triggerPrintSlip(t.number, t.patientName, t.counter, id); return; }
         const snap = await window._fs.getDoc(window._fs.doc(window._db, 'hospitals', currentHospital, 'tokens', id));
         if (snap.exists()) {
-          const t = snap.data();
-          triggerPrintSlip(t.number, t.patientName, t.counter, id);
+          const d = snap.data();
+          triggerPrintSlip(d.number, d.patientName, d.counter, id);
         }
       } catch (e) { showToast('Print error: ' + e.message, true); }
     }
@@ -770,13 +839,18 @@
           playBeep(); 
           maybeAnnounce(id);
 
-          window._fs.getDoc(window._fs.doc(window._db, 'hospitals', currentHospital, 'tokens', id)).then(snap => {
-            const t = snap.data();
-            if (t && t.phone) {
-              const trackLink = `${getAppBaseUrl()}/token.html?id=${id}&h=${currentHospital}`;
-              queueFreeSMS(t.phone, `TokMark Alert: Token #${t.number}, please proceed to ${t.counter || 'Counter A'}. Track: ${trackLink}`);
-            }
-          });
+          // Prototype mode only: the backend already enqueues the SMS in
+          // functions mode (transitionToken writes to sms_queue server-side),
+          // and direct token reads are denied to desk users there anyway.
+          if (!FUNC) {
+            window._fs.getDoc(window._fs.doc(window._db, 'hospitals', currentHospital, 'tokens', id)).then(snap => {
+              const t = snap.data();
+              if (t && t.phone) {
+                const trackLink = `${getAppBaseUrl()}/token.html?id=${id}&h=${currentHospital}`;
+                queueFreeSMS(t.phone, `TokMark Alert: Token #${t.number}, please proceed to ${t.counter || 'Counter A'}. Track: ${trackLink}`);
+              }
+            }).catch(() => {});
+          }
         }
         if (status === 'completed') loadHistory();
       } catch (e) { showToast('Failed: ' + e.message, true); }
@@ -784,8 +858,7 @@
 
     async function maybeAnnounce(id) {
       try {
-        const snap = await window._fs.getDoc(window._fs.doc(window._db, 'hospitals', currentHospital, 'tokens', id));
-        const t = snap.data();
+        const t = lastKnownTokenData[id] || (await window._fs.getDoc(window._fs.doc(window._db, 'hospitals', currentHospital, 'tokens', id))).data();
         if (window.announceToken) window.announceToken(t.number, t.patientName, t.counter);
       } catch (e) {}
     }
@@ -797,8 +870,7 @@
 
     async function notifyPatient(id, method) {
       try {
-        const snap = await window._fs.getDoc(window._fs.doc(window._db, 'hospitals', currentHospital, 'tokens', id));
-        const t = snap.data();
+        const t = lastKnownTokenData[id] || (await window._fs.getDoc(window._fs.doc(window._db, 'hospitals', currentHospital, 'tokens', id))).data();
         if (!t.phone) return showToast('No phone number.', true);
 
         let cleanPhone = String(t.phone).replace(/\D/g, '');
@@ -833,19 +905,30 @@
       if (!currentHospital || !currentDoctor) return;
       const today = window.todayStr ? window.todayStr() : new Date().toISOString().slice(0, 10);
       try {
-        const snap = await window._fs.getDocs(window._fs.query(
-          window._fs.collection(window._db, 'hospitals', currentHospital, 'tokens'),
-          window._fs.where('date', '==', today)
-        ));
         let done = 0;
         const history = [];
-        snap.docs.forEach(d => {
-          const t = d.data();
-          if (String(t.doctorId) === String(currentDoctor) && t.status === 'completed') {
-            done++;
-            history.push(t);
-          }
-        });
+
+        if (FUNC) {
+          // No client token reads (denied) — derive from the polled row cache.
+          Object.values(lastKnownTokenData).forEach(t => {
+            if (String(t.doctorId) === String(currentDoctor) && t.status === 'completed') {
+              done++;
+              history.push(t);
+            }
+          });
+        } else {
+          const snap = await window._fs.getDocs(window._fs.query(
+            window._fs.collection(window._db, 'hospitals', currentHospital, 'tokens'),
+            window._fs.where('date', '==', today)
+          ));
+          snap.docs.forEach(d => {
+            const t = d.data();
+            if (String(t.doctorId) === String(currentDoctor) && t.status === 'completed') {
+              done++;
+              history.push(t);
+            }
+          });
+        }
         document.getElementById('stDone').textContent = done;
         const hl = document.getElementById('historyList');
         hl.innerHTML = history.slice(-8).reverse().map(t => `

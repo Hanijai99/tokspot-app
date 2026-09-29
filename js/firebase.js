@@ -40,6 +40,35 @@
       window._db = db;
       window._auth = auth;
       window._useAuth = useAuth;
+
+      // Lazy loader for App Check (reCAPTCHA v3 provider). Bound to the
+      // app instance so initializeAppCheck runs on the same app.
+      window._loadAppCheck = async function (app, siteKey) {
+        if (window._appCheckLoaded) return window._appCheckLoaded;
+        try {
+          const mod = await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-app-check.js');
+          let check = null;
+          try {
+            check = mod.getAppCheck(app);
+          } catch (_) {
+            check = mod.initializeAppCheck(app, {
+              provider: new mod.ReCaptchaV3Provider(siteKey),
+              isTokenAutoRefreshEnabled: true,
+            });
+          }
+          window._appCheck = check;
+          window._appCheckLoaded = check;
+          return check;
+        } catch (e) {
+          console.warn('App Check unavailable:', e.message);
+          return null;
+        }
+      };
+      // If the site key was already set before init, run the loader.
+      if (String(window.TOKSPOT_APP_CHECK_SITE_KEY || '').trim()) {
+        window._loadAppCheck(app, String(window.TOKSPOT_APP_CHECK_SITE_KEY).trim()).catch(() => {});
+      }
+      window.appCheck = appCheck || window._appCheck || null;
       
       // Expose all firestore methods including runTransaction
       window._fs = {

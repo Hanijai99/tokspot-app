@@ -28,6 +28,23 @@ window.FB_CONFIG = {
 window.DEFAULT_HOSPITAL = "demo";
 
 // ------------------------------------------------------------------
+//  BACKEND MODE SWITCH — the one-line pilot flip.
+//  Keep "prototype" during dev/demo. Set to "functions" ONLY after the
+//  Firestore rules + Functions are deployed together (never rules
+//  alone), or the static pages will stop talking to the database.
+// ------------------------------------------------------------------
+window.TOKSPOT_API_MODE = "prototype";
+
+// ------------------------------------------------------------------
+//  App Check (reCAPTCHA v3) — bot/abuse attestation for Firestore.
+//  Console: Project Settings -> App Check -> Apps -> reCAPTCHA v3 ->
+//  copy the *site key* here. Enable enforcement in the console ONLY
+//  after this key is set AND the update below is deployed, or every
+//  client request will be rejected.
+// ------------------------------------------------------------------
+window.TOKSPOT_APP_CHECK_SITE_KEY = "";
+
+// ------------------------------------------------------------------
 //  Web Push (FCM) — "Your turn!" notifications.
 //  Leave empty until you complete the console setup:
 //    1. Firebase Console → your project → Cloud Messaging
