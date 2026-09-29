@@ -89,6 +89,18 @@
       
     </section>
 
+    <!-- 1b. Email verification required (instead of an instant silent sign-out) -->
+    <section id="verifyCard" class="card hidden" style="max-width:420px;margin:40px auto;text-align:center;">
+      <div style="width:64px;height:64px;border-radius:20px;background:linear-gradient(135deg,#f59e0b,#d97706);display:flex;align-items:center;justify-content:center;font-size:1.9rem;margin:0 auto 16px;box-shadow:0 12px 30px rgba(217,119,6,.3);color:#fff;"><i class="fa-solid fa-envelope-circle-check"></i></div>
+      <div class="htitle">Verify Your Admin Email</div>
+      <div class="hsub mt-6">We sent a verification link to <b id="verifyEmailText">your email</b>.<br/>Open it, click <b>Verify email</b>, then press continue below.</div>
+      <div class="mt-16" style="text-align:center;">
+        <button class="btn btn-green btn-block btn-lg" id="btnResendVerify" onclick="resendVerificationEmail()"><i class="fa-solid fa-paper-plane"></i> Resend Verification Email</button>
+        <button class="btn btn-slate btn-block btn-lg mt-12" id="btnIVerified" onclick="continueAfterVerify()"><i class="fa-solid fa-rotate-right"></i> I've Verified — Continue</button>
+        <button class="btn btn-block mt-12" onclick="cancelVerifyToLogout()">Use a different account</button>
+      </div>
+    </section>
+
     <!-- 2. Isolated Admin Dashboard -->
     <section class="hidden" id="mainCard">
       <div style="display:flex;align-items:center;gap:12px;margin-bottom:4px;flex-wrap:wrap;">
@@ -315,9 +327,8 @@
         window._useAuth.onAuthStateChanged(window._auth, async (u) => {
           if (u) {
             if (!u.emailVerified) {
-              await window._useAuth.signOut(window._auth);
-              showLoggedOutState();
-              showToast('Verify your admin email before opening the hospital workspace.', true, 5000);
+              activeAdminUser = u;
+              renderEmailVerificationState(u);
               return;
             }
             activeAdminUser = u;
@@ -336,6 +347,7 @@
       assignedHospitalSlug = null;
       currentHospitalCode = '';
       document.getElementById('mainCard').classList.add('hidden');
+      document.getElementById('verifyCard').classList.add('hidden');
       document.getElementById('loginCard').classList.remove('hidden');
       sessionStorage.clear();
     }
@@ -356,6 +368,7 @@
       if (!email || !pass) return showToast('Enter email and password.', true);
 
       btn.disabled = true;
+      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Signing in...';
       try {
         await window._useAuth.signInWithEmailAndPassword(window._auth, email, pass);
         showToast('Signed in successfully.');
@@ -363,7 +376,62 @@
         showToast('Login Error: ' + (e.message || e.code), true, 4000);
       } finally {
         btn.disabled = false;
+        btn.innerHTML = '<i class="fa-solid fa-right-to-bracket"></i> Sign In';
       }
+    }
+
+    // Unverified admin → show the verify panel instead of an instant
+    // silent sign-out. The workspace stays closed until emailVerified.
+    function renderEmailVerificationState(u) {
+      document.getElementById('loginCard').classList.add('hidden');
+      document.getElementById('mainCard').classList.add('hidden');
+      document.getElementById('verifyCard').classList.remove('hidden');
+      document.getElementById('verifyEmailText').textContent = u.email || 'your email';
+    }
+
+    async function resendVerificationEmail() {
+      const btn = document.getElementById('btnResendVerify');
+      btn.disabled = true;
+      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Sending...';
+      try {
+        const u = window._auth.currentUser;
+        if (!u) throw new Error('Session expired — sign in again first.');
+        await window._useAuth.sendEmailVerification(u);
+        showToast('Verification email sent — check inbox & spam.', false, 4500);
+      } catch (e) {
+        showToast('Could not send: ' + (e.message || e.code), true, 4500);
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fa-solid fa-paper-plane"></i> Resend Verification Email';
+      }
+    }
+
+    async function continueAfterVerify() {
+      const btn = document.getElementById('btnIVerified');
+      btn.disabled = true;
+      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Checking...';
+      try {
+        const u = window._auth.currentUser;
+        if (!u) throw new Error('Session expired — sign in again.');
+        await u.reload();
+        const fresh = window._auth.currentUser;
+        if (fresh && fresh.emailVerified) {
+          activeAdminUser = fresh;
+          await resolveAdminHospital(fresh);
+          return;
+        }
+        showToast('Not verified yet — open the email link or resend.', true, 5000);
+      } catch (e) {
+        showToast('Check failed: ' + (e.message || e.code), true, 4500);
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fa-solid fa-rotate-right"></i> I\'ve Verified — Continue';
+      }
+    }
+
+    async function cancelVerifyToLogout() {
+      try { await window._useAuth.signOut(window._auth); } catch (_) {}
+      showLoggedOutState();
     }
 
     async function adminLogout() {
