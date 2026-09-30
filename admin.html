@@ -321,6 +321,23 @@
     let targetResetDoctorId = null;
     let qrInstance = null;
 
+    // Email-verification policy: new admins verify once on first login, then
+    // the check is renewed only every VERIFY_RENEW_DAYS. Between renewals the
+    // admin goes straight to the workspace (no verification gate per login).
+    const VERIFY_RENEW_DAYS = 30;
+    const VERIFY_RENEW_MS = VERIFY_RENEW_DAYS * 24 * 60 * 60 * 1000;
+    const VERIFY_STAMP_KEY = 'tokspot_admin_verified_at';
+    function getVerifiedAt() {
+      const raw = parseInt(localStorage.getItem(VERIFY_STAMP_KEY) || '0', 10);
+      return Number.isFinite(raw) && raw > 0 ? raw : 0;
+    }
+    function setVerifiedAt() { localStorage.setItem(VERIFY_STAMP_KEY, String(Date.now())); }
+    function isVerifyRenewalDue() {
+      const at = getVerifiedAt();
+      if (!at) return true; // never verified on this device → verify once
+      return (Date.now() - at) >= VERIFY_RENEW_MS;
+    }
+
     window.addEventListener('load', async () => {
       if (window.hk && hk.applyDark) hk.applyDark();
 
@@ -335,12 +352,15 @@
             // back to the verify card on every login (stale-flag loop).
             try { await u.reload(); } catch (_) {}
             const fresh = window._auth.currentUser || u;
+            activeAdminUser = fresh;
             if (!fresh.emailVerified) {
-              activeAdminUser = fresh;
               renderEmailVerificationState(fresh);
               return;
             }
-            activeAdminUser = fresh;
+            if (isVerifyRenewalDue()) {
+              renderEmailVerificationState(fresh);
+              return;
+            }
             await resolveAdminHospital(fresh);
           } else {
             showLoggedOutState();
@@ -426,6 +446,7 @@
         const fresh = window._auth.currentUser;
         if (fresh && fresh.emailVerified) {
           activeAdminUser = fresh;
+          setVerifiedAt(); // this success starts/bumps the 30-day renewal window
           await resolveAdminHospital(fresh);
           return;
         }
