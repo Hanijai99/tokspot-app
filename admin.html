@@ -697,11 +697,14 @@
           const limitBadge = Number(doc.dailyLimit || 0) > 0
             ? `<span class="badge blue">${l10n('admin.docLimitBadge', 'Max %s/day').replace('%s', doc.dailyLimit)}</span>`
             : `<span class="badge slate">${l10n('admin.docLimitNone', 'Unlimited')}</span>`;
+          const accessBadge = doc.accessCode
+            ? `<span class="badge gray" title="${l10n('admin.docAccessHint', 'Doctor access code (prototype station login)')}"><i class="fa-solid fa-key"></i> ${escHtml(doc.accessCode)}</span>`
+            : `<span class="badge amber" style="cursor:pointer;border:1px dashed #f59e0b;" title="${l10n('admin.docAccessHint', 'Set the doctor access code (prototype station login)')}" onclick="editDoctor('${docId}')">${l10n('admin.docAccessNone', 'No Code — Set')}</span>`;
 
           list.innerHTML += `<div class="mgmt-card" style="padding:14px;border-radius:12px;background:var(--bg);border:1px solid var(--line);margin-bottom:10px;">
             <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
               <div style="flex:1;min-width:200px;">
-                <div style="font-weight:700;color:var(--ink);">${escHtml(doc.name || docId)} ${statusBadge} ${pinBadge} ${roomBadge} ${limitBadge}</div>
+                <div style="font-weight:700;color:var(--ink);">${escHtml(doc.name || docId)} ${statusBadge} ${pinBadge} ${roomBadge} ${accessBadge} ${limitBadge}</div>
                 <div class="muted" style="font-size:.82rem;margin-top:2px;">${escHtml(doc.department || l10n('admin.general', 'General'))} ${doc.email ? '· ' + escHtml(doc.email) : ''}</div>
                 <div class="muted" style="font-size:.78rem;margin-top:2px;"><i class="fa-solid fa-clock"></i> ${scheduleSummary(doc.schedule)}</div>
               </div>
