@@ -101,6 +101,18 @@
     .tv-ctrls { position: fixed; bottom: 16px; right: 16px; display: flex; gap: 8px; opacity: 0.25; transition: opacity 0.2s; }
     .tv-ctrls:hover { opacity: 1; }
 
+    /* Pharmacy Counter Panel */
+    .tv-pharmacy-box {
+      margin-top: 18px; background: rgba(139,187,146,0.08);
+      border: 1px solid rgba(139,187,146,0.35); border-radius: 20px;
+      padding: 14px 18px;
+    }
+    .tv-pharmacy-now {
+      display: flex; align-items: center; gap: 14px; margin-top: 8px;
+    }
+    .tv-pharm-num { font-size: 3.2rem; font-weight: 900; color: #8BBB92; line-height: 1; }
+    .tv-pharmacy-wait { color: #94a3b8; font-weight: 700; font-size: 0.85rem; margin-top: 6px; }
+
     @media (max-width: 900px) {
       .tv-body { grid-template-columns: 1fr; }
       .hero-token { font-size: 5.5rem; }
@@ -162,6 +174,13 @@
       </div>
     </div>
 
+    <!-- Pharmacy Counter Panel (prototype live feed) -->
+    <div class="tv-pharmacy-box hidden" id="tvPharmacySection">
+      <div class="queue-title"><i class="fa-solid fa-prescription-bottle-medical"></i> <span data-i18n="display.pharmacy">Pharmacy</span></div>
+      <div class="tv-pharmacy-now" id="tvPharmacyNow"><span class="hero-token tv-pharm-num">—</span></div>
+      <div class="tv-pharmacy-wait" id="tvPharmacyWait"></div>
+    </div>
+
     <!-- Screen utilities -->
     <div class="tv-ctrls">
       <button class="btn btn-slate btn-sm" onclick="toggleFullscreen()"><i class="fa-solid fa-expand"></i> <span data-i18n="display.fullscreen">Fullscreen</span></button>
@@ -208,6 +227,7 @@
     let unsubTvTokens = null;
     let unsubTvDoctors = null;
     let lastCalledTokenKey = null;
+    let lastTvPharmacyKey = null;
     let tvPollTimer = null;
     const FUNC = window.TokSpotAPI && window.TokSpotAPI.mode() === 'functions';
     let isAudioUnlocked = false;
@@ -359,19 +379,21 @@
       const today = window.todayStr ? window.todayStr() : new Date().toISOString().slice(0, 10);
 
       const tokensRef = window._fs.collection(window._db, 'hospitals', slug, 'tokens');
-      const q = window._fs.query(
-        tokensRef,
-        window._fs.where('date', '==', today),
-        window._fs.where('status', 'in', ['waiting', 'called', 'in-consultation'])
-      );
+      const q = window._fs.query(tokensRef, window._fs.where('date', '==', today));
 
       unsubTvTokens = window._fs.onSnapshot(q, (snap) => {
         let called = [];
         let waiting = [];
+        let pharmacyRows = [];
 
         snap.docs.forEach(d => {
           const t = d.data();
           t.id = d.id;
+          // Pharmacy stage starts only after the consultation completes —
+          // tokens flagged "Needs Pharmacy" at issue stay in the doctor queue.
+          if (t.pharmacy === true && (t.status === 'completed' || t.status === 'in-consultation')) {
+            if (t.status === 'completed') { pharmacyRows.push(t); return; }
+          }
           if (t.status === 'called' || t.status === 'in-consultation') {
             called.push(t);
           } else if (t.status === 'waiting') {
@@ -380,6 +402,7 @@
         });
 
         renderTvBoard(called, waiting, computeTvExtra(waiting, called));
+        renderTvPharmacyPanel(pharmacyRows);
       }, (err) => {
         console.error('Realtime sync error:', err);
       });
@@ -544,6 +567,36 @@
           </span>
         </div>
       `).join('');
+    }
+
+    function renderTvPharmacyPanel(rows) {
+      const section = document.getElementById('tvPharmacySection');
+      if (!section) return;
+      const nowEl = document.getElementById('tvPharmacyNow');
+      const waitEl = document.getElementById('tvPharmacyWait');
+
+      const active = rows.filter((t) => t.pharmacyStatus === 'called')
+        .sort((a, b) => tvMillis(b.pharmacyCalledAt) - tvMillis(a.pharmacyCalledAt))[0] || null;
+      const waiting = rows.filter((t) => t.pharmacyStatus === 'waiting').length;
+
+      if (!active && waiting === 0) { section.classList.add('hidden'); return; }
+      section.classList.remove('hidden');
+
+      if (active) {
+        const counterLabel = active.pharmacyCounter || l10n('display.pharmacy', 'Pharmacy');
+        nowEl.innerHTML = `<span class="hero-token tv-pharm-num">#${escHtml(active.number)}</span>
+          <span style="font-weight:700;color:#94a3b8;font-size:0.9rem;">${escHtml(counterLabel)}</span>`;
+        const key = `${active.id}_${tvMillis(active.pharmacyCalledAt) || active.number}`;
+        if (lastTvPharmacyKey !== key) {
+          lastTvPharmacyKey = key;
+          handlePatientCallAudio(active.number, '', l10n('display.pharmacy', 'Pharmacy'));
+        }
+      } else {
+        nowEl.innerHTML = `<span class="hero-token tv-pharm-num">—</span>`;
+      }
+      waitEl.textContent = waiting > 0
+        ? l10n('display.pharmacyWait', '%s waiting at pharmacy').replace('%s', waiting)
+        : '';
     }
 
     function handlePatientCallAudio(tokenNum, patientName, counter) {

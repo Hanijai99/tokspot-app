@@ -1,0 +1,507 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <script src="js/loader.js"></script>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>Pharmacy Desk — TokMark</title>
+  <link rel="stylesheet" href="css/style.css?v=20260930" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+  <link rel="manifest" href="manifest.json" />
+  <link rel="icon" type="image/png" href="logo.png?v=2" />
+  <link rel="apple-touch-icon" href="logo.png?v=2" />
+  <style>
+    body { background: var(--night-bg); color: #f8fafc; min-height: 100vh; padding: 0; margin: 0; font-family: system-ui, -apple-system, sans-serif; }
+    .pharm-container { max-width: 680px; margin: 0 auto; padding: 16px 20px 40px; }
+
+    .pharm-badge-bar {
+      display: flex; justify-content: space-between; align-items: center;
+      background: #1E5C50; border: 1px solid #334155; border-radius: 16px;
+      padding: 14px 18px; margin-top: 14px; flex-wrap: wrap; gap: 10px;
+    }
+
+    .gate-card {
+      background: #1E5C50; border: 1px solid #334155; border-radius: 20px;
+      padding: 28px 22px; margin-top: 16px; max-width: 440px; margin-left: auto; margin-right: auto;
+      text-align: center;
+    }
+    .gate-input {
+      width: 100%; box-sizing: border-box; background: #0B1120; border: 1px solid #334155;
+      border-radius: 12px; color: #f8fafc; padding: 12px 14px; font-weight: 800;
+      letter-spacing: 0.5px; font-size: 0.95rem;
+    }
+    .gate-input::placeholder { color: #64748b; font-weight: 700; }
+
+    .curr-num { font-size: 5.5rem; font-weight: 900; color: #8BBB92; letter-spacing: -2px; line-height: 1; margin: 10px 0; }
+    .curr-name { font-size: 1.35rem; font-weight: 700; color: #fff; }
+
+    .current-card {
+      background: #1E5C50; border-radius: 24px; padding: 28px 20px;
+      text-align: center; border: 1px solid #334155; margin-top: 16px;
+      box-shadow: 0 20px 40px rgba(0,0,0,0.35);
+    }
+    .current-card.priority { border-color: #ef4444; background: linear-gradient(180deg, #2a1b1b, #1E5C50); }
+
+    .action-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-top: 20px; }
+    .call-btn {
+      grid-column: span 3; height: 60px; font-size: 1.2rem; font-weight: 800;
+      background: #2A835F; border: none; border-radius: 14px; color: #fff;
+      display: flex; align-items: center; justify-content: center; gap: 10px; cursor: pointer;
+      box-shadow: 0 8px 24px rgba(42,131,95,0.3); transition: transform 0.15s;
+    }
+    .call-btn:active { transform: scale(0.98); }
+    .sec-btn { height: 48px; font-size: 0.92rem; font-weight: 700; border-radius: 12px; border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; }
+    .btn-recall { background: #2A835F; color: #fff; }
+    .btn-skip { background: #dc2626; color: #fff; }
+    .btn-done { background: #2A835F; color: #fff; }
+
+    .queue-list { background: #1E5C50; border-radius: 20px; padding: 18px; margin-top: 20px; border: 1px solid #334155; }
+    .queue-item { display: flex; align-items: center; justify-content: space-between; padding: 12px 14px; border-bottom: 1px solid #334155; border-radius: 10px; gap: 10px; flex-wrap: wrap; }
+    .queue-item:hover { background: #1E5C50; }
+    .queue-item:last-child { border-bottom: none; }
+
+    .hotkey-legend {
+      display: flex; gap: 10px; justify-content: center; flex-wrap: wrap;
+      font-size: 0.74rem; color: #94a3b8; margin-top: 12px;
+    }
+    .hotkey-legend kbd {
+      background: #0f172a; color: #8BBB92; padding: 2px 6px; border-radius: 4px;
+      font-weight: 800; border: 1px solid #334155; font-family: monospace;
+    }
+
+    .others-notice {
+      margin-top: 12px; background: rgba(139,187,146,0.1); border: 1px solid #334155;
+      border-radius: 12px; padding: 10px 14px; color: #94a3b8; font-size: 0.85rem; font-weight: 700;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="topbar" style="background:#1E5C50;border-bottom:1px solid #334155;">
+    <a class="brand" href="index.html" style="color:#8BBB92;">
+      <span class="logomark"><img src="logo.png?v=2" alt="TokMark" /></span><span data-i18n="pharmacy.brand">TokMark Pharmacy</span>
+    </a>
+    <span class="spacer"></span>
+    <button class="icn-btn" onclick="location.href='staff.html'" title="Staff Portal" data-i18n-title="desk.staffPortal"><i class="fa-solid fa-hospital-user"></i></button>
+    <button class="icn-btn" onclick="hk.toggleDark()"><i class="fa-solid fa-moon"></i></button>
+  </div>
+
+  <div class="pharm-container">
+    <div class="hsub mt-12" style="color:#94a3b8;" data-i18n="pharmacy.tagline">Pharmacy counter — call &amp; dispense after consultation.</div>
+
+    <!-- Station Gate: Hospital Code + Counter Name -->
+    <section id="stationGate">
+      <div class="gate-card">
+        <div style="width:56px;height:56px;border-radius:18px;background:rgba(139,187,146,0.15);color:#8BBB92;display:flex;align-items:center;justify-content:center;font-size:1.6rem;margin:0 auto 14px;">
+          <i class="fa-solid fa-prescription-bottle-medical"></i>
+        </div>
+        <div style="font-weight:800;font-size:1.25rem;" data-i18n="pharmacy.gate.title">Pharmacy Counter Setup</div>
+        <p class="muted" style="font-size:0.86rem;margin:6px 0 18px;color:#94a3b8;" data-i18n="pharmacy.gate.sub">Enter your Hospital Code and a Counter Name to start the queue.</p>
+
+        <div style="display:flex;flex-direction:column;gap:10px;">
+          <input class="gate-input" id="gateCodeInput" placeholder="e.g. HOSP-1234" style="text-transform:uppercase;letter-spacing:1px;" data-i18n-ph="desk.gatePh" />
+          <input class="gate-input" id="gateCounterInput" placeholder="e.g. Pharmacy A" data-i18n-ph="pharmacy.counterPh" />
+          <button class="btn btn-green btn-block" id="btnAuthStation" onclick="authStation()"><i class="fa-solid fa-check"></i> <span data-i18n="pharmacy.unlock">Unlock Desk</span></button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Pharmacy Desk -->
+    <div id="pharmMain" class="hidden">
+      <div class="pharm-badge-bar">
+        <div>
+          <div style="font-weight:800;font-size:1.1rem;color:#f8fafc;" id="hospNameDisplay">—</div>
+          <div style="font-size:0.82rem;color:#94a3b8;" id="pharmCounterBadge">—</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+          <span class="badge green" data-i18n="pharmacy.active">Active Counter</span>
+          <span style="font-size:0.78rem;font-weight:800;color:#8BBB92;" id="pharmCodeBadge">HOSP-CODE</span>
+          <button class="sec-btn" onclick="exitStation()" style="background:#334155;color:#fff;border:none;padding:6px 12px;border-radius:8px;font-weight:800;cursor:pointer;"><i class="fa-solid fa-arrow-right-from-bracket"></i> <span data-i18n="desk.exitStation">Exit Station</span></button>
+        </div>
+      </div>
+
+      <!-- Now Dispensing Card -->
+      <div class="current-card" id="activeCard">
+        <div style="font-size:0.82rem;text-transform:uppercase;color:#94a3b8;letter-spacing:1.5px;font-weight:700;" data-i18n="pharmacy.serving">Now Dispensing</div>
+        <div class="curr-num" id="activeNumber">—</div>
+        <div class="curr-name" id="activeName" data-i18n="pharmacy.noActive">No patient at the counter</div>
+        <div id="activeMeta" style="color:#94a3b8;font-size:0.85rem;margin-top:4px;"></div>
+
+        <div style="margin-top:10px;color:#e2e8f0;background:rgba(255,255,255,0.06);border:1px solid #334155;border-radius:12px;padding:10px 12px;font-size:0.85rem;font-weight:700;" data-i18n="pharmacy.pleaseBring">Please bring your prescription slip to the counter.</div>
+
+        <div class="action-grid">
+          <button class="call-btn" id="btnCallNext" onclick="callNext()"><i class="fa-solid fa-bullhorn"></i> <span data-i18n="pharmacy.callNext">Call Next Patient</span></button>
+          <button class="sec-btn btn-recall" onclick="recallActive()"><i class="fa-solid fa-volume-high"></i> <span data-i18n="pharmacy.recall">Recall</span></button>
+          <button class="sec-btn btn-skip" onclick="skipActive()"><i class="fa-solid fa-user-xmark"></i> <span data-i18n="pharmacy.skip">Absent / Skip</span></button>
+          <button class="sec-btn btn-done" onclick="dispenseActive()"><i class="fa-solid fa-check-double"></i> <span data-i18n="pharmacy.dispense">Mark Dispensed</span></button>
+        </div>
+
+        <div class="hotkey-legend">
+          <span><kbd>F4</kbd> <span data-i18n="pharmacy.hot.next">Next</span></span>
+          <span><kbd>F8</kbd> <span data-i18n="pharmacy.hot.recall">Recall</span></span>
+          <span><kbd>F9</kbd> <span data-i18n="pharmacy.hot.skip">Skip</span></span>
+          <span><kbd>F10</kbd> <span data-i18n="pharmacy.hot.done">Dispense</span></span>
+        </div>
+      </div>
+
+      <div id="othersNotice" class="others-notice hidden"></div>
+
+      <!-- Waiting Queue -->
+      <div class="queue-list">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;padding:0 6px;">
+          <span style="font-weight:800;color:#94a3b8;font-size:0.85rem;letter-spacing:1px;text-transform:uppercase;" data-i18n="pharmacy.waiting">Waiting For Pharmacy</span>
+          <span style="font-weight:800;color:#8BBB92;font-size:0.85rem;" id="queueCount">0 Waiting</span>
+        </div>
+        <div id="queueRows"></div>
+      </div>
+    </div>
+  </div>
+
+  <audio id="pharmChime" preload="auto">
+    <source src="https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3" type="audio/mpeg">
+  </audio>
+
+  <script src="js/firebase-config.js"></script>
+  <script src="js/app.js"></script>
+  <script src="js/firebase.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/i18n.js"></script>
+  <script>
+    try { if (window.I18N) I18N.init(); } catch (e) {}
+    function l10n(key, fb) { return (window.I18N && window.I18N.t) ? window.I18N.t(key) : fb; }
+    window.escHtml = window.escHtml || function (s) {
+      return String(s == null ? '' : s)
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+    };
+
+    window.showToast = window.showToast || function(msg, isErr, ms) {
+      let w = document.getElementById('hkToastWrap');
+      if (!w) {
+        w = document.createElement('div');
+        w.id = 'hkToastWrap';
+        w.style.cssText = 'position:fixed;bottom:24px;left:50%;transform:translateX(-50%);z-index:99999;display:flex;flex-direction:column;gap:8px;align-items:center;pointer-events:none;';
+        document.body.appendChild(w);
+      }
+      const t = document.createElement('div');
+      t.style.cssText = `background:${isErr ? '#ef4444' : '#2A835F'};color:#fff;padding:12px 20px;border-radius:12px;font-weight:700;font-size:0.9rem;box-shadow:0 10px 25px rgba(0,0,0,0.2);transition:opacity 0.3s;`;
+      t.textContent = msg;
+      w.appendChild(t);
+      setTimeout(() => { t.style.opacity = '0'; setTimeout(() => t.remove(), 300); }, ms || 2500);
+    };
+
+    // ---- state ----
+    let currentHospital = null;
+    let currentHospitalName = '';
+    let currentHospitalCode = '';
+    let pharmCounter = '';
+    let waitingTokens = [];
+    let activeToken = null;
+    let unsubQueue = null;
+    let pharmPollTimer = null;
+    const FUNC = window.TokSpotAPI && window.TokSpotAPI.mode() === 'functions';
+
+    async function ensureAuth() {
+      if (!window._auth) return;
+      if (!window._auth.currentUser) {
+        try { await window._useAuth.signInAnonymously(window._auth); } catch (e) {}
+      }
+    }
+
+    function tvMillis(v) {
+      if (v == null) return 0;
+      if (typeof v === 'number') return v;
+      if (typeof v.toMillis === 'function') return v.toMillis();
+      return 0;
+    }
+
+    function tsLabel(v) {
+      const ms = tvMillis(v);
+      if (!ms) return '—';
+      return new Date(ms).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    }
+
+    window.addEventListener('load', async () => {
+      if (window.hk && hk.applyDark) hk.applyDark();
+      try {
+        if (typeof initFirebase === 'function') await initFirebase();
+        if (typeof waitForFB === 'function') await waitForFB();
+      } catch (e) {}
+
+      const params = new URLSearchParams(window.location.search);
+      const urlCode = params.get('code') || params.get('h');
+      const urlCounter = params.get('counter');
+      const savedCode = sessionStorage.getItem('tokspot_pharmacy_hospital');
+      const savedCounter = sessionStorage.getItem('tokspot_pharmacy_counter');
+
+      if (urlCode) {
+        document.getElementById('gateCodeInput').value = urlCode.toUpperCase();
+        if (urlCounter) document.getElementById('gateCounterInput').value = urlCounter;
+        authStation();
+      } else if (savedCode) {
+        document.getElementById('gateCodeInput').value = savedCode.toUpperCase();
+        document.getElementById('gateCounterInput').value = savedCounter || '';
+        authStation();
+      }
+    });
+
+    async function authStation() {
+      const rawCode = document.getElementById('gateCodeInput').value.trim();
+      const codeInput = rawCode.toUpperCase();
+      const counter = document.getElementById('gateCounterInput').value.trim();
+      if (!codeInput) return showToast(l10n('pharmacy.err.code', 'Enter hospital code to unlock the desk.'), true);
+      if (!counter) return showToast(l10n('pharmacy.err.counter', 'Enter a counter name (e.g. Pharmacy A).'), true);
+
+      const btn = document.getElementById('btnAuthStation');
+      btn.disabled = true;
+      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> ' + l10n('pharmacy.unlocking', 'Unlocking…');
+
+      try {
+        await ensureAuth();
+
+        let targetDoc = null;
+        if (FUNC) {
+          const resolved = await window.TokSpotAPI.resolveHospitalByCode({ code: codeInput });
+          targetDoc = { id: resolved.id, data: () => resolved };
+        } else {
+          const hospSnap = await window._fs.getDocs(window._fs.collection(window._db, 'hospitals'));
+          const cleanInput = codeInput.replace(/^HOSP-?/i, '');
+          targetDoc = hospSnap.docs.find(d => {
+            const data = d.data();
+            const c = (data.hospitalCode || data.code || '').toUpperCase();
+            return c === codeInput || c.replace(/^HOSP-?/i, '') === cleanInput || d.id.toUpperCase() === codeInput;
+          });
+        }
+
+        if (!targetDoc) {
+          showToast(l10n('pharmacy.err.invalid', 'Invalid Hospital Code. Access denied.'), true);
+          return;
+        }
+
+        currentHospital = targetDoc.id;
+        const hData = targetDoc.data();
+        currentHospitalName = hData.name || currentHospital;
+        currentHospitalCode = hData.hospitalCode || codeInput;
+        pharmCounter = counter;
+
+        sessionStorage.setItem('tokspot_pharmacy_hospital', currentHospitalCode);
+        sessionStorage.setItem('tokspot_pharmacy_counter', counter);
+
+        document.getElementById('hospNameDisplay').textContent = `${currentHospitalName} · ${pharmCounter}`;
+        document.getElementById('pharmCounterBadge').textContent = pharmCounter;
+        document.getElementById('pharmCodeBadge').textContent = currentHospitalCode;
+
+        document.getElementById('stationGate').classList.add('hidden');
+        document.getElementById('pharmMain').classList.remove('hidden');
+
+        startPharmacySync();
+      } catch (err) {
+        console.error(err);
+        showToast(l10n('pharmacy.err.auth', 'Authorization error: ') + err.message, true);
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fa-solid fa-check"></i> ' + l10n('pharmacy.unlock', 'Unlock Desk');
+      }
+    }
+
+    function startPharmacySync() {
+      if (FUNC) { startPharmPolling(); return; }
+      if (unsubQueue) unsubQueue();
+      const today = window.todayStr ? window.todayStr() : new Date().toISOString().slice(0, 10);
+      const tokensRef = window._fs.collection(window._db, 'hospitals', currentHospital, 'tokens');
+      const q = window._fs.query(tokensRef, window._fs.where('date', '==', today));
+
+      unsubQueue = window._fs.onSnapshot(q, (snap) => {
+        const rows = [];
+        snap.docs.forEach(d => {
+          const t = d.data();
+          t.id = d.id;
+          // Pharmacy stage starts only after the consultation completes.
+          if (t.pharmacy === true && t.status === 'completed') rows.push(t);
+        });
+        finalizePharmacyQueue(rows);
+      }, (err) => {
+        console.error('Pharmacy sync error:', err);
+        showToast(l10n('pharmacy.err.sync', 'Error syncing queue: ') + err.message, true);
+      });
+    }
+
+    function startPharmPolling() {
+      const tick = async () => {
+        try {
+          const res = await window.TokSpotAPI.getPharmacyQueue({ slug: currentHospital });
+          finalizePharmacyQueue(res.rows || []);
+        } catch (e) {
+          console.error('Pharmacy poll error:', e);
+          showToast(l10n('pharmacy.err.sync', 'Error syncing queue: ') + e.message, true);
+        }
+      };
+      tick();
+      if (pharmPollTimer) clearInterval(pharmPollTimer);
+      pharmPollTimer = setInterval(tick, 3000);
+    }
+
+    function finalizePharmacyQueue(rows) {
+      const waiting = rows.filter(t => t.pharmacyStatus === 'waiting');
+      const mine = rows.filter(t => t.pharmacyStatus === 'called' && String(t.pharmacyCounter || '') === pharmCounter);
+      const others = rows.filter(t => t.pharmacyStatus === 'called' && String(t.pharmacyCounter || '') !== pharmCounter);
+
+      mine.sort((a, b) => tvMillis(b.pharmacyCalledAt) - tvMillis(a.pharmacyCalledAt));
+      activeToken = mine[0] || null;
+
+      waiting.sort((a, b) => {
+        if (b.priority && !a.priority) return 1;
+        if (!b.priority && a.priority) return -1;
+        return (Number(a.number) || 0) - (Number(b.number) || 0);
+      });
+      waitingTokens = waiting;
+
+      renderDesk(activeToken, waiting, others);
+    }
+
+    function renderDesk(active, waiting, others) {
+      document.getElementById('queueCount').textContent = `${waiting.length} ${l10n('pharmacy.wait', 'Waiting')}`;
+
+      const card = document.getElementById('activeCard');
+      if (active) {
+        document.getElementById('activeNumber').textContent = `#${active.number}`;
+        document.getElementById('activeName').textContent = active.patientName || l10n('pharmacy.patient', 'Patient');
+        const metaBits = [
+          l10n('pharmacy.sentAt', 'Sent at %s').replace('%s', tsLabel(active.pharmacySentAt || active.createdAt)),
+          active.doctorName ? l10n('pharmacy.fromDoc', 'Via %s').replace('%s', active.doctorName) : ''
+        ].filter(Boolean);
+        document.getElementById('activeMeta').textContent = metaBits.join(' · ');
+        card.classList.toggle('priority', !!active.priority);
+      } else {
+        document.getElementById('activeNumber').textContent = '—';
+        document.getElementById('activeName').textContent = l10n('pharmacy.noActive', 'No patient at the counter');
+        document.getElementById('activeMeta').textContent = '';
+        card.classList.remove('priority');
+      }
+
+      const notice = document.getElementById('othersNotice');
+      if (others && others.length) {
+        notice.classList.remove('hidden');
+        notice.textContent = others.map(t =>
+          l10n('pharmacy.otherCounter', 'Being served at %s').replace('%s', t.pharmacyCounter || '—') + ' · #' + t.number
+        ).join('  |  ');
+      } else {
+        notice.classList.add('hidden');
+        notice.textContent = '';
+      }
+
+      renderQueueRows(waiting);
+    }
+
+    function renderQueueRows(waiting) {
+      const container = document.getElementById('queueRows');
+      if (!waiting.length) {
+        container.innerHTML = `<div style="padding:18px;text-align:center;color:#64748b;">${l10n('pharmacy.empty', 'Pharmacy queue is empty')}</div>`;
+        return;
+      }
+
+      container.innerHTML = waiting.map((t, idx) => `
+        <div class="queue-item">
+          <div>
+            <span style="font-weight:800;color:#8BBB92;font-size:1.15rem;margin-right:10px;">#${escHtml(t.number)}</span>
+            <span style="color:#cbd5e1;font-weight:600;font-size:0.95rem;">${escHtml(t.patientName || l10n('pharmacy.patient', 'Patient'))}</span>
+            ${t.priority ? `<span class="badge red" style="margin-left:6px;"><i class="fa-solid fa-truck-medical"></i> ${l10n('doctor.priority', 'PRIORITY')}</span>` : ''}
+          </div>
+          <span style="color:#64748b;font-size:0.82rem;font-weight:700;">
+            ${t.doctorName ? l10n('pharmacy.fromDoc', 'Via %s').replace('%s', escHtml(t.doctorName)) : ''}
+            ${t.pharmacySentAt || t.createdAt ? ' · ' + l10n('pharmacy.sentAt', 'Sent at %s').replace('%s', tsLabel(t.pharmacySentAt || t.createdAt)) : ''}
+          </span>
+        </div>
+      `).join('');
+    }
+
+    function playChime() {
+      try {
+        const audio = document.getElementById('pharmChime');
+        if (audio) {
+          audio.currentTime = 0;
+          audio.play().catch(() => {});
+        }
+      } catch (e) {}
+    }
+
+    async function callNext() {
+      if (!waitingTokens.length) return showToast(l10n('pharmacy.err.noWait2', 'No waiting patients to call.'), true);
+      const nextToken = waitingTokens[0];
+      const btn = document.getElementById('btnCallNext');
+      btn.disabled = true;
+      try {
+        await window.TokSpotAPI.pharmacyAction({ slug: currentHospital, tokenId: nextToken.id, action: 'call', counter: pharmCounter });
+        playChime();
+        if (window.announceToken) {
+          window.announceToken(nextToken.number, nextToken.patientName || '', `${l10n('pharmacy.brand', 'Pharmacy')} · ${pharmCounter}`);
+        }
+        showToast(l10n('pharmacy.ok.calling', 'Calling Token #%s').replace('%s', nextToken.number));
+      } catch (e) {
+        showToast(l10n('pharmacy.err.action', 'Action failed: ') + e.message, true);
+      } finally {
+        btn.disabled = false;
+      }
+    }
+
+    async function recallActive() {
+      if (!activeToken) return showToast(l10n('pharmacy.err.noActive2', 'No active patient at your counter.'), true);
+      try {
+        await window.TokSpotAPI.pharmacyAction({ slug: currentHospital, tokenId: activeToken.id, action: 'recall', counter: pharmCounter });
+        playChime();
+        if (window.announceToken) {
+          window.announceToken(activeToken.number, activeToken.patientName || '', `${l10n('pharmacy.brand', 'Pharmacy')} · ${pharmCounter}`);
+        }
+        showToast(l10n('pharmacy.ok.recalled', 'Recalled Token #%s').replace('%s', activeToken.number));
+      } catch (e) {
+        showToast(l10n('pharmacy.err.action', 'Action failed: ') + e.message, true);
+      }
+    }
+
+    async function skipActive() {
+      if (!activeToken) return showToast(l10n('pharmacy.err.noActive2', 'No active patient at your counter.'), true);
+      try {
+        await window.TokSpotAPI.pharmacyAction({ slug: currentHospital, tokenId: activeToken.id, action: 'skip', counter: pharmCounter });
+        showToast(l10n('pharmacy.ok.absent', 'Token #%s marked Absent.').replace('%s', activeToken.number));
+      } catch (e) {
+        showToast(l10n('pharmacy.err.action', 'Action failed: ') + e.message, true);
+      }
+    }
+
+    async function dispenseActive() {
+      if (!activeToken) return showToast(l10n('pharmacy.err.dispense', 'No dispensing patient at your counter.'), true);
+      try {
+        await window.TokSpotAPI.pharmacyAction({ slug: currentHospital, tokenId: activeToken.id, action: 'dispense', counter: pharmCounter });
+        showToast(l10n('pharmacy.ok.dispensed', 'Token #%s dispensed. Thank you!').replace('%s', activeToken.number));
+      } catch (e) {
+        showToast(l10n('pharmacy.err.action', 'Action failed: ') + e.message, true);
+      }
+    }
+
+    function exitStation() {
+      if (!confirm(l10n('pharmacy.confirmExit', 'Disconnect this pharmacy counter from this hospital?'))) return;
+      sessionStorage.removeItem('tokspot_pharmacy_hospital');
+      sessionStorage.removeItem('tokspot_pharmacy_counter');
+      currentHospital = null;
+      pharmCounter = '';
+      if (unsubQueue) { unsubQueue(); unsubQueue = null; }
+      if (pharmPollTimer) { clearInterval(pharmPollTimer); pharmPollTimer = null; }
+      document.getElementById('pharmMain').classList.add('hidden');
+      document.getElementById('stationGate').classList.remove('hidden');
+      document.getElementById('gateCodeInput').value = '';
+      document.getElementById('gateCounterInput').value = '';
+    }
+
+    // Keyboard Shortcuts
+    window.addEventListener('keydown', (e) => {
+      const activeEl = document.activeElement;
+      if (activeEl && (activeEl.tagName === 'TEXTAREA' || activeEl.tagName === 'INPUT')) return;
+
+      if (e.key === 'F4') { e.preventDefault(); callNext(); }
+      if (e.key === 'F8') { e.preventDefault(); recallActive(); }
+      if (e.key === 'F9') { e.preventDefault(); skipActive(); }
+      if (e.key === 'F10') { e.preventDefault(); dispenseActive(); }
+    });
+  </script>
+</body>
+</html>

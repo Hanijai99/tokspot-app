@@ -172,6 +172,14 @@
           </div>
         </div>
 
+        <div style="display:flex;align-items:center;gap:10px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:12px;padding:12px 14px;margin-top:10px;">
+          <input type="checkbox" id="newPharmacy" style="width:20px;height:20px;accent-color:#2A835F;" />
+          <div style="flex:1;">
+            <div style="font-weight:700;font-size:.9rem;color:#166534;"><i class="fa-solid fa-prescription-bottle-medical"></i> <span data-i18n="desk.pharmacy">Needs Pharmacy</span></div>
+            <div class="muted" style="font-size:.78rem;" data-i18n="desk.pharmacySub">Route this token to the pharmacy counter after consultation.</div>
+          </div>
+        </div>
+
         <div style="display:flex;align-items:center;gap:8px;margin-top:10px;padding:4px;">
           <input type="checkbox" id="autoPrintSlip" checked style="width:16px;height:16px;accent-color:var(--green);" />
           <label for="autoPrintSlip" style="font-size:0.85rem;font-weight:600;color:var(--ink);cursor:pointer;">
@@ -1025,6 +1033,7 @@
       btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> ' + l10n('desk.issuing', 'Issuing...');
 
       const isPriority = document.getElementById('newPriority').checked;
+      const isPharmacy = document.getElementById('newPharmacy') ? document.getElementById('newPharmacy').checked : false;
       const counter = document.getElementById('newCounter').value;
 
       try {
@@ -1039,7 +1048,8 @@
           phone,
           priority: isPriority,
           counter,
-          source: mode
+          source: mode,
+          pharmacy: isPharmacy
         });
         const tokenNum = issued.tokenNum;
         createdTokenId = issued.tokenId;
@@ -1048,6 +1058,7 @@
         document.getElementById('newName').value = '';
         document.getElementById('newPhone').value = '';
         document.getElementById('newPriority').checked = false;
+        if (document.getElementById('newPharmacy')) document.getElementById('newPharmacy').checked = false;
         playBeep();
         showToast(l10n('desk.ok.issued', 'Token #%s issued').replace('%s', tokenNum));
 

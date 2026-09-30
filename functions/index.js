@@ -60,6 +60,8 @@ function doctorDisplayStatus(doc) {
 const RL = {
   issue: { maxCalls: 60, periodSeconds: 60 },
   transition: { maxCalls: 240, periodSeconds: 60 },
+  pharmacy: { maxCalls: 120, periodSeconds: 60 },
+  pharmacyQueue: { maxCalls: 120, periodSeconds: 60 },
   cancel: { maxCalls: 60, periodSeconds: 60 },
   tokenStatus: { maxCalls: 120, periodSeconds: 60 },
   doctorQueue: { maxCalls: 120, periodSeconds: 60 },
@@ -222,7 +224,7 @@ async function notifyPatient(slug, hospital, phone, body) {
 //  issueToken — trusted token allocation (uniqueness + quota + idempotency)
 // ------------------------------------------------------------------
 exports.issueToken = onCall({ maxInstances: 10, rateLimiting: RL.issue }, async (request) => {
-  const { slug, code, doctorId, name, phone, priority, counter, source, idempotencyKey } =
+  const { slug, code, doctorId, name, phone, priority, counter, source, idempotencyKey, pharmacy } =
     request.data || {};
   if (!slug || !doctorId) throw new HttpsError('invalid-argument', 'slug + doctorId required.');
   const hospital = await loadHospital(slug);
@@ -320,6 +322,7 @@ exports.issueToken = onCall({ maxInstances: 10, rateLimiting: RL.issue }, async 
         idempotencyKey: key || null,
         estWaitMinutes,
         createdAt: new Date(),
+        ...(pharmacy ? { pharmacy: true, pharmacyStatus: 'waiting', pharmacySentAt: new Date() } : {}),
       });
     });
   } catch (err) {
@@ -335,6 +338,119 @@ exports.issueToken = onCall({ maxInstances: 10, rateLimiting: RL.issue }, async 
     }
   }
   return { slug, tokenId, number, reused };
+});
+
+// ------------------------------------------------------------------
+//  routeToPharmacy — doctor desk sends a completed token to the
+//  pharmacy counter (queue routing only, no clinical data).
+// ------------------------------------------------------------------
+exports.routeToPharmacy = onCall({ maxInstances: 10, rateLimiting: RL.pharmacy }, async (request) => {
+  const { slug, tokenId } = request.data || {};
+  if (!slug || !tokenId) throw new HttpsError('invalid-argument', 'slug + tokenId required.');
+  const uid = request.auth && request.auth.uid;
+  if (!uid) throw new HttpsError('unauthenticated', 'Sign in required.');
+  const hospital = await loadHospital(slug);
+  if (!hospital) throw new HttpsError('not-found', 'Hospital not found.');
+  const ref = db.doc(`hospitals/${slug}/tokens/${tokenId}`);
+  const snap = await ref.get();
+  if (!snap.exists) throw new HttpsError('not-found', 'Token not found.');
+  const now = new Date();
+  await ref.update({
+    pharmacy: true,
+    pharmacyStatus: 'waiting',
+    pharmacySentAt: now,
+  });
+  await audit(uid, slug, 'pharmacy:routed', tokenId, 'ok', { number: snap.data().number });
+  return { ok: true, tokenId };
+});
+
+// ------------------------------------------------------------------
+//  pharmacyAction — pharmacy counter desk: call / recall / skip /
+//  dispense a token routed to the pharmacy. Only queue-stage markers
+//  are written; no medication or diagnosis data is ever stored.
+// ------------------------------------------------------------------
+exports.pharmacyAction = onCall({ maxInstances: 10, rateLimiting: RL.pharmacy }, async (request) => {
+  const { slug, tokenId, action, counter } = request.data || {};
+  if (!slug || !tokenId || !action) {
+    throw new HttpsError('invalid-argument', 'slug + tokenId + action required.');
+  }
+  const allowed = ['call', 'recall', 'skip', 'dispense'];
+  if (!allowed.includes(action)) throw new HttpsError('invalid-argument', 'Unknown pharmacy action.');
+  const uid = request.auth && request.auth.uid;
+  if (!uid) throw new HttpsError('unauthenticated', 'Sign in required.');
+  const hospital = await loadHospital(slug);
+  if (!hospital) throw new HttpsError('not-found', 'Hospital not found.');
+
+  const ref = db.doc(`hospitals/${slug}/tokens/${tokenId}`);
+  const snap = await ref.get();
+  if (!snap.exists) throw new HttpsError('not-found', 'Token not found.');
+  const t = snap.data();
+  if (t.pharmacy !== true) {
+    throw new HttpsError('failed-precondition', 'Token is not routed to the pharmacy counter.');
+  }
+  const counterName = String(counter || 'Pharmacy').slice(0, 40);
+  const now = new Date();
+  const patch = {};
+  if (action === 'call') {
+    if (String(t.pharmacyStatus || '') === 'dispensed') throw new HttpsError('failed-precondition', 'Token was already dispensed.');
+    patch.pharmacyStatus = 'called';
+    patch.pharmacyCalledAt = now;
+    patch.pharmacyCounter = counterName;
+  } else if (action === 'recall') {
+    if (String(t.pharmacyStatus || '') !== 'called') throw new HttpsError('failed-precondition', 'No active patient to recall.');
+    patch.pharmacyCalledAt = now;
+    patch.pharmacyRecallCount = (Number(t.pharmacyRecallCount) || 0) + 1;
+  } else if (action === 'skip') {
+    if (String(t.pharmacyStatus || '') === 'dispensed') throw new HttpsError('failed-precondition', 'Token was already dispensed.');
+    patch.pharmacyStatus = 'skipped';
+    patch.pharmacySkippedAt = now;
+    patch.pharmacyCounter = counterName;
+  } else if (action === 'dispense') {
+    if (String(t.pharmacyStatus || '') !== 'called') throw new HttpsError('failed-precondition', 'No called patient at this counter to dispense.');
+    patch.pharmacyStatus = 'dispensed';
+    patch.pharmacyDispensedAt = now;
+    patch.pharmacyCounter = counterName;
+  }
+  await ref.update(patch);
+  await audit(uid, slug, `pharmacy:${action}`, tokenId, 'ok', { number: t.number, counter: counterName });
+  return { ok: true, status: patch.pharmacyStatus };
+});
+
+// ------------------------------------------------------------------
+//  getPharmacyQueue — today's pharmacy queue for a counter desk.
+//  Staff view: token number, patient name (desk only), doctor, stage.
+// ------------------------------------------------------------------
+exports.getPharmacyQueue = onCall({ rateLimiting: RL.pharmacyQueue }, async (request) => {
+  const { slug } = request.data || {};
+  if (!slug) throw new HttpsError('invalid-argument', 'slug required.');
+  const hospital = await loadHospital(slug);
+  if (!hospital) throw new HttpsError('not-found', 'Hospital not found.');
+  const today = todayInZone(getHospitalTz(hospital));
+  const docs = await db.collection(`hospitals/${slug}/tokens`)
+    .where('date', '==', today).get();
+  const rows = [];
+  docs.forEach((d) => {
+    const t = d.data();
+    // Pharmacy stage starts only after the consultation completes.
+    if (t.pharmacy !== true || normalizeStatus(t.status) !== 'completed') return;
+    rows.push({
+      id: d.id,
+      number: t.number,
+      patientName: t.patientName || '',
+      phone: t.phone || '',
+      doctorName: t.doctorName || '',
+      priority: Boolean(t.priority),
+      pharmacyStatus: String(t.pharmacyStatus || 'waiting'),
+      pharmacyCounter: String(t.pharmacyCounter || ''),
+      createdAt: t.createdAt ? t.createdAt.toMillis() : null,
+      pharmacySentAt: t.pharmacySentAt ? t.pharmacySentAt.toMillis() : null,
+      pharmacyCalledAt: t.pharmacyCalledAt ? t.pharmacyCalledAt.toMillis() : null,
+      pharmacyDispensedAt: t.pharmacyDispensedAt ? t.pharmacyDispensedAt.toMillis() : null,
+      pharmacyRecallCount: Number(t.pharmacyRecallCount) || 0,
+    });
+  });
+  rows.sort((a, b) => Number(a.number) - Number(b.number));
+  return { rows };
 });
 
 // ------------------------------------------------------------------

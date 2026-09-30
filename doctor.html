@@ -112,6 +112,11 @@
         <button class="sec-btn btn-done" onclick="completeCurrent()"><i class="fa-solid fa-check-double"></i> <span data-i18n="doctor.complete">Complete</span></button>
       </div>
 
+      <label style="display:flex;align-items:center;gap:8px;justify-content:center;margin-top:14px;cursor:pointer;color:#e2e8f0;font-weight:700;font-size:0.85rem;background:rgba(255,255,255,0.06);border:1px solid #334155;border-radius:12px;padding:10px 12px;">
+        <input type="checkbox" id="chkSendPharmacy" style="width:18px;height:18px;accent-color:#2A835F;" />
+        <i class="fa-solid fa-prescription-bottle-medical"></i> <span data-i18n="doctor.pharmacySend">Send to Pharmacy after completion</span>
+      </label>
+
       <div class="hotkey-legend">
         <span><kbd>F4</kbd> <span data-i18n="doctor.hot.next">Next</span></span>
         <span><kbd>F8</kbd> <span data-i18n="doctor.hot.recall">Recall</span></span>
@@ -526,7 +531,13 @@
 
       try {
         if (currentActiveToken) {
+          const cb = document.getElementById('chkSendPharmacy');
+          const wantPharmacy = !!(cb && cb.checked);
           await window.TokSpotAPI.transition({ slug: currentHospitalSlug, tokenId: currentActiveToken.id, nextStatus: 'completed' });
+          if (wantPharmacy) {
+            await window.TokSpotAPI.routeToPharmacy({ slug: currentHospitalSlug, tokenId: currentActiveToken.id });
+            if (cb) cb.checked = false;
+          }
         }
 
         const nextToken = waitingTokens[0];
@@ -569,6 +580,8 @@
       if (!currentActiveToken) return showToast(l10n('doctor.err.noActiveSkip', 'No active patient to skip.'), true);
       try {
         await window.TokSpotAPI.transition({ slug: currentHospitalSlug, tokenId: currentActiveToken.id, nextStatus: 'skipped' });
+        const cb = document.getElementById('chkSendPharmacy');
+        if (cb) cb.checked = false;
         showToast(l10n('doctor.ok.absent', 'Token #%s marked Absent.').replace('%s', currentActiveToken.number));
       } catch (e) {
         showToast(l10n('doctor.err.skip', 'Skip failed: ') + e.message, true);
@@ -577,8 +590,15 @@
 
     async function completeCurrent() {
       if (!currentActiveToken) return showToast(l10n('doctor.err.noActive', 'No active patient.'), true);
+      const cb = document.getElementById('chkSendPharmacy');
+      const wantPharmacy = !!(cb && cb.checked);
       try {
         await window.TokSpotAPI.transition({ slug: currentHospitalSlug, tokenId: currentActiveToken.id, nextStatus: 'completed' });
+        if (wantPharmacy) {
+          await window.TokSpotAPI.routeToPharmacy({ slug: currentHospitalSlug, tokenId: currentActiveToken.id });
+          if (cb) cb.checked = false;
+          showToast(l10n('doctor.ok.sentPharm', 'Token #%s sent to Pharmacy.').replace('%s', currentActiveToken.number));
+        }
         showToast(l10n('doctor.ok.completed', 'Token #%s consultation completed.').replace('%s', currentActiveToken.number));
       } catch (e) {
         showToast(l10n('doctor.err.action', 'Action failed: ') + e.message, true);

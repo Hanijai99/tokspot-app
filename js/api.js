@@ -80,7 +80,7 @@
    * @returns {Promise<{tokenId: string, tokenNum: string, reused?: boolean}>}
    */
   async function issueToken(opts) {
-    const { slug, doctorId, doctorName, name, phone, priority, counter, source, extra, idempotencyKey } = opts || {};
+    const { slug, doctorId, doctorName, name, phone, priority, counter, source, extra, idempotencyKey, pharmacy } = opts || {};
     if (!slug || !doctorId || !name) {
       throw new Error('Hospital, doctor and patient name are required.');
     }
@@ -91,6 +91,7 @@
         priority: Boolean(priority), counter: counter || 'Counter A',
         source: source || 'desk',
         idempotencyKey: idempotencyKey || generateIdempotencyKey(),
+        pharmacy: Boolean(pharmacy),
       });
       return { tokenId: res.tokenId, tokenNum: res.number, reused: Boolean(res.reused) };
     }
@@ -148,6 +149,11 @@
         priority: Boolean(priority),
         counter: counter || 'Counter A',
         ...(extra || {}),
+        ...((pharmacy && {
+          pharmacy: true,
+          pharmacyStatus: 'waiting',
+          pharmacySentAt: win._fs.serverTimestamp ? win._fs.serverTimestamp() : new Date(),
+        }) || {}),
       });
     });
     return { tokenId, tokenNum };
@@ -172,6 +178,96 @@
     await ensureAuth();
     requireFs();
     return win.TokspotQueue.transitionToken(win._fs, win._db, slug, tokenId, nextStatus, changes);
+  }
+
+  // ---- routeToPharmacy (doctor → pharmacy counter) ---------------
+
+  /**
+   * Marks a token for the pharmacy counter after consultation.
+   * Works in both modes; functions mode is enforced server-side so the
+   * strict ruleset cannot block the doctor desk routing.
+   * @param {object} opts { slug, tokenId }
+   * @returns {Promise<{slug: string, tokenId: string}>}
+   */
+  async function routeToPharmacy(opts) {
+    const { slug, tokenId } = opts || {};
+    if (!slug || !tokenId) throw new Error('slug and tokenId are required.');
+    if (apiMode() === 'functions') {
+      return callFunction('routeToPharmacy', { slug, tokenId });
+    }
+    await ensureAuth();
+    requireFs();
+    const ref = win._fs.doc(win._db, 'hospitals', slug, 'tokens', tokenId);
+    const snap = await win._fs.getDoc(ref);
+    if (!snap.exists()) throw new Error('Token not found.');
+    await win._fs.updateDoc(ref, {
+      pharmacy: true,
+      pharmacyStatus: 'waiting',
+      pharmacySentAt: win._fs.serverTimestamp ? win._fs.serverTimestamp() : new Date(),
+    });
+    return { slug, tokenId };
+  }
+
+  // ---- pharmacyAction (pharmacy desk call/skip/dispense) ---------
+
+  /**
+   * Pharmacy counter queue actions on a token routed to the pharmacy.
+   * No clinical data is written — only queue-stage markers.
+   * @param {object} opts { slug, tokenId, action, counter }
+   *   action: 'call' | 'recall' | 'skip' | 'dispense'
+   * @returns {Promise<{status: string}>}
+   */
+  async function pharmacyAction(opts) {
+    const { slug, tokenId, action, counter } = opts || {};
+    if (!slug || !tokenId || !action) {
+      throw new Error('slug, tokenId and action are required.');
+    }
+    const allowed = ['call', 'recall', 'skip', 'dispense'];
+    if (!allowed.includes(action)) throw new Error('Unknown pharmacy action: ' + action);
+    if (apiMode() === 'functions') {
+      return callFunction('pharmacyAction', { slug, tokenId, action, counter: String(counter || 'Pharmacy') });
+    }
+    await ensureAuth();
+    requireFs();
+    const ref = win._fs.doc(win._db, 'hospitals', slug, 'tokens', tokenId);
+    const snap = await win._fs.getDoc(ref);
+    if (!snap.exists()) throw new Error('Token not found.');
+    const t = snap.data();
+    if (t.pharmacy !== true) throw new Error('Token is not routed to the pharmacy counter.');
+    const now = win._fs.serverTimestamp ? win._fs.serverTimestamp() : new Date();
+    const counterName = String(counter || 'Pharmacy');
+    const patch = {};
+    if (action === 'call') {
+      if (String(t.pharmacyStatus || '') === 'dispensed') throw new Error('Token was already dispensed.');
+      patch.pharmacyStatus = 'called';
+      patch.pharmacyCalledAt = now;
+      patch.pharmacyCounter = counterName;
+    } else if (action === 'recall') {
+      if (String(t.pharmacyStatus || '') !== 'called') throw new Error('No active patient to recall.');
+      patch.pharmacyCalledAt = now;
+      patch.pharmacyRecallCount = (Number(t.pharmacyRecallCount) || 0) + 1;
+    } else if (action === 'skip') {
+      if (String(t.pharmacyStatus || '') === 'dispensed') throw new Error('Token was already dispensed.');
+      patch.pharmacyStatus = 'skipped';
+      patch.pharmacySkippedAt = now;
+      patch.pharmacyCounter = counterName;
+    } else if (action === 'dispense') {
+      if (String(t.pharmacyStatus || '') !== 'called') throw new Error('No called patient at this counter to dispense.');
+      patch.pharmacyStatus = 'dispensed';
+      patch.pharmacyDispensedAt = now;
+      patch.pharmacyCounter = counterName;
+    }
+    await win._fs.updateDoc(ref, patch);
+    return { status: patch.pharmacyStatus };
+  }
+
+  // ---- getPharmacyQueue (pharmacy desk day queue, functions mode) -
+
+  async function getPharmacyQueue(opts) {
+    const { slug } = opts || {};
+    if (!slug) throw new Error('slug required.');
+    if (apiMode() !== 'functions') return readNeedsFunctions('getPharmacyQueue');
+    return callFunction('getPharmacyQueue', { slug });
   }
 
   // ---- cancelToken (patient self-cancel, verified by phone) ---------
@@ -500,5 +596,8 @@
     listFeedback,
     getAnalytics,
     transferQueue,
+    routeToPharmacy,
+    pharmacyAction,
+    getPharmacyQueue,
   };
 });
