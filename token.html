@@ -183,9 +183,16 @@
     let unsubscribeQueue = null;
     let prevStatus = null;
 
+    async function ensureAuth() {
+      if (!window._auth.currentUser) {
+        try { await window._useAuth.signInAnonymously(window._auth); } catch (e) {}
+      }
+    }
+
     window.addEventListener('load', async () => {
       await initFirebase();
       await waitForFB();
+      await ensureAuth();
 
       const params = new URLSearchParams(window.location.search);
       const tokenId = params.get('id');

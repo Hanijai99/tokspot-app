@@ -67,9 +67,16 @@
     let qDoc = null;
     let qr = null;
 
+    async function ensureAuth() {
+      if (!window._auth.currentUser) {
+        try { await window._useAuth.signInAnonymously(window._auth); } catch (e) {}
+      }
+    }
+
     window.addEventListener('load', async () => {
       hk.applyDark();
       await initFirebase();
+      await ensureAuth();
       await loadHospitals();
     });
 

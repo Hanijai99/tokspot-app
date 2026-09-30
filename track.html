@@ -68,8 +68,15 @@
     const FUNC = window.TokSpotAPI && window.TokSpotAPI.mode() === 'functions';
     let pollTimer = null;
 
+    async function ensureAuth() {
+      if (!window._auth.currentUser) {
+        try { await window._useAuth.signInAnonymously(window._auth); } catch (e) {}
+      }
+    }
+
     window.addEventListener('load', async () => {
       await initFirebase();
+      await ensureAuth();
       if (!hospitalId || !tokenId) {
         document.getElementById('hospName').textContent = l10n('track.invalid', 'Invalid tracking link.');
         return;

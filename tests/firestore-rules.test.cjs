@@ -34,8 +34,10 @@ let testEnv = null;
 
 before(async () => {
   if (!rulesTest || !EMU) return;
+  // Validate the HARDENED policy. The live-prototype policy sits in
+  // firestore.rules (cooperative-posture); this suite pins the target.
   const rules = require('fs').readFileSync(
-    require('path').join(__dirname, '..', 'firestore.rules'), 'utf8');
+    require('path').join(__dirname, '..', 'firestore.rules.target'), 'utf8');
   testEnv = await rulesTest.initializeTestEnvironment({
     projectId: 'tokspot-rules-test',
     firestore: { rules, host: '127.0.0.1', port: 8080 },
