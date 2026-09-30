@@ -2,6 +2,43 @@
 // UNIVERSAL MULTI-LANGUAGE VOICE ANNOUNCEMENT ENGINE FOR TOKMARK
 // =========================================================================
 
+// =========================================================================
+// THEME (light/dark) TOGGLE — window.hk shared by every page.
+// The CSS already ships full body.dark support; this restores the missing
+// toggle JS and persists the choice so the button actually works.
+// =========================================================================
+window.hk = (function () {
+  const KEY = 'tokspot_theme';
+  function isDark() { return document.body && document.body.classList.contains('dark'); }
+  function syncIcons() {
+    const dark = isDark();
+    document.querySelectorAll('.theme-toggle i, .icn-btn i.fa-moon, .icn-btn i.fa-sun').forEach((el) => {
+      if (!el.classList.contains('fa-moon') && !el.classList.contains('fa-sun')) return;
+      el.classList.toggle('fa-moon', !dark);
+      el.classList.toggle('fa-sun', dark);
+    });
+  }
+  function applyDark() {
+    if (!document.body) return;
+    let dark = false;
+    try { dark = localStorage.getItem(KEY) === 'dark'; } catch (e) {}
+    document.body.classList.toggle('dark', dark);
+    syncIcons();
+  }
+  function toggleDark() {
+    const dark = !isDark();
+    document.body.classList.toggle('dark', dark);
+    try { localStorage.setItem(KEY, dark ? 'dark' : 'light'); } catch (e) {}
+    syncIcons();
+  }
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', applyDark);
+  } else {
+    applyDark();
+  }
+  return { applyDark: applyDark, toggleDark: toggleDark };
+})();
+
 window.TOKMARK_LANGS = {
   // --- Indian Languages ---
   'ta': {
