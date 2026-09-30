@@ -101,29 +101,34 @@
     requireFs();
     const date = todayStr();
     const counterRef = win._fs.doc(win._db, 'hospitals', slug, 'counters', date);
+
+    // Doctor's daily token limit (0/unset = unlimited). This must run OUTSIDE
+    // the write transaction: the Firestore web SDK's Transaction.get() only
+    // accepts document references — passing a query throws a cryptic
+    // `Cannot read properties of undefined (reading 'path')`. Functions mode
+    // counts atomically inside the server-side transaction instead.
+    const doctorRef = win._fs.doc(win._db, 'hospitals', slug, 'doctors', doctorId);
+    const doctorSnap = await win._fs.getDoc(doctorRef);
+    const dailyLimit = doctorSnap.exists() ? Number(doctorSnap.data().dailyLimit || 0) : 0;
+    if (dailyLimit > 0) {
+      const daySnap = await win._fs.getDocs(win._fs.query(
+        win._fs.collection(win._db, 'hospitals', slug, 'tokens'),
+        win._fs.where('doctorId', '==', doctorId),
+        win._fs.where('date', '==', date)
+      ));
+      let issuedToday = 0;
+      daySnap.docs.forEach((dd) => {
+        const s = String(dd.data().status || '').toLowerCase();
+        if (s !== 'canceled') issuedToday++;
+      });
+      if (issuedToday >= dailyLimit) {
+        throw new Error('This doctor\'s daily token limit of ' + dailyLimit + ' has been reached. Please try again tomorrow.');
+      }
+    }
+
     let tokenId = '';
     let tokenNum = '';
     await win._fs.runTransaction(win._db, async (transaction) => {
-      // Doctor's daily token limit (0/unset = unlimited) — mirrors the
-      // server-side check so prototype mode behaves identically.
-      const doctorSnap = await transaction.get(win._fs.doc(win._db, 'hospitals', slug, 'doctors', doctorId));
-      const dailyLimit = doctorSnap.exists() ? Number(doctorSnap.data().dailyLimit || 0) : 0;
-      if (dailyLimit > 0) {
-        const daySnap = await transaction.get(win._fs.query(
-          win._fs.collection(win._db, 'hospitals', slug, 'tokens'),
-          win._fs.where('doctorId', '==', doctorId),
-          win._fs.where('date', '==', date)
-        ));
-        let issuedToday = 0;
-        daySnap.docs.forEach((dd) => {
-          const s = String(dd.data().status || '').toLowerCase();
-          if (s !== 'canceled') issuedToday++;
-        });
-        if (issuedToday >= dailyLimit) {
-          throw new Error('This doctor\'s daily token limit of ' + dailyLimit + ' has been reached. Please try again tomorrow.');
-        }
-      }
-
       const counterDoc = await transaction.get(counterRef);
       const nextCount = win.TokspotQueue.nextTokenNumber(
         counterDoc.exists() ? (counterDoc.data().count || 0) : 0
