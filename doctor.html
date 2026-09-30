@@ -702,16 +702,16 @@
       const payload = rxCurrentPayload();
       try {
         await window.TokSpotAPI.savePrescription({ slug: currentHospitalSlug, tokenId: t.id, prescription: payload });
+        // A written prescription means the patient has to collect the
+        // medicines, so Done is a single tap: save the prescription, finish
+        // the consultation and route the token to the pharmacy counter —
+        // where it appears with the token # and patient name (and on the
+        // patient's own pass). No extra checkbox needed.
+        await window.TokSpotAPI.transition({ slug: currentHospitalSlug, tokenId: t.id, nextStatus: 'completed' });
+        await window.TokSpotAPI.routeToPharmacy({ slug: currentHospitalSlug, tokenId: t.id });
         const cb = document.getElementById('chkSendPharmacy');
-        const wantPharmacy = !!(cb && cb.checked);
-        if (wantPharmacy) {
-          await window.TokSpotAPI.transition({ slug: currentHospitalSlug, tokenId: t.id, nextStatus: 'completed' });
-          await window.TokSpotAPI.routeToPharmacy({ slug: currentHospitalSlug, tokenId: t.id });
-          if (cb) cb.checked = false;
-          showToast(l10n('doctor.rx.okSent', 'Prescription saved — #%s sent to Pharmacy.').replace('%s', t.number));
-        } else {
-          showToast(l10n('doctor.rx.ok', 'Prescription saved for #%s.').replace('%s', t.number));
-        }
+        if (cb) cb.checked = false;
+        showToast(l10n('doctor.rx.okSent', 'Prescription saved — #%s sent to Pharmacy.').replace('%s', t.number));
       } catch (e) {
         showToast(l10n('doctor.rx.err', 'Could not save prescription: ') + e.message, true);
       }
@@ -772,7 +772,10 @@
       try {
         if (currentActiveToken) {
           const cb = document.getElementById('chkSendPharmacy');
-          const wantPharmacy = !!(cb && cb.checked);
+          // A patient who already has a prescription written always goes to
+          // the pharmacy counter, otherwise only when the desk's
+          // "Send to Pharmacy" box is ticked.
+          const wantPharmacy = !!(cb && cb.checked) || !!(currentActiveToken.prescription);
           await window.TokSpotAPI.transition({ slug: currentHospitalSlug, tokenId: currentActiveToken.id, nextStatus: 'completed' });
           if (wantPharmacy) {
             await window.TokSpotAPI.routeToPharmacy({ slug: currentHospitalSlug, tokenId: currentActiveToken.id });
@@ -834,20 +837,25 @@
       const wantPharmacy = !!(cb && cb.checked);
       try {
         // Auto-save an in-progress prescription before completing.
+        let savedRx = false;
         if (rxDraft.tokenId === currentActiveToken.id && rxDraft.items.length) {
           await window.TokSpotAPI.savePrescription({
             slug: currentHospitalSlug,
             tokenId: currentActiveToken.id,
             prescription: rxCurrentPayload(),
           });
+          savedRx = true;
         }
         await window.TokSpotAPI.transition({ slug: currentHospitalSlug, tokenId: currentActiveToken.id, nextStatus: 'completed' });
-        if (wantPharmacy) {
+        // A written prescription always routes to the pharmacy counter, so
+        // the pharmacist sees the medicines with the token # and name.
+        if (wantPharmacy || savedRx) {
           await window.TokSpotAPI.routeToPharmacy({ slug: currentHospitalSlug, tokenId: currentActiveToken.id });
           if (cb) cb.checked = false;
           showToast(l10n('doctor.ok.sentPharm', 'Token #%s sent to Pharmacy.').replace('%s', currentActiveToken.number));
+        } else {
+          showToast(l10n('doctor.ok.completed', 'Token #%s consultation completed.').replace('%s', currentActiveToken.number));
         }
-        showToast(l10n('doctor.ok.completed', 'Token #%s consultation completed.').replace('%s', currentActiveToken.number));
       } catch (e) {
         showToast(l10n('doctor.err.action', 'Action failed: ') + e.message, true);
       }
