@@ -107,14 +107,21 @@ test('admin ownership requires the exact Firebase UID, not matching email', () =
   assert.equal(queue.isHospitalAdmin(null, hospital), false);
 });
 
-test('doctor PIN login remains closed until secure Auth provisioning exists', () => {
+test('doctor station unlock uses doctor code + department (prototype) or email auth — never a plaintext PIN', () => {
   const loginPage = fs.readFileSync(path.join(__dirname, '..', 'doctor-login.html'), 'utf8');
   const adminPage = fs.readFileSync(path.join(__dirname, '..', 'admin.html'), 'utf8');
-  assert.match(loginPage, /async function doctorPinLogin\(\) \{\s*showToast\(/);
+  // PIN sign-in is fully removed — no doctorPinLogin stub or PIN pad remains.
+  assert.doesNotMatch(loginPage, /doctorPinLogin|stationPin/);
+  // Prototype unlock: doctor access code + department, verified against the doctor doc.
+  assert.match(loginPage, /async function doctorCodeLogin\(\) \{/);
+  assert.match(loginPage, /data\.accessCode/);
+  assert.match(loginPage, /loggedInVia: 'code'/);
+  // Code unlock is refused in functions mode; secure Auth email sign-in remains.
+  assert.match(loginPage, /login\.err\.codeMode/);
   assert.match(loginPage, /async function doctorEmailLogin\(\) \{/);
   assert.match(loginPage, /getMyDoctorProfile/);
   assert.match(loginPage, /resolveHospitalByCode/);
-  assert.doesNotMatch(loginPage, /checkPinMatch|signInAnonymously/);
+  // No raw pin/pinHash is ever written from the admin page.
   assert.doesNotMatch(adminPage, /data\.pin\s*=\s*rawPin|data\.pinHash\s*=\s*hashedPin|pin:\s*rawPin/);
 });
 

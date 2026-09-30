@@ -41,7 +41,7 @@
   <div class="auth-wrapper">
     <div class="auth-card card">
       <div class="auth-title"><i class="fa-solid fa-user-doctor" style="color:var(--green)"></i> <span data-i18n="login.title">Doctor Portal</span></div>
-      <div class="auth-sub" data-i18n="login.sub">Doctor access is unavailable until Firebase Auth accounts and server-enforced roles are provisioned.</div>
+      <div class="auth-sub" data-i18n="login.sub">Sign in with your doctor access code + department (prototype unlock), or your hospital email + password (secure backend).</div>
 
       <!-- Station Credentials -->
       <div class="form-group">
@@ -49,16 +49,23 @@
         <input type="text" id="hospCode" class="form-control" placeholder="e.g. HOSP-1234" data-i18n-ph="login.codePh" style="text-transform:uppercase;font-weight:800;letter-spacing:1px;" />
       </div>
 
-      <!-- Method 1: Fast 4-Digit Room PIN -->
+      <!-- Method 1: Doctor Access Code + Department (prototype station unlock) -->
       <div class="form-group">
-        <label style="text-align:center;"><span data-i18n="login.pin">Doctor 4-Digit PIN</span> <span class="req">*</span></label>
-        <input type="password" maxlength="4" id="stationPin" class="form-control pin-box" placeholder="PIN sign-in disabled" data-i18n-ph="login.pinDisabled" disabled />
+        <label><span data-i18n="login.doctorCode">Doctor Access Code</span> <span class="req">*</span></label>
+        <input type="text" id="doctorCode" class="form-control" placeholder="e.g. D102" data-i18n-ph="login.codeDoctorPh" style="text-transform:uppercase;font-weight:800;letter-spacing:1px;" maxlength="12" autocomplete="off" />
       </div>
-      <button id="btnPinLogin" class="btn btn-submit btn-green mt-8" onclick="doctorPinLogin()">
+      <div class="form-group">
+        <label data-i18n="login.dept">Department</label>
+        <input type="text" id="doctorDept" class="form-control" placeholder="e.g. Cardiology" data-i18n-ph="login.deptPh" />
+      </div>
+      <button id="btnCodeLogin" class="btn btn-submit btn-green" onclick="doctorCodeLogin()">
         <i class="fa-solid fa-door-open"></i> <span data-i18n="login.openStation">Open Doctor Station</span>
       </button>
+      <div class="muted" style="font-size:0.78rem;margin-top:8px;text-align:center;" data-i18n="login.codeNote">
+        Prototype unlock: ask the admin to set your doctor access code + department. The secure backend uses email + password below.
+      </div>
 
-      <div class="divider"><span data-i18n="login.or">OR VERIFY BY EMAIL &amp; PIN</span></div>
+      <div class="divider"><span data-i18n="login.or">OR SIGN IN WITH EMAIL &amp; PASSWORD</span></div>
 
       <!-- Method 2: Doctor Email + Password (Firebase Auth) -->
       <div>
@@ -75,7 +82,7 @@
         </button>
         <div class="muted" style="font-size:0.78rem;margin-top:10px;text-align:center;" data-i18n="login.secureNote">
           Secure sign-in works after the hospital is moved to the trusted
-          backend (Functions + Firebase Auth). PIN buttons above stay disabled.
+          backend (Functions + Firebase Auth).
         </div>
       </div>
     </div>
@@ -116,9 +123,75 @@
       if (savedHosp) document.getElementById('hospCode').value = savedHosp.toUpperCase();
     });
 
-    // 1. Fast PIN Login (legacy — permanently disabled, PINs removed)
-    async function doctorPinLogin() {
-      showToast(l10n('login.err.pinDisabled', 'Doctor PIN sign-in is disabled. Use Secure Sign In (email + password) below.'), true, 5000);
+    const FUNC = window.TokSpotAPI && window.TokSpotAPI.mode() === 'functions';
+
+    async function ensureAuth() {
+      if (!window._auth || !window._useAuth) return;
+      if (!window._auth.currentUser) {
+        try { await window._useAuth.signInAnonymously(window._auth); } catch (e) {}
+      }
+    }
+
+    // 1. Doctor Access Code + Department (prototype station unlock) —
+    //    verified against the doctor document, same trust class as the
+    //    front desk hospital-code gate. Functions mode requires real auth.
+    async function doctorCodeLogin() {
+      const codeInput = (document.getElementById('hospCode').value || '').trim().toUpperCase();
+      const dCode = (document.getElementById('doctorCode').value || '').trim().toUpperCase();
+      const dept = (document.getElementById('doctorDept').value || '').trim();
+      if (!codeInput) return showToast(l10n('login.err.code', 'Enter the hospital code.'), true, 4000);
+      if (!dCode) return showToast(l10n('login.err.doctorCode', 'Enter your doctor access code.'), true, 4000);
+      if (!dept) return showToast(l10n('login.err.dept', 'Enter the department for the doctor.'), true, 4000);
+      if (FUNC) return showToast(l10n('login.err.codeMode', 'Doctor code login is for prototype mode. Use Secure Sign In below.'), true, 5000);
+
+      const btn = document.getElementById('btnCodeLogin');
+      btn.disabled = true;
+      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> ' + l10n('login.signingIn', 'Signing in...');
+
+      try {
+        await ensureAuth();
+        if (!window._fs || !window._db) throw new Error(l10n('login.err.failed', 'Sign-in failed.'));
+
+        const cleanInput = codeInput.replace(/^HOSP-?/i, '');
+        const hospSnap = await window._fs.getDocs(window._fs.collection(window._db, 'hospitals'));
+        const hospital = hospSnap.docs.find(d => {
+          const data = d.data();
+          const c = (data.hospitalCode || data.code || '').toUpperCase();
+          return c === codeInput || c.replace(/^HOSP-?/i, '') === cleanInput || d.id.toUpperCase() === codeInput;
+        });
+        if (!hospital) throw new Error(l10n('login.err.invalidCode', 'Invalid hospital code.'));
+
+        const slug = hospital.id;
+        const hData = hospital.data();
+        const docSnap = await window._fs.getDocs(window._fs.collection(window._db, 'hospitals', slug, 'doctors'));
+        const match = docSnap.docs.find(d => {
+          const data = d.data();
+          const codeOk = String(data.accessCode || '').toUpperCase() === dCode;
+          const deptOk = String(data.department || '').toLowerCase() === dept.toLowerCase();
+          return codeOk && deptOk && data.status !== 'revoked' && data.status !== 'inactive';
+        });
+        if (!match) throw new Error(l10n('login.err.noMatch', 'No doctor matches that code and department. Ask the admin to set your access code.'));
+
+        const docData = match.data();
+        const session = {
+          id: match.id,
+          name: docData.name || match.id,
+          department: docData.department || '',
+          room: docData.room || docData.counter || '',
+          hospitalSlug: slug,
+          hospitalName: hData.name || slug,
+          hospitalCode: hData.hospitalCode || codeInput,
+          loggedInVia: 'code',
+        };
+        sessionStorage.setItem('activeDoctor', JSON.stringify(session));
+        localStorage.setItem('tokmark_hospital_code', codeInput);
+        window.location.replace('doctor.html');
+      } catch (e) {
+        showToast(e.message || l10n('login.err.failed', 'Sign-in failed.'), true, 5000);
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fa-solid fa-door-open"></i> ' + l10n('login.openStation', 'Open Doctor Station');
+      }
     }
 
     // 2. Secure email + password sign-in (Firebase Auth, functions mode)
@@ -157,6 +230,7 @@
           hospitalSlug: profile.hospitalSlug,
           hospitalName: profile.hospitalName,
           hospitalCode: profile.hospitalCode,
+          loggedInVia: 'auth',
         };
         sessionStorage.setItem('activeDoctor', JSON.stringify(session));
         localStorage.setItem('tokmark_hospital_code', codeInput);

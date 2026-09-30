@@ -166,8 +166,8 @@
               <input class="input" id="docEmail" type="email" placeholder="doctor@hospital.com" data-i18n-ph="admin.docEmailPh" />
             </div>
             <div class="field">
-              <label class="label" data-i18n="admin.docPin">Doctor PIN Login</label>
-              <input class="input" id="docPin" type="password" maxlength="4" placeholder="Disabled pending secure account provisioning" data-i18n-ph="admin.docPinPh" disabled />
+              <label class="label" data-i18n="admin.docAccessCode">Doctor Access Code (prototype unlock)</label>
+              <input class="input" id="docAccessCode" type="text" maxlength="12" placeholder="e.g. D102" data-i18n-ph="admin.docAccessCodePh" />
             </div>
           </div>
 
@@ -773,7 +773,7 @@
       document.getElementById('docName').value = '';
       document.getElementById('docDept').value = '';
       document.getElementById('docEmail').value = '';
-      document.getElementById('docPin').value = '';
+      document.getElementById('docAccessCode').value = '';
       document.getElementById('docRoom').value = '';
       document.getElementById('docDailyLimit').value = '0';
       document.getElementById('docEmail').disabled = false;
@@ -881,8 +881,7 @@
         document.getElementById('docDept').value = doc.department || '';
         document.getElementById('docEmail').value = doc.email || '';
         document.getElementById('docEmail').disabled = true;
-        document.getElementById('docPin').value = '';
-        document.getElementById('docPin').placeholder = l10n('admin.docPinPh', 'Disabled pending secure account provisioning');
+        document.getElementById('docAccessCode').value = doc.accessCode || '';
         document.getElementById('docRoom').value = doc.room || doc.counter || '';
         document.getElementById('docDailyLimit').value = doc.dailyLimit || 0;
         document.getElementById('docStatus').value = doc.status || 'open';
@@ -904,11 +903,15 @@
           return showToast(l10n('admin.err.dailyLimit', 'Daily limit must be a number between 0 and 999 (0 = unlimited).'), true);
         }
       }
+      const accessCode = document.getElementById('docAccessCode').value.trim().toUpperCase();
       const btn = document.getElementById('btnSaveDoctor');
 
       if (!name) return showToast(l10n('admin.err.docName', 'Enter doctor name.'), true);
       if (!assignedHospitalSlug) return showToast(l10n('admin.err.noHosp', 'No hospital assigned.'), true);
       if (!editDoctorId && !email) return showToast(l10n('admin.err.docEmail', 'Enter doctor email.'), true);
+      if (!FUNC && !editDoctorId && !accessCode) {
+        showToast(l10n('admin.warn.accessCode', 'Set a doctor access code so the doctor can sign in at the station (prototype mode).'), true, 5000);
+      }
 
       btn.disabled = true;
       btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> ' + l10n('admin.syncing', 'Syncing to Cloud Database...');
@@ -956,6 +959,11 @@
         };
 
         if (email) data.email = email;
+        if (accessCode) {
+          data.accessCode = accessCode;
+        } else if (editDoctorId) {
+          data.accessCode = window._fs.deleteField();
+        }
 
         if (editDoctorId) {
           data.pin = window._fs.deleteField();

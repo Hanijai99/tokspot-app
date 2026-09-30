@@ -208,16 +208,27 @@
       }
 
       const authUser = window._auth && window._auth.currentUser;
-      if (!authUser || authUser.isAnonymous) {
-        sessionStorage.removeItem('activeDoctor');
-        window.location.replace('doctor-login.html');
-        return;
+      // Functions mode requires a real Firebase Auth account linked to the
+      // doctor (authUid). Prototype mode also accepts the doctor access
+      // code + department station unlock (verified at login time).
+      if (FUNC) {
+        const viaCode = activeDoctorProfile.loggedInVia === 'code';
+        if (!authUser || authUser.isAnonymous || viaCode) {
+          sessionStorage.removeItem('activeDoctor');
+          window.location.replace('doctor-login.html');
+          return;
+        }
       }
 
       try {
         const doctorRef = window._fs.doc(window._db, 'hospitals', currentHospitalSlug, 'doctors', activeDoctorProfile.id);
         const doctorSnap = await window._fs.getDoc(doctorRef);
-        if (!doctorSnap.exists() || doctorSnap.data().authUid !== authUser.uid || doctorSnap.data().status === 'revoked') {
+        if (!doctorSnap.exists() || doctorSnap.data().status === 'revoked') {
+          sessionStorage.removeItem('activeDoctor');
+          window.location.replace('doctor-login.html');
+          return;
+        }
+        if (FUNC && doctorSnap.data().authUid !== authUser.uid) {
           sessionStorage.removeItem('activeDoctor');
           window.location.replace('doctor-login.html');
           return;

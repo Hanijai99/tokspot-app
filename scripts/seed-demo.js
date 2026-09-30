@@ -48,9 +48,9 @@ function todayInZone(tz) {
 
 const TODAY = todayInZone(TZ);
 const DOCTORS = [
-  { id: 'dr-1', name: 'Anitha Rao', department: 'General Medicine', room: 'Room 1', authUid: 'demo-doctor-1' },
-  { id: 'dr-2', name: 'Vikram Menon', department: 'Cardiology', room: 'Room 2', authUid: 'demo-doctor-2' },
-  { id: 'dr-3', name: 'Sara Philip', department: 'Pediatrics', room: 'Room 3', authUid: 'demo-doctor-3' },
+  { id: 'dr-1', name: 'Anitha Rao', department: 'General Medicine', room: 'Room 1', accessCode: 'D101', authUid: 'demo-doctor-1' },
+  { id: 'dr-2', name: 'Vikram Menon', department: 'Cardiology', room: 'Room 2', accessCode: 'D102', authUid: 'demo-doctor-2' },
+  { id: 'dr-3', name: 'Sara Philip', department: 'Pediatrics', room: 'Room 3', accessCode: 'D103', authUid: 'demo-doctor-3' },
 ];
 
 // seeded tokens — 2 called, 6 waiting, 1 completed (kept out of PII feeds)
@@ -114,6 +114,7 @@ async function main() {
       counter: d.room,
       status: 'active',
       hospitalSlug: HOSPITAL_SLUG,
+      accessCode: d.accessCode,
       createdAt: now,
       updatedAt: now,
     });
