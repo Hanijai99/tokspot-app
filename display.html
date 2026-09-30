@@ -111,7 +111,7 @@
 
   <!-- Audio Unlock Banner for Browser Autoplay Compliance -->
   <div id="audioUnlockPrompt" class="audio-banner hidden" onclick="unlockAudio()">
-    <i class="fa-solid fa-volume-high"></i> Click once to enable TV Audio & Voice Announcements
+    <i class="fa-solid fa-volume-high"></i> <span data-i18n="display.audioUnlock">Click once to enable TV Audio &amp; Voice Announcements</span>
   </div>
 
   <!-- STEP 1: Hospital Gate (Auto-bypasses if code is in URL) -->
@@ -119,14 +119,14 @@
     <div style="width:60px;height:60px;border-radius:20px;background:rgba(139,187,146,0.15);color:#8BBB92;display:flex;align-items:center;justify-content:center;font-size:1.8rem;margin:0 auto 16px;">
       <i class="fa-solid fa-tv"></i>
     </div>
-    <h2 style="margin:0;font-size:1.4rem;font-weight:900;">Waiting Hall TV Screen</h2>
-    <p class="muted" style="font-size:0.86rem;margin:8px 0 20px;color:#94a3b8;">
+    <h2 style="margin:0;font-size:1.4rem;font-weight:900;" data-i18n="display.launch">Waiting Hall TV Screen</h2>
+    <p class="muted" style="font-size:0.86rem;margin:8px 0 20px;color:#94a3b8;" data-i18n="display.launchSub">
       Enter Hospital Code to display real-time waiting tokens and voice calls.
     </p>
 
     <div style="display:flex;gap:8px;">
-      <input class="input" id="tvCodeInput" type="text" placeholder="e.g. HOSP-1234" style="background:#092328;border-color:#1E5C50;color:#fff;font-weight:800;letter-spacing:1px;text-transform:uppercase;" />
-      <button class="btn btn-green" id="btnLaunchTv" onclick="launchDisplay()"><i class="fa-solid fa-play"></i> Launch</button>
+      <input class="input" id="tvCodeInput" type="text" placeholder="e.g. HOSP-1234" style="background:#092328;border-color:#1E5C50;color:#fff;font-weight:800;letter-spacing:1px;text-transform:uppercase;" data-i18n-ph="display.codePh" />
+      <button class="btn btn-green" id="btnLaunchTv" onclick="launchDisplay()"><i class="fa-solid fa-play"></i> <span data-i18n="display.launchBtn">Launch</span></button>
     </div>
   </div>
 
@@ -134,7 +134,7 @@
   <div id="tvDashboard" class="tv-screen hidden">
     <div class="tv-header">
       <div style="display:flex;align-items:center;gap:12px;">
-        <span class="tv-hospital-name" id="tvHospName">Hospital Name</span>
+        <span class="tv-hospital-name" id="tvHospName" data-i18n="display.hospName">Hospital Name</span>
         <span style="background:rgba(139,187,146,0.15);color:#8BBB92;font-size:0.82rem;font-weight:800;padding:4px 10px;border-radius:8px;" id="tvHospCode">HOSP-CODE</span>
         <span id="tvWaitChip" class="hidden" style="background:rgba(251,191,36,0.12);color:#fbbf24;font-size:0.82rem;font-weight:800;padding:4px 10px;border-radius:8px;"><i class="fa-solid fa-clock"></i> <span id="tvWaitChipLabel">~15 min wait</span></span>
       </div>
@@ -149,23 +149,23 @@
       <div class="hero-box">
         <span class="hero-badge"><i class="fa-solid fa-bullhorn"></i> <span data-i18n="display.calling">Now Calling</span></span>
         <div class="hero-token" id="tvActiveNum">—</div>
-        <div class="hero-patient" id="tvActivePatient">Waiting for next token…</div>
-        <div class="hero-meta" id="tvActiveDoctor">Doctor Consultation</div>
+        <div class="hero-patient" id="tvActivePatient" data-i18n="display.waitNext">Waiting for next token…</div>
+        <div class="hero-meta" id="tvActiveDoctor" data-i18n="display.doctorConsult">Doctor Consultation</div>
       </div>
 
       <!-- Upcoming Queue List -->
       <div class="queue-box">
         <div class="queue-title"><i class="fa-solid fa-hourglass-half"></i> <span data-i18n="display.next">Next in Line (Waiting)</span></div>
         <div class="waiting-list" id="tvWaitingList">
-          <div style="color:#64748b;font-weight:600;padding:20px;">No patients waiting in line.</div>
+          <div style="color:#64748b;font-weight:600;padding:20px;" data-i18n="display.noPatients">No patients waiting in line.</div>
         </div>
       </div>
     </div>
 
     <!-- Screen utilities -->
     <div class="tv-ctrls">
-      <button class="btn btn-slate btn-sm" onclick="toggleFullscreen()"><i class="fa-solid fa-expand"></i> Fullscreen</button>
-      <button class="btn btn-slate btn-sm" onclick="exitTvSession()"><i class="fa-solid fa-power-off"></i> Disconnect</button>
+      <button class="btn btn-slate btn-sm" onclick="toggleFullscreen()"><i class="fa-solid fa-expand"></i> <span data-i18n="display.fullscreen">Fullscreen</span></button>
+      <button class="btn btn-slate btn-sm" onclick="exitTvSession()"><i class="fa-solid fa-power-off"></i> <span data-i18n="display.disconnect">Disconnect</span></button>
     </div>
   </div>
 
@@ -182,6 +182,7 @@
     // Inline failsafes to guarantee zero ReferenceError crashes
     // I18N.init may be called again safely after DOM is ready:
     try { if (window.I18N) I18N.init(); } catch (e) {}
+    function l10n(key, fb) { return (window.I18N && window.I18N.t) ? window.I18N.t(key) : fb; }
     window.escHtml = window.escHtml || function(s) {
       return String(s == null ? '' : s)
         .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
@@ -268,7 +269,7 @@
       }
       isAudioUnlocked = true;
       document.getElementById('audioUnlockPrompt').classList.add('hidden');
-      showToast('Audio & Voice enabled for this screen');
+      showToast(l10n('display.ok.audio', 'Audio & Voice enabled for this screen'));
     }
 
     async function ensureAuth() {
@@ -280,11 +281,11 @@
     async function launchDisplay() {
       const rawCode = document.getElementById('tvCodeInput').value.trim();
       const codeInput = rawCode.toUpperCase();
-      if (!codeInput) return showToast('Please enter Hospital Code.', true);
+      if (!codeInput) return showToast(l10n('display.err.code', 'Please enter Hospital Code.'), true);
 
       const btn = document.getElementById('btnLaunchTv');
       btn.disabled = true;
-      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Initializing...';
+      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> ' + l10n('display.initializing', 'Initializing...');
 
       try {
         await ensureAuth();
@@ -305,7 +306,7 @@
         }
 
         if (!targetDoc) {
-          showToast(`Hospital Code "${codeInput}" not found.`, true);
+          showToast(l10n('display.err.notFound', `Hospital Code "${codeInput}" not found.`).replace('%s', codeInput), true);
           return;
         }
 
@@ -324,15 +325,15 @@
 
       } catch (err) {
         console.error('Launch Error:', err);
-        showToast('Error launching TV: ' + err.message, true);
+        showToast(l10n('display.err.launch', 'Error launching TV: ') + err.message, true);
       } finally {
         btn.disabled = false;
-        btn.innerHTML = '<i class="fa-solid fa-play"></i> Launch';
+        btn.innerHTML = '<i class="fa-solid fa-play"></i> ' + l10n('display.launchBtn', 'Launch');
       }
     }
 
     function exitTvSession() {
-      if (!confirm('Disconnect this TV display from the current hospital?')) return;
+      if (!confirm(l10n('display.confirm.exit', 'Disconnect this TV display from the current hospital?'))) return;
       localStorage.removeItem('tokspot_tv_hospital_code');
       if (unsubTvTokens) { unsubTvTokens(); unsubTvTokens = null; }
       if (unsubTvDoctors) { unsubTvDoctors(); unsubTvDoctors = null; }
@@ -417,7 +418,7 @@
       }
       strip.innerHTML = doctors.map((doc) => {
         const st = doc.displayStatus || 'open';
-        const label = st === 'break' ? 'On Break' : (st === 'closed' ? 'Closed' : 'Open');
+        const label = st === 'break' ? l10n('display.break', 'On Break') : (st === 'closed' ? l10n('display.closed', 'Closed') : l10n('display.open', 'Open'));
         const note = doc.breakNote ? ` · ${escHtml(doc.breakNote)}` : '';
         return `<span class="tv-doc-chip dot-${st}" title="${escHtml(doc.name || 'Doctor')}${note}">
           <span class="dot dot-${st}"></span>${escHtml(doc.name || 'Doctor')} · ${label}${note}
@@ -453,10 +454,10 @@
 
       if (active) {
         document.getElementById('tvActiveNum').textContent = `#${active.number}`;
-        document.getElementById('tvActivePatient').textContent = 'Please proceed to the displayed room';
+        document.getElementById('tvActivePatient').textContent = l10n('display.proceedRoom', 'Please proceed to the displayed room');
 
-        const counterLabel = active.counter || active.doctorName || 'Consultation Room';
-        document.getElementById('tvActiveDoctor').textContent = `Please proceed to: ${counterLabel}`;
+        const counterLabel = active.counter || active.doctorName || l10n('doctor.room', 'Consultation Room');
+        document.getElementById('tvActiveDoctor').textContent = l10n('display.proceedTo', 'Please proceed to: %s').replace('%s', counterLabel);
 
         // Unique identifier key to identify new calls or recalls
         const currentCallKey = `${active.id || active.number}_${tvMillis(active.calledAt) || active.number}`;
@@ -467,8 +468,8 @@
         }
       } else {
         document.getElementById('tvActiveNum').textContent = '—';
-        document.getElementById('tvActivePatient').textContent = 'Waiting for next token…';
-        document.getElementById('tvActiveDoctor').textContent = 'Consultation Desk Ready';
+        document.getElementById('tvActivePatient').textContent = l10n('display.waitNext', 'Waiting for next token…');
+        document.getElementById('tvActiveDoctor').textContent = l10n('display.deskReady', 'Consultation Desk Ready');
       }
 
       // Render upcoming queue list
@@ -479,7 +480,7 @@
       const waitLabel = document.getElementById('tvWaitChipLabel');
       if (extra && Number.isFinite(extra.waitEstimateMinutes) && extra.waitEstimateMinutes > 0) {
         waitChip.classList.remove('hidden');
-        waitLabel.textContent = `~${extra.waitEstimateMinutes} min wait for next slot`;
+        waitLabel.textContent = l10n('display.estWaitSlots', `~${extra.waitEstimateMinutes} min wait for next slot`).replace('%s', extra.waitEstimateMinutes);
       } else {
         waitChip.classList.add('hidden');
       }
@@ -489,7 +490,7 @@
       if (extra && Array.isArray(extra.doctors) && extra.doctors.length) {
         strip.innerHTML = extra.doctors.map((doc) => {
           const st = doc.displayStatus || (doc.onBreak ? 'break' : (doc.status === 'closed' ? 'closed' : 'open'));
-          const label = st === 'break' ? 'On Break' : (st === 'closed' ? 'Closed' : 'Open');
+          const label = st === 'break' ? l10n('display.break', 'On Break') : (st === 'closed' ? l10n('display.closed', 'Closed') : l10n('display.open', 'Open'));
           const note = doc.breakNote ? ` · ${escHtml(doc.breakNote)}` : '';
           return `<span class="tv-doc-chip dot-${st}" title="${escHtml(doc.name || 'Doctor')}${note}">
             <span class="dot dot-${st}"></span>${escHtml(doc.name || 'Doctor')} · ${label}${note}
@@ -528,7 +529,7 @@
     function renderWaitingList(waiting) {
       const wList = document.getElementById('tvWaitingList');
       if (!waiting.length) {
-        wList.innerHTML = '<div style="color:#64748b;font-weight:600;padding:20px;">No patients waiting in line.</div>';
+        wList.innerHTML = `<div style="color:#64748b;font-weight:600;padding:20px;">${l10n('display.noPatients', 'No patients waiting in line.')}</div>`;
         return;
       }
 
@@ -536,10 +537,10 @@
         <div class="tv-token-chip ${t.priority ? 'priority' : ''}">
           <div>
             <div class="tv-chip-num">#${escHtml(t.number)}</div>
-            <div class="tv-chip-doc">Please wait</div>
+            <div class="tv-chip-doc">${l10n('display.pleaseWait', 'Please wait')}</div>
           </div>
           <span style="font-size:0.8rem;font-weight:800;color:${t.priority ? '#ef4444' : '#8BBB92'};">
-            ${t.priority ? 'PRIORITY' : 'WAITING'}
+            ${t.priority ? l10n('doctor.priority', 'PRIORITY') : l10n('token.waitingTag', 'WAITING')}
           </span>
         </div>
       `).join('');

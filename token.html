@@ -79,22 +79,22 @@
     <!-- Loading State -->
     <div id="loaderCard" class="card" style="text-align:center;padding:40px 16px;">
       <i class="fa-solid fa-circle-notch fa-spin" style="font-size:2rem;color:var(--green);"></i>
-      <div class="muted mt-12" style="font-weight:600;">Retrieving token details...</div>
+      <div class="muted mt-12" style="font-weight:600;"><span data-i18n="token.retrieving">Retrieving token details...</span></div>
     </div>
 
     <!-- Error State -->
     <div id="errorCard" class="card hidden" style="text-align:center;padding:30px 16px;">
       <i class="fa-solid fa-circle-exclamation" style="font-size:2.4rem;color:#ef4444;margin-bottom:12px;"></i>
-      <div style="font-weight:800;font-size:1.1rem;color:var(--ink);" id="errorMsg">Token Not Found</div>
-      <p class="muted" style="font-size:0.86rem;margin-top:6px;">Please check your token ID or re-enter from home.</p>
-      <a href="index.html" class="btn btn-green mt-16" style="text-decoration:none;"><i class="fa-solid fa-arrow-left"></i> Return Home</a>
+      <div style="font-weight:800;font-size:1.1rem;color:var(--ink);" id="errorMsg" data-i18n="token.notFound">Token Not Found</div>
+      <p class="muted" style="font-size:0.86rem;margin-top:6px;" data-i18n="token.notFound.sub">Please check your token ID or re-enter from home.</p>
+      <a href="index.html" class="btn btn-green mt-16" style="text-decoration:none;"><i class="fa-solid fa-arrow-left"></i> <span data-i18n="common.backHome">Return Home</span></a>
     </div>
 
     <!-- Secure-mode: hospital code required for number-only lookups -->
     <div id="codePrompt" class="card hidden" style="text-align:center;padding:24px 16px;">
-      <div style="font-weight:900;font-size:1.1rem;color:var(--ink);">Find your token</div>
+      <div style="font-weight:900;font-size:1.1rem;color:var(--ink);"><span data-i18n="token.findYour">Find your token</span></div>
       <p class="muted" style="font-size:0.85rem;margin:8px 0 14px;">
-        Enter the <b>hospital code</b> from your booking screen to locate token
+        Enter the <b data-i18n="token.hospCode">hospital code</b> from your booking screen to locate token
         #<b id="codeNumberLabel" style="color:#2A835F;">—</b>.
       </p>
       <input id="codeInput" class="form-control" data-i18n-ph="token.codeHint" placeholder="e.g. HOSP-1234"
@@ -109,13 +109,13 @@
       
       <!-- Hospital & Doctor Header -->
       <div class="ticket-header">
-        <div style="font-size:0.82rem;font-weight:700;letter-spacing:1px;text-transform:uppercase;opacity:0.9;" id="tHospitalCode">HOSPITAL TOKEN</div>
+        <div style="font-size:0.82rem;font-weight:700;letter-spacing:1px;text-transform:uppercase;opacity:0.9;" id="tHospitalCode" data-i18n="token.hospitalPass">HOSPITAL TOKEN</div>
         <div style="font-size:1.3rem;font-weight:900;margin-top:4px;" id="tHospitalName">—</div>
-        <div style="font-size:0.88rem;opacity:0.95;margin-top:2px;" id="tDoctorName">Doctor Station</div>
+        <div style="font-size:0.88rem;opacity:0.95;margin-top:2px;" id="tDoctorName" data-i18n="token.consultation">Doctor Station</div>
       </div>
 
       <div class="ticket-body">
-        <div class="muted" style="font-size:0.75rem;font-weight:800;text-transform:uppercase;letter-spacing:1px;">Your Token Number</div>
+        <div class="muted" style="font-size:0.75rem;font-weight:800;text-transform:uppercase;letter-spacing:1px;" data-i18n="token.yourNumber">Your Token Number</div>
         <div class="token-big-num" id="tNumber">--</div>
         <!-- Live Queue Metrics -->
         <div class="status-grid">
@@ -136,13 +136,13 @@
         <!-- Smart Crowd Control Status Message -->
         <div id="statusInstruction" class="arrival-banner banner-wait">
           <i class="fa-solid fa-hourglass-half" style="font-size:1.3rem;"></i>
-          <span id="instructionText">Calculating queue pace...</span>
+          <span id="instructionText" data-i18n="token.instruction.calc">Calculating queue pace...</span>
         </div>
 
         <!-- Booking Date & ID Info -->
         <div style="margin-top:24px;border-top:1px dashed var(--line);padding-top:16px;display:flex;justify-content:space-between;font-size:0.78rem;" class="muted">
-          <span>Date: <b id="tDate">--</b></span>
-          <span>Status: <b id="tStatusTag" style="text-transform:uppercase;color:var(--green);">WAITING</b></span>
+          <span><span data-i18n="token.date">Date:</span> <b id="tDate">--</b></span>
+          <span><span data-i18n="token.status">Status:</span> <b id="tStatusTag" style="text-transform:uppercase;color:var(--green);" data-i18n="token.waitingTag">WAITING</b></span>
         </div>
       </div>
 
@@ -151,7 +151,7 @@
     <!-- Action links -->
     <div id="subActions" class="hidden" style="text-align:center;margin-top:20px;">
       <a href="book.html" style="font-size:0.85rem;color:var(--slate-500);text-decoration:none;font-weight:700;">
-        <i class="fa-solid fa-plus"></i> Book Another Token
+        <i class="fa-solid fa-plus"></i> <span data-i18n="token.bookAnother">Book Another Token</span>
       </a>
     </div>
 
@@ -169,6 +169,12 @@
   <script src="js/i18n.js"></script>
   <script>
     if (window.I18N) I18N.init();
+    function l10n(key, fb) { return (window.I18N && window.I18N.t) ? window.I18N.t(key) : fb; }
+    function statusLabel(s) {
+      const k = 'token.' + (s || 'waiting') + 'Tag';
+      const v = (window.I18N && window.I18N.t) ? window.I18N.t(k) : null;
+      return (v && v !== k) ? v : (s || 'waiting');
+    }
     if (window.hk && hk.applyDark) hk.applyDark();
 
     const FUNC = window.TokSpotAPI && window.TokSpotAPI.mode() === 'functions';
@@ -193,7 +199,7 @@
         if (FUNC) showCodePrompt(tokenNumberQuery);
         else findTokenByNumber(tokenNumberQuery);
       } else {
-        showError('No valid token ID or number provided in URL.');
+        showError(l10n('token.err.url', 'No valid token ID or number provided in URL.'));
       }
     });
 
@@ -207,12 +213,12 @@
       inp.focus();
       const doSearch = async () => {
         const code = inp.value.trim();
-        if (!code) return showError('Enter the hospital code to continue.');
+        if (!code) return showError(l10n('token.err.code', 'Enter the hospital code to continue.'));
         try {
           const res = await window.TokSpotAPI.getTokenByNumber({ code, number });
           startTokenStatusPolling(res.slug, res.tokenId);
         } catch (e) {
-          showError(e.message || 'Could not find this token.');
+          showError(e.message || l10n('token.err.notFound2', 'Could not find this token.'));
         }
       };
       document.getElementById('codeSearchBtn').addEventListener('click', (ev) => { ev.preventDefault(); doSearch(); });
@@ -225,7 +231,7 @@
         const st = await window.TokSpotAPI.getTokenStatus({ slug, tokenId });
         renderFunctionsStatus(st);
       } catch (e) {
-        showError(e.message || 'Live tracking failed.');
+        showError(e.message || l10n('token.err.live', 'Live tracking failed.'));
         if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
       }
     }
@@ -250,17 +256,17 @@
     function renderFunctionsStatus(st) {
       document.getElementById('tNumber').textContent = `#${st.number}`;
       document.getElementById('tDate').textContent = st.date || '--';
-      document.getElementById('tStatusTag').textContent = st.status || 'waiting';
+      document.getElementById('tStatusTag').textContent = statusLabel(st.status);
       document.getElementById('tHospitalName').textContent = st.hospitalName || 'Hospital';
-      document.getElementById('tHospitalCode').textContent = st.hospitalCode || 'HOSPITAL PASS';
-      document.getElementById('tDoctorName').textContent = st.doctorName || 'Consultation';
-      document.getElementById('tServing').textContent = st.nowServing > 0 ? `#${st.nowServing}` : 'Ready';
+      document.getElementById('tHospitalCode').textContent = st.hospitalCode || l10n('token.hospitalPass', 'HOSPITAL PASS');
+      document.getElementById('tDoctorName').textContent = st.doctorName || l10n('token.consultation', 'Consultation');
+      document.getElementById('tServing').textContent = st.nowServing > 0 ? `#${st.nowServing}` : l10n('token.ready', 'Ready');
       document.getElementById('tAhead').textContent = st.aheadCount;
 
       const estEl = document.getElementById('tEstWait');
       if (estEl) {
         const ewt = Number.isFinite(st.waitEstimateMinutes) ? st.waitEstimateMinutes : null;
-        estEl.textContent = ewt === 0 ? 'Now' : (ewt > 0 ? `~${ewt} min` : '—');
+        estEl.textContent = ewt === 0 ? l10n('token.now', 'Now') : (ewt > 0 ? l10n('token.estWaitFew', `~${ewt} min`).replace('%s', ewt) : '—');
       }
 
       const myNum = Number(st.number || 0);
@@ -268,22 +274,24 @@
       const ahead = st.aheadCount || 0;
 
       if (st.status === 'called') {
-        setBanner('banner-called', '<i class="fa-solid fa-bell"></i> <b>It is your turn now!</b> Please enter the doctor room immediately.');
+        setBanner('banner-called', `<i class="fa-solid fa-bell"></i> <b>${l10n('token.yourTurn', 'It is your turn now!')}</b> ${l10n('token.enterRoom', 'Please enter the doctor room immediately.')}`);
         playAlert();
       } else if (st.status === 'completed') {
-        setBanner('banner-ready', '<i class="fa-solid fa-check"></i> Consultation completed. Thank you!');
+        setBanner('banner-ready', `<i class="fa-solid fa-check"></i> ${l10n('token.completed', 'Consultation completed. Thank you!')}`);
       } else if (st.status === 'skipped') {
-        setBanner('banner-wait', '<i class="fa-solid fa-user-xmark"></i> You were skipped / on hold. Please check with the front desk.');
+        setBanner('banner-wait', `<i class="fa-solid fa-user-xmark"></i> ${l10n('token.skipped', 'You were skipped / on hold. Please check with the front desk.')}`);
       } else if (st.status === 'canceled') {
-        setBanner('banner-wait', '<i class="fa-solid fa-circle-xmark"></i> This token was canceled.');
+        setBanner('banner-wait', `<i class="fa-solid fa-circle-xmark"></i> ${l10n('token.canceled', 'This token was canceled.')}`);
       } else if (ahead === 0 && serving < myNum) {
-        setBanner('banner-ready', '<i class="fa-solid fa-person-walking"></i> <b>You are NEXT!</b> Please wait right outside the doctor door.');
+        setBanner('banner-ready', `<i class="fa-solid fa-person-walking"></i> ${l10n('token.banner.next', '<b>You are NEXT!</b> Please wait right outside the doctor door.')}`);
         playAlert();
       } else if (ahead <= 2) {
-        setBanner('banner-ready', '<i class="fa-solid fa-car-side"></i> <b>Please arrive now.</b> You are almost next in line (2 people ahead).');
+        setBanner('banner-ready', `<i class="fa-solid fa-car-side"></i> ${l10n('token.banner.arrive', '<b>Please arrive now.</b> You are almost next in line (2 people ahead).')}`);
       } else {
         const ewt = Number.isFinite(st.waitEstimateMinutes) ? st.waitEstimateMinutes : null;
-        setBanner('banner-wait', `<i class="fa-solid fa-hourglass-half"></i> <b>Please wait.</b> ${ahead} people are ahead of you.${ewt > 0 ? ` Estimated wait ~${ewt} min.` : ' A reliable time estimate is not available.'}`);
+        const waitHtml = l10n('token.banner.wait', `<b>Please wait.</b> ${ahead} people are ahead of you.`).replace('%s', ahead);
+        const ewtHtml = ewt > 0 ? l10n('token.banner.waitEwt', ` Estimated wait ~${ewt} min.`).replace('%s', ewt) : l10n('token.banner.waitNoEwt', ' A reliable time estimate is not available.');
+        setBanner('banner-wait', `<i class="fa-solid fa-hourglass-half"></i> ${waitHtml}${ewtHtml}`);
       }
     }
 
@@ -311,12 +319,12 @@
         if (matches.length === 1) {
           initTokenListener(matches[0].slug, matches[0].id);
         } else if (matches.length > 1) {
-          showError('That token number exists at more than one hospital. Use the private tracking link from your token pass.');
+          showError(l10n('token.err.multi', 'That token number exists at more than one hospital. Use the private tracking link from your token pass.'));
         } else {
-          showError(`No active token found matching "${num}" for today.`);
+          showError(l10n('token.err.noToken', `No active token found matching "${num}" for today.`).replace('%s', num));
         }
       } catch (e) {
-        showError('Search failed: ' + e.message);
+        showError(l10n('token.err.search', 'Search failed: ') + e.message);
       }
     }
 
@@ -326,7 +334,7 @@
       // Realtime listener for this individual token
       unsubscribeToken = window._fs.onSnapshot(docRef, async (snap) => {
         if (!snap.exists()) {
-          showError('Token record not found or expired.');
+          showError(l10n('token.err.record', 'Token record not found or expired.'));
           return;
         }
 
@@ -334,7 +342,7 @@
         renderToken(data, hospitalSlug);
         listenToServingDoctor(hospitalSlug, data.doctorId, data.number);
       }, (err) => {
-        showError('Live tracking disconnected: ' + err.message);
+        showError(l10n('token.err.disconnected', 'Live tracking disconnected: ') + err.message);
       });
     }
 
@@ -365,7 +373,7 @@
           }
         });
 
-        document.getElementById('tServing').textContent = currentServing > 0 ? `#${currentServing}` : 'Ready';
+        document.getElementById('tServing').textContent = currentServing > 0 ? `#${currentServing}` : l10n('token.ready', 'Ready');
         document.getElementById('tAhead').textContent = aheadCount;
 
         let ewt = null;
@@ -374,7 +382,7 @@
           ewt = window.TokspotQueue.estimateWaitMinutes({ waitingCount: aheadCount, avgServeMinutes: avg });
         }
         const estEl = document.getElementById('tEstWait');
-        if (estEl) estEl.textContent = ewt === 0 ? 'Now' : (ewt > 0 ? `~${ewt} min` : '—');
+        if (estEl) estEl.textContent = ewt === 0 ? l10n('token.now', 'Now') : (ewt > 0 ? l10n('token.estWaitFew', `~${ewt} min`).replace('%s', ewt) : '—');
 
         updateArrivalInstruction(aheadCount, myTokenNum, currentServing, ewt);
       });
@@ -386,18 +394,20 @@
 
       if (serving === myNum) {
         banner.className = 'arrival-banner banner-called';
-        text.innerHTML = '<i class="fa-solid fa-bell"></i> <b>It is your turn now!</b> Please enter the doctor room immediately.';
+        text.innerHTML = `<i class="fa-solid fa-bell"></i> <b>${l10n('token.yourTurn', 'It is your turn now!')}</b> ${l10n('token.enterRoom', 'Please enter the doctor room immediately.')}`;
         playAlert();
       } else if (ahead === 0 && serving < myNum) {
         banner.className = 'arrival-banner banner-ready';
-        text.innerHTML = '<i class="fa-solid fa-person-walking"></i> <b>You are NEXT!</b> Please wait right outside the doctor door.';
+        text.innerHTML = `<i class="fa-solid fa-person-walking"></i> ${l10n('token.banner.next', '<b>You are NEXT!</b> Please wait right outside the doctor door.')}`;
         playAlert();
       } else if (ahead <= 2) {
         banner.className = 'arrival-banner banner-ready';
-        text.innerHTML = '<i class="fa-solid fa-car-side"></i> <b>Please arrive now.</b> You are almost next in line (2 people ahead).';
+        text.innerHTML = `<i class="fa-solid fa-car-side"></i> ${l10n('token.banner.arrive', '<b>Please arrive now.</b> You are almost next in line (2 people ahead).')}`;
       } else {
         banner.className = 'arrival-banner banner-wait';
-        text.innerHTML = `<i class="fa-solid fa-hourglass-half"></i> <b>Please wait.</b> ${ahead} people are ahead of you.${ewt > 0 ? ` Estimated wait ~${ewt} min.` : ' A reliable time estimate is not available.'}`;
+        const waitHtml = l10n('token.banner.wait', `<b>Please wait.</b> ${ahead} people are ahead of you.`).replace('%s', ahead);
+        const ewtHtml = ewt > 0 ? l10n('token.banner.waitEwt', ` Estimated wait ~${ewt} min.`).replace('%s', ewt) : l10n('token.banner.waitNoEwt', ' A reliable time estimate is not available.');
+        text.innerHTML = `<i class="fa-solid fa-hourglass-half"></i> ${waitHtml}${ewtHtml}`;
       }
     }
 
@@ -409,7 +419,7 @@
 
       document.getElementById('tNumber').textContent = `#${t.number}`;
       document.getElementById('tDate').textContent = t.date || '--';
-      document.getElementById('tStatusTag').textContent = t.status || 'waiting';
+      document.getElementById('tStatusTag').textContent = statusLabel(t.status);
 
       // Load Hospital & Doctor Names
       try {
@@ -417,13 +427,13 @@
         if (hSnap.exists()) {
           const h = hSnap.data();
           document.getElementById('tHospitalName').textContent = h.name || hospitalSlug;
-          document.getElementById('tHospitalCode').textContent = h.hospitalCode || 'HOSPITAL PASS';
+          document.getElementById('tHospitalCode').textContent = h.hospitalCode || l10n('token.hospitalPass', 'HOSPITAL PASS');
         }
         if (t.doctorId) {
           const dSnap = await window._fs.getDoc(window._fs.doc(window._db, 'hospitals', hospitalSlug, 'doctors', t.doctorId));
           if (dSnap.exists()) {
             const d = dSnap.data();
-            document.getElementById('tDoctorName').textContent = `${d.name || 'Doctor'} · ${d.department || 'Consultation'}`;
+            document.getElementById('tDoctorName').textContent = `${d.name || 'Doctor'} · ${d.department || l10n('token.consultation', 'Consultation')}`;
           }
         }
       } catch(e) { console.error(e); }

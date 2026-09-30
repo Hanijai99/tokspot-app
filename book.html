@@ -68,20 +68,20 @@
     <!-- STEP 1: Search Hospital Name or Enter Code -->
     <div class="step-card" id="stepCode">
       <div style="font-weight: 800; font-size: 1.2rem; margin-bottom: 6px;">
-        <i class="fa-solid fa-hospital" style="color:var(--green);margin-right:8px;"></i>Find Your Hospital
+        <i class="fa-solid fa-hospital" style="color:var(--green);margin-right:8px;"></i> <span data-i18n="book.find">Find Your Hospital</span>
       </div>
-      <div class="muted" style="font-size: 0.88rem; margin-bottom: 16px;">
+      <div class="muted" style="font-size: 0.88rem; margin-bottom: 16px;" data-i18n="book.find.sub">
         Search by Hospital Name, City, or enter your 4-digit booking code.
       </div>
       
       <div class="search-wrapper">
-        <input class="input" id="hospitalSearchInput" type="text" placeholder="e.g. Apollo or HOSP-1234" autocomplete="off" oninput="handleSearch()" style="font-weight:700; padding:14px 16px;" />
+        <input class="input" id="hospitalSearchInput" type="text" placeholder="e.g. Apollo or HOSP-1234" autocomplete="off" oninput="handleSearch()" style="font-weight:700; padding:14px 16px;" data-i18n-ph="book.search.ph" />
         <div id="searchLoader" class="hidden" style="position:absolute;right:14px;top:16px;color:var(--slate-400);"><i class="fa-solid fa-spinner fa-spin"></i></div>
         <div id="searchResults" class="search-dropdown hidden"></div>
       </div>
 
       <div id="directLookupBtn" class="mt-12 hidden">
-        <button class="btn btn-slate btn-block btn-sm" onclick="forceDirectLookup()"><i class="fa-solid fa-magnifying-glass"></i> Direct Lookup Code</button>
+        <button class="btn btn-slate btn-block btn-sm" onclick="forceDirectLookup()"><i class="fa-solid fa-magnifying-glass"></i> <span data-i18n="code.direct">Direct Lookup Code</span></button>
       </div>
     </div>
 
@@ -107,19 +107,19 @@
         <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap;" id="apptDateRow"></div>
         <div id="apptSlotsWrap" class="hidden" style="margin-top:10px;background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:12px;">
           <div class="muted" style="font-size:.8rem;margin-bottom:8px;"><span data-i18n="book.appt.pick">Pick a time slot</span> (<span id="apptSlotsDateLabel">—</span>)</div>
-          <div style="display:flex;gap:8px;flex-wrap:wrap;" id="apptSlotsRow"><div class="muted" style="font-size:.8rem;">Loading slots…</div></div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;" id="apptSlotsRow"><div class="muted" style="font-size:.8rem;"><span data-i18n="book.slots.loading">Loading slots…</span></div></div>
         </div>
       </div>
 
       <!-- Patient Information -->
       <div class="field mt-16">
         <label class="label"><span data-i18n="book.step.name">Patient Full Name</span> <span class="req">*</span></label>
-        <input class="input" id="patName" type="text" placeholder="e.g. Rahul Sharma" />
+        <input class="input" id="patName" type="text" placeholder="e.g. Rahul Sharma" data-i18n-ph="book.name.ph" />
       </div>
 
       <div class="field">
         <label class="label"><span data-i18n="book.step.phone">Mobile Number</span> <span class="req">*</span> <span class="muted" data-i18n="book.step.phone.sub">(for live queue alerts)</span></label>
-        <input class="input" id="patPhone" type="tel" maxlength="10" placeholder="10-digit mobile number" />
+        <input class="input" id="patPhone" type="tel" maxlength="10" placeholder="10-digit mobile number" data-i18n-ph="book.phone.ph" />
       </div>
 
       <button class="btn btn-green btn-block btn-lg mt-20" id="btnSubmitToken" onclick="generatePatientToken()">
@@ -127,7 +127,7 @@
       </button>
 
       <button class="btn btn-slate btn-block mt-10" onclick="resetHospitalSelection()" style="background:transparent;border:none;">
-        <i class="fa-solid fa-arrow-rotate-left"></i> Change Hospital
+        <i class="fa-solid fa-arrow-rotate-left"></i> <span data-i18n="book.changeHospital">Change Hospital</span>
       </button>
     </div>
 
@@ -141,6 +141,7 @@
   <script src="js/i18n.js"></script>
   <script>
     if (window.I18N) I18N.init();
+    function l10n(key, fb) { return (window.I18N && window.I18N.t) ? window.I18N.t(key) : fb; }
     window.escHtml = window.escHtml || function(s) {
       return String(s == null ? '' : s)
         .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
@@ -331,10 +332,10 @@
         if (found) {
           selectHospital(found.id);
         } else {
-          showToast(`Hospital Code "${raw}" not found in system.`, true);
+          showToast(l10n('book.err.codeNotFound', `Hospital Code "${raw}" not found in system.`), true);
         }
       } catch (e) {
-        showToast('Lookup error: ' + e.message, true);
+        showToast(l10n('book.err.lookup') + e.message, true);
       } finally {
         if (loader) loader.classList.add('hidden');
       }
@@ -584,9 +585,9 @@
       const phone = document.getElementById('patPhone').value.trim().replace(/\D/g, '');
       const btn = document.getElementById('btnSubmitToken');
 
-      if (!name) return showToast('Please enter patient name.', true);
-      if (!phone || phone.length !== 10) return showToast('Please enter a valid 10-digit mobile number.', true);
-      if (!selectedDoctorId) return showToast('Please select a doctor.', true);
+      if (!name) return showToast(l10n('book.err.name', 'Please enter patient name.'), true);
+      if (!phone || phone.length !== 10) return showToast(l10n('book.err.phone', 'Please enter a valid 10-digit mobile number.'), true);
+      if (!selectedDoctorId) return showToast(l10n('book.err.doctor', 'Please select a doctor.'), true);
 
       const isAppointment = Boolean(apptDate && apptSlot);
 
@@ -624,7 +625,7 @@
           }
           const parts = apptDate.split('-');
           const niceDate = `${parts[2]}/${parts[1]}/${parts[0]}`;
-          showToast(`Appointment booked for ${niceDate} at ${apptSlot}!`);
+          showToast(l10n('book.ok.appt', `Appointment booked for ${niceDate} at ${apptSlot}!`).replace('%s', niceDate).replace('%s', apptSlot));
           setTimeout(() => {
             document.getElementById('stepDetails').classList.add('hidden');
             document.getElementById('stepCode').classList.remove('hidden');
@@ -636,7 +637,7 @@
           return;
         } catch (err) {
           console.error('Appointment Booking Error:', err);
-          showToast('Appointment booking failed: ' + err.message, true);
+          showToast(l10n('book.err.apptFail', 'Appointment booking failed: ') + err.message, true);
           btn.disabled = false;
           btn.innerHTML = '<i class="fa-solid fa-ticket"></i> Confirm &amp; Get Live Token';
           return;
@@ -663,14 +664,14 @@
         });
         const createdTokenId = tokenId;
 
-        showToast(`Token #${tokenNum} booked successfully!`);
+        showToast(l10n('book.ok.token', `Token #${tokenNum} booked successfully!`).replace('%s', tokenNum));
         setTimeout(() => {
           window.location.href = `token.html?id=${encodeURIComponent(createdTokenId)}&h=${encodeURIComponent(targetHospitalSlug)}`;
         }, 350);
 
       } catch (err) {
         console.error('Booking Error:', err);
-        showToast('Token booking failed: ' + err.message, true);
+        showToast(l10n('book.err.tokenFail', 'Token booking failed: ') + err.message, true);
       } finally {
         btn.disabled = false;
         btn.innerHTML = '<i class="fa-solid fa-ticket"></i> Confirm &amp; Get Live Token';

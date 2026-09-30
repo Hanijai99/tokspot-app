@@ -31,49 +31,49 @@
 
   <div class="topbar">
     <a class="brand" href="index.html">
-      <span class="logomark"><img src="logo.png?v=2" alt="TokMark" /></span>TokMark Doctor
+      <span class="logomark"><img src="logo.png?v=2" alt="TokMark" /></span><span data-i18n="doctor.brand">TokMark Doctor</span>
     </a>
     <span class="spacer"></span>
-    <button class="icn-btn" onclick="location.href='staff.html'" title="Staff Portal"><i class="fa-solid fa-hospital-user"></i></button>
+    <button class="icn-btn" onclick="location.href='staff.html'" title="Staff Portal" data-i18n-title="desk.staffPortal"><i class="fa-solid fa-hospital-user"></i></button>
     <button class="icn-btn" onclick="hk.toggleDark()"><i class="fa-solid fa-moon"></i></button>
   </div>
 
   <div class="auth-wrapper">
     <div class="auth-card card">
-      <div class="auth-title"><i class="fa-solid fa-user-doctor" style="color:var(--green)"></i> Doctor Portal</div>
-      <div class="auth-sub">Doctor access is unavailable until Firebase Auth accounts and server-enforced roles are provisioned.</div>
+      <div class="auth-title"><i class="fa-solid fa-user-doctor" style="color:var(--green)"></i> <span data-i18n="login.title">Doctor Portal</span></div>
+      <div class="auth-sub" data-i18n="login.sub">Doctor access is unavailable until Firebase Auth accounts and server-enforced roles are provisioned.</div>
 
       <!-- Station Credentials -->
       <div class="form-group">
-        <label>Hospital Code <span class="req">*</span></label>
-        <input type="text" id="hospCode" class="form-control" placeholder="e.g. HOSP-1234" style="text-transform:uppercase;font-weight:800;letter-spacing:1px;" />
+        <label><span data-i18n="login.hospitalCode">Hospital Code</span> <span class="req">*</span></label>
+        <input type="text" id="hospCode" class="form-control" placeholder="e.g. HOSP-1234" data-i18n-ph="login.codePh" style="text-transform:uppercase;font-weight:800;letter-spacing:1px;" />
       </div>
 
       <!-- Method 1: Fast 4-Digit Room PIN -->
       <div class="form-group">
-        <label style="text-align:center;">Doctor 4-Digit PIN <span class="req">*</span></label>
-        <input type="password" maxlength="4" id="stationPin" class="form-control pin-box" placeholder="PIN sign-in disabled" disabled />
+        <label style="text-align:center;"><span data-i18n="login.pin">Doctor 4-Digit PIN</span> <span class="req">*</span></label>
+        <input type="password" maxlength="4" id="stationPin" class="form-control pin-box" placeholder="PIN sign-in disabled" data-i18n-ph="login.pinDisabled" disabled />
       </div>
       <button id="btnPinLogin" class="btn btn-submit btn-green mt-8" onclick="doctorPinLogin()">
-        <i class="fa-solid fa-door-open"></i> Open Doctor Station
+        <i class="fa-solid fa-door-open"></i> <span data-i18n="login.openStation">Open Doctor Station</span>
       </button>
 
-      <div class="divider"><span>OR VERIFY BY EMAIL & PIN</span></div>
+      <div class="divider"><span data-i18n="login.or">OR VERIFY BY EMAIL &amp; PIN</span></div>
 
       <!-- Method 2: Doctor Email + Password (Firebase Auth) -->
       <div>
         <div class="form-group">
-          <label>Doctor Email</label>
-          <input type="email" id="loginEmail" class="form-control" placeholder="doctor@hospital.com" autocomplete="username" />
+          <label data-i18n="login.doctorEmail">Doctor Email</label>
+          <input type="email" id="loginEmail" class="form-control" placeholder="doctor@hospital.com" data-i18n-ph="login.emailPh" autocomplete="username" />
         </div>
         <div class="form-group">
-          <label>Password</label>
-          <input type="password" id="loginPassword" class="form-control" placeholder="Your secure sign-in password" autocomplete="current-password" />
+          <label data-i18n="login.password">Password</label>
+          <input type="password" id="loginPassword" class="form-control" placeholder="Your secure sign-in password" data-i18n-ph="login.passPh" autocomplete="current-password" />
         </div>
         <button id="btnEmailLogin" class="btn btn-submit btn-green" onclick="doctorEmailLogin()">
-          <i class="fa-solid fa-id-badge"></i> Secure Sign In
+          <i class="fa-solid fa-id-badge"></i> <span data-i18n="login.secureSignIn">Secure Sign In</span>
         </button>
-        <div class="muted" style="font-size:0.78rem;margin-top:10px;text-align:center;">
+        <div class="muted" style="font-size:0.78rem;margin-top:10px;text-align:center;" data-i18n="login.secureNote">
           Secure sign-in works after the hospital is moved to the trusted
           backend (Functions + Firebase Auth). PIN buttons above stay disabled.
         </div>
@@ -82,10 +82,13 @@
   </div>
 
   <script src="js/firebase-config.js"></script>
+  <script src="js/i18n.js"></script>
   <script src="js/app.js"></script>
   <script src="js/firebase.js"></script>
   <script src="js/api.js"></script>
   <script>
+    if (window.I18N) I18N.init();
+    function l10n(key, fb) { return (window.I18N && window.I18N.t) ? window.I18N.t(key) : fb; }
     window.showToast = window.showToast || function(msg, isErr, ms) {
       let w = document.getElementById('hkToastWrap');
       if (!w) {
@@ -115,7 +118,7 @@
 
     // 1. Fast PIN Login (legacy — permanently disabled, PINs removed)
     async function doctorPinLogin() {
-      showToast('Doctor PIN sign-in is disabled. Use Secure Sign In (email + password) below.', true, 5000);
+      showToast(l10n('login.err.pinDisabled', 'Doctor PIN sign-in is disabled. Use Secure Sign In (email + password) below.'), true, 5000);
     }
 
     // 2. Secure email + password sign-in (Firebase Auth, functions mode)
@@ -124,12 +127,12 @@
       const email = (document.getElementById('loginEmail').value || '').trim();
       const password = document.getElementById('loginPassword').value;
 
-      if (!codeInput) return showToast('Enter the hospital code.', true, 4000);
-      if (!email || !password) return showToast('Enter your doctor email and password.', true, 4000);
+      if (!codeInput) return showToast(l10n('login.err.code', 'Enter the hospital code.'), true, 4000);
+      if (!email || !password) return showToast(l10n('login.err.credentials', 'Enter your doctor email and password.'), true, 4000);
 
       const btn = document.getElementById('btnEmailLogin');
       btn.disabled = true;
-      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Signing in...';
+      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> ' + l10n('login.signingIn', 'Signing in...');
 
       try {
         // Resolve the code to a hospital slug on the server (client-side
@@ -159,15 +162,15 @@
         localStorage.setItem('tokmark_hospital_code', codeInput);
         window.location.replace('doctor.html');
       } catch (e) {
-        let msg = e.message || 'Sign-in failed.';
-        if (e.code === 'auth/wrong-password' || e.code === 'auth/user-not-found') msg = 'Invalid email or password.';
-        if (e.code === 'auth/invalid-credential') msg = 'Invalid email or password.';
-        if (e.code === 'auth/too-many-requests') msg = 'Too many attempts. Please try again in a minute.';
+        let msg = e.message || l10n('login.err.failed', 'Sign-in failed.');
+        if (e.code === 'auth/wrong-password' || e.code === 'auth/user-not-found') msg = l10n('login.err.invalid', 'Invalid email or password.');
+        if (e.code === 'auth/invalid-credential') msg = l10n('login.err.invalid', 'Invalid email or password.');
+        if (e.code === 'auth/too-many-requests') msg = l10n('login.err.tooMany', 'Too many attempts. Please try again in a minute.');
         showToast(msg, true, 5000);
         try { if (window._auth.currentUser) await window._useAuth.signOut(window._auth); } catch (_) {}
       } finally {
         btn.disabled = false;
-        btn.innerHTML = '<i class="fa-solid fa-id-badge"></i> Secure Sign In';
+        btn.innerHTML = '<i class="fa-solid fa-id-badge"></i> ' + l10n('login.secureSignIn', 'Secure Sign In');
       }
     }
 

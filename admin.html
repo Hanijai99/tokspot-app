@@ -63,9 +63,9 @@
 </head>
 <body>
   <div class="topbar">
-    <a class="brand" href="index.html"><span class="logomark"><img src="logo.png?v=2" alt="TokMark" /></span>TokMark Admin</a>
+    <a class="brand" href="index.html"><span class="logomark"><img src="logo.png?v=2" alt="TokMark" /></span><span data-i18n="admin.brand">TokMark Admin</span></a>
     <span class="spacer"></span>
-    <button class="icn-btn" onclick="location.href='staff.html'" title="Staff Portal"><i class="fa-solid fa-hospital-user"></i></button>
+    <button class="icn-btn" onclick="location.href='staff.html'" title="Staff Portal" data-i18n-title="desk.staffPortal"><i class="fa-solid fa-hospital-user"></i></button>
     <button class="icn-btn" onclick="hk.toggleDark()"><i class="fa-solid fa-moon"></i></button>
   </div>
 
@@ -74,54 +74,54 @@
     <!-- 1. Strict Login Card -->
     <section id="loginCard" class="card" style="max-width:420px;margin:40px auto;text-align:center;">
       <div style="width:64px;height:64px;border-radius:20px;background:linear-gradient(135deg,#8BBB92,#2A835F);display:flex;align-items:center;justify-content:center;font-size:1.9rem;margin:0 auto 16px;box-shadow:0 12px 30px rgba(42,131,95,.3);color:#fff;"><i class="fa-solid fa-shield-halved"></i></div>
-      <div class="htitle">Hospital Admin Login</div>
-      <div class="hsub mt-6">Sign in to manage doctors, view hospital code & recovery key.</div>
+      <div class="htitle" data-i18n="admin.loginTitle">Hospital Admin Login</div>
+      <div class="hsub mt-6" data-i18n="admin.loginSub">Sign in to manage doctors, view hospital code &amp; recovery key.</div>
       <div class="mt-16" style="text-align:left;">
-        <div class="field"><label class="label">Admin Email</label><input class="input" id="loginEmail" type="email" placeholder="admin@hospital.com" /></div>
-        <div class="field"><label class="label">Password</label><input class="input" id="loginPass" type="password" /></div>
+        <div class="field"><label class="label" data-i18n="admin.email">Admin Email</label><input class="input" id="loginEmail" type="email" placeholder="admin@hospital.com" data-i18n-ph="admin.emailPh" /></div>
+        <div class="field"><label class="label" data-i18n="admin.password">Password</label><input class="input" id="loginPass" type="password" /></div>
         <div style="display:flex;justify-content:flex-end;margin-top:6px;margin-bottom:14px;">
-          <a href="javascript:void(0)" onclick="toggleResetPasswordModal(true)" style="color:#2A835F;font-size:0.82rem;font-weight:700;text-decoration:none;">
+          <a href="javascript:void(0)" onclick="toggleResetPasswordModal(true)" style="color:#2A835F;font-size:0.82rem;font-weight:700;text-decoration:none;" data-i18n="admin.forgot">
             Forgot Admin Password?
           </a>
         </div>
       </div>
-      <button class="btn btn-green btn-block btn-lg" id="btnLogin" onclick="adminLogin()"><i class="fa-solid fa-right-to-bracket"></i> Sign In</button>
+      <button class="btn btn-green btn-block btn-lg" id="btnLogin" onclick="adminLogin()"><i class="fa-solid fa-right-to-bracket"></i> <span data-i18n="admin.signIn">Sign In</span></button>
       
     </section>
 
     <!-- 1b. Email verification required (instead of an instant silent sign-out) -->
     <section id="verifyCard" class="card hidden" style="max-width:420px;margin:40px auto;text-align:center;">
       <div style="width:64px;height:64px;border-radius:20px;background:linear-gradient(135deg,#f59e0b,#d97706);display:flex;align-items:center;justify-content:center;font-size:1.9rem;margin:0 auto 16px;box-shadow:0 12px 30px rgba(217,119,6,.3);color:#fff;"><i class="fa-solid fa-envelope-circle-check"></i></div>
-      <div class="htitle">Verify Your Admin Email</div>
-      <div class="hsub mt-6">We sent a verification link to <b id="verifyEmailText">your email</b>.<br/>Open it, click <b>Verify email</b>, then press continue below.</div>
+      <div class="htitle" data-i18n="admin.verifyTitle">Verify Your Admin Email</div>
+      <div class="hsub mt-6"><span data-i18n="admin.verifyPre">We sent a verification link to</span> <b id="verifyEmailText">your email</b><span data-i18n="admin.verifyPost">. Open it, click Verify email, then press continue below.</span></div>
       <div class="mt-16" style="text-align:center;">
-        <button class="btn btn-green btn-block btn-lg" id="btnResendVerify" onclick="resendVerificationEmail()"><i class="fa-solid fa-paper-plane"></i> Resend Verification Email</button>
-        <button class="btn btn-slate btn-block btn-lg mt-12" id="btnIVerified" onclick="continueAfterVerify()"><i class="fa-solid fa-rotate-right"></i> I've Verified — Continue</button>
-        <button class="btn btn-block mt-12" onclick="cancelVerifyToLogout()">Use a different account</button>
+        <button class="btn btn-green btn-block btn-lg" id="btnResendVerify" onclick="resendVerificationEmail()"><i class="fa-solid fa-paper-plane"></i> <span data-i18n="admin.verify.resend">Resend Verification Email</span></button>
+        <button class="btn btn-slate btn-block btn-lg mt-12" id="btnIVerified" onclick="continueAfterVerify()"><i class="fa-solid fa-rotate-right"></i> <span data-i18n="admin.verify.continue">I've Verified — Continue</span></button>
+        <button class="btn btn-block mt-12" onclick="cancelVerifyToLogout()"><span data-i18n="admin.verify.other">Use a different account</span></button>
       </div>
     </section>
 
     <!-- 2. Isolated Admin Dashboard -->
     <section class="hidden" id="mainCard">
       <div style="display:flex;align-items:center;gap:12px;margin-bottom:4px;flex-wrap:wrap;">
-        <div class="htitle">Admin Workspace</div>
+        <div class="htitle" data-i18n="admin.workspace">Admin Workspace</div>
         <span class="spacer"></span>
         <button class="btn btn-mint btn-sm" onclick="openAnalyticsPage()" style="margin-right:4px;">
-          <i class="fa-solid fa-chart-line"></i> Analytics &amp; Reports
+          <i class="fa-solid fa-chart-line"></i> <span data-i18n="admin.analytics">Analytics &amp; Reports</span>
         </button>
         <span class="chip gray" id="adminEmailBadge">—</span>
-        <button class="btn btn-slate btn-sm" onclick="adminLogout()"><i class="fa-solid fa-arrow-right-from-bracket"></i> Logout</button>
+        <button class="btn btn-slate btn-sm" onclick="adminLogout()"><i class="fa-solid fa-arrow-right-from-bracket"></i> <span data-i18n="admin.logout">Logout</span></button>
       </div>
-      <div class="hsub">Manage your hospital tokens, assigned doctors, and station credentials.</div>
+      <div class="hsub" data-i18n="admin.workspaceSub">Manage your hospital tokens, assigned doctors, and station credentials.</div>
 
       <!-- Hospital Credentials Card -->
       <div class="card mt-24">
         <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
           <span style="width:36px;height:36px;border-radius:12px;background:var(--green-050);color:var(--green);display:flex;align-items:center;justify-content:center;"><i class="fa-solid fa-hospital"></i></span>
-          <h2 style="font-size:1.05rem;font-weight:800;margin:0;">Hospital Credentials</h2>
+          <h2 style="font-size:1.05rem;font-weight:800;margin:0;" data-i18n="admin.hospCred">Hospital Credentials</h2>
         </div>
         <div id="hospitalInfoBox">
-          <div class="muted"><i class="fa-solid fa-spinner fa-spin"></i> Loading assigned hospital details...</div>
+          <div class="muted"><i class="fa-solid fa-spinner fa-spin"></i> <span data-i18n="admin.hospLoading">Loading assigned hospital details...</span></div>
         </div>
       </div>
 
@@ -129,11 +129,11 @@
       <div class="card mt-24">
         <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
           <span style="width:36px;height:36px;border-radius:12px;background:var(--green-050);color:var(--green);display:flex;align-items:center;justify-content:center;"><i class="fa-solid fa-qrcode"></i></span>
-          <h2 style="font-size:1.05rem;font-weight:800;margin:0;">Front-Desk Patient Booking QR Standee</h2>
+          <h2 style="font-size:1.05rem;font-weight:800;margin:0;" data-i18n="admin.qrStandee">Front-Desk Patient Booking QR Standee</h2>
           <span class="spacer"></span>
-          <button class="btn btn-slate btn-sm" onclick="printStandeeQr()"><i class="fa-solid fa-print"></i> Print Standee</button>
+          <button class="btn btn-slate btn-sm" onclick="printStandeeQr()"><i class="fa-solid fa-print"></i> <span data-i18n="admin.qrPrint">Print Standee</span></button>
         </div>
-        <p class="muted" style="font-size:0.86rem;margin-top:0;">Patients can scan this QR at reception to view their live token progress or self-book queue passes on their smartphones.</p>
+        <p class="muted" style="font-size:0.86rem;margin-top:0;" data-i18n="admin.qrSub">Patients can scan this QR at reception to view their live token progress or self-book queue passes on their smartphones.</p>
         
         <div class="qr-standee-box">
           <div id="qrcode"></div>
@@ -146,59 +146,59 @@
       <div class="card mt-24">
         <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;">
           <span style="width:36px;height:36px;border-radius:12px;background:var(--green-050);color:var(--green);display:flex;align-items:center;justify-content:center;"><i class="fa-solid fa-user-doctor"></i></span>
-          <h2 style="font-size:1.05rem;font-weight:800;margin:0;">Hospital Doctors</h2>
+          <h2 style="font-size:1.05rem;font-weight:800;margin:0;" data-i18n="admin.doctors">Hospital Doctors</h2>
         </div>
 
         <div id="doctorList"></div>
 
         <!-- Add / Edit Doctor Form -->
         <div class="panel hidden" id="doctorForm" style="margin-top:16px;background:var(--bg);border-radius:14px;padding:16px;">
-          <div class="htitle" style="font-size:1rem;" id="formTitle">Doctor Details</div>
+          <div class="htitle" style="font-size:1rem;" id="formTitle" data-i18n="admin.docDetails">Doctor Details</div>
           
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px;">
-            <div class="field"><label class="label">Name <span class="req">*</span></label><input class="input" id="docName" placeholder="Dr. Name" /></div>
-            <div class="field"><label class="label">Department</label><input class="input" id="docDept" placeholder="e.g. Cardiology" /></div>
+            <div class="field"><label class="label"><span data-i18n="admin.docName">Name</span> <span class="req">*</span></label><input class="input" id="docName" placeholder="Dr. Name" /></div>
+            <div class="field"><label class="label" data-i18n="admin.docDept">Department</label><input class="input" id="docDept" placeholder="e.g. Cardiology" data-i18n-ph="admin.docDeptPh" /></div>
           </div>
 
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
             <div class="field">
-              <label class="label">Doctor Email <span class="req">*</span></label>
-              <input class="input" id="docEmail" type="email" placeholder="doctor@hospital.com" />
+              <label class="label"><span data-i18n="admin.docEmail">Doctor Email</span> <span class="req">*</span></label>
+              <input class="input" id="docEmail" type="email" placeholder="doctor@hospital.com" data-i18n-ph="admin.docEmailPh" />
             </div>
             <div class="field">
-              <label class="label">Doctor PIN Login</label>
-              <input class="input" id="docPin" type="password" maxlength="4" placeholder="Disabled pending secure account provisioning" disabled />
+              <label class="label" data-i18n="admin.docPin">Doctor PIN Login</label>
+              <input class="input" id="docPin" type="password" maxlength="4" placeholder="Disabled pending secure account provisioning" data-i18n-ph="admin.docPinPh" disabled />
             </div>
           </div>
 
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
-            <div class="field"><label class="label">Consultation Room / Counter</label><input class="input" id="docRoom" placeholder="e.g. Room 1 or Counter A" /></div>
-            <div class="field"><label class="label">Status</label><select class="input" id="docStatus"><option value="open">Open</option><option value="closed">Closed</option></select></div>
+            <div class="field"><label class="label" data-i18n="admin.docRoom">Consultation Room / Counter</label><input class="input" id="docRoom" placeholder="e.g. Room 1 or Counter A" data-i18n-ph="admin.docRoomPh" /></div>
+            <div class="field"><label class="label" data-i18n="admin.docStatus">Status</label><select class="input" id="docStatus"><option value="open" data-i18n="common.open">Open</option><option value="closed" data-i18n="common.closed">Closed</option></select></div>
           </div>
 
           <div class="btn-row mt-16">
-            <button class="btn btn-green" id="btnSaveDoctor" onclick="saveDoctor()"><i class="fa-solid fa-floppy-disk"></i> Save Doctor</button>
-            <button class="btn btn-slate" onclick="cancelDoctorEdit()">Cancel</button>
+            <button class="btn btn-green" id="btnSaveDoctor" onclick="saveDoctor()"><i class="fa-solid fa-floppy-disk"></i> <span data-i18n="admin.saveDoctor">Save Doctor</span></button>
+            <button class="btn btn-slate" onclick="cancelDoctorEdit()"><span data-i18n="common.cancel">Cancel</span></button>
           </div>
         </div>
 
-        <button class="btn btn-mint btn-block mt-16" onclick="showDoctorForm()"><i class="fa-solid fa-plus"></i> Add Doctor</button>
+        <button class="btn btn-mint btn-block mt-16" onclick="showDoctorForm()"><i class="fa-solid fa-plus"></i> <span data-i18n="admin.addDoctor">Add Doctor</span></button>
       </div>
 
       <!-- Security Audit Trail Card -->
       <div class="card mt-24">
         <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
           <span style="width:36px;height:36px;border-radius:12px;background:var(--green-050);color:var(--green);display:flex;align-items:center;justify-content:center;"><i class="fa-solid fa-shield-halved"></i></span>
-          <h2 style="font-size:1.05rem;font-weight:800;margin:0;">Security Audit Trail</h2>
+          <h2 style="font-size:1.05rem;font-weight:800;margin:0;" data-i18n="admin.audit">Security Audit Trail</h2>
           <span class="spacer"></span>
-          <button class="btn btn-slate btn-sm" onclick="loadAuditLog()"><i class="fa-solid fa-rotate"></i> Refresh</button>
+          <button class="btn btn-slate btn-sm" onclick="loadAuditLog()"><i class="fa-solid fa-rotate"></i> <span data-i18n="admin.refresh">Refresh</span></button>
         </div>
-        <p class="muted" style="font-size:0.84rem;margin-top:0;">
+        <p class="muted" style="font-size:0.84rem;margin-top:0;" data-i18n="admin.auditSub">
           Append-only server log of token issuance, transitions and doctor
           provisioning (Functions writes only — clients cannot forge entries).
         </p>
         <div id="auditLogBox" style="max-height:340px;overflow-y:auto;">
-          <div class="muted"><i class="fa-solid fa-spinner fa-spin"></i> Loading audit events...</div>
+          <div class="muted"><i class="fa-solid fa-spinner fa-spin"></i> <span data-i18n="admin.auditLoading">Loading audit events...</span></div>
         </div>
       </div>
 
@@ -209,19 +209,19 @@
       <div class="card" style="max-width:400px;width:100%;border-radius:20px;padding:24px;text-align:left;background:var(--card);border:1px solid var(--line);box-shadow:var(--shadow);">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
           <h3 style="font-size:1.15rem;font-weight:800;margin:0;">
-            <i class="fa-solid fa-lock-open" style="color:var(--green);margin-right:6px;"></i> Reset Admin Password
+            <i class="fa-solid fa-lock-open" style="color:var(--green);margin-right:6px;"></i> <span data-i18n="admin.resetTitle">Reset Admin Password</span>
           </h3>
           <button class="icn-btn" onclick="toggleResetPasswordModal(false)"><i class="fa-solid fa-xmark"></i></button>
         </div>
-        <p class="muted" style="font-size:0.84rem;line-height:1.5;margin-bottom:16px;">
+        <p class="muted" style="font-size:0.84rem;line-height:1.5;margin-bottom:16px;" data-i18n="admin.resetSub">
           Enter your registered admin email address. An official password reset link will be sent to your inbox.
         </p>
         <div class="field" style="margin-bottom:14px;">
-          <label class="label">Registered Email</label>
-          <input class="input" id="resetEmailInput" type="email" placeholder="admin@hospital.com" />
+          <label class="label" data-i18n="admin.registeredEmail">Registered Email</label>
+          <input class="input" id="resetEmailInput" type="email" placeholder="admin@hospital.com" data-i18n-ph="admin.emailPh" />
         </div>
         <button class="btn btn-green btn-block" id="btnSendReset" onclick="executePasswordReset()">
-          <i class="fa-solid fa-paper-plane"></i> Send Reset Link
+          <i class="fa-solid fa-paper-plane"></i> <span data-i18n="admin.sendReset">Send Reset Link</span>
         </button>
       </div>
     </div>
@@ -231,19 +231,19 @@
       <div class="card" style="max-width:400px;width:100%;border-radius:20px;padding:24px;background:var(--card);border:1px solid var(--line);box-shadow:var(--shadow);">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
           <h3 style="font-size:1.1rem;font-weight:800;margin:0;">
-            <i class="fa-solid fa-user-shield" style="color:var(--green);margin-right:6px;"></i> Quick Reset Doctor PIN
+            <i class="fa-solid fa-user-shield" style="color:var(--green);margin-right:6px;"></i> <span data-i18n="admin.quickResetPin">Quick Reset Doctor PIN</span>
           </h3>
           <button class="icn-btn" onclick="closeDoctorResetModal()"><i class="fa-solid fa-xmark"></i></button>
         </div>
         <p style="font-size:0.84rem;color:var(--slate-500);margin-bottom:14px;">
-          Directly assigning a new PIN for <b id="resetDocName" style="color:var(--ink);"></b> (<span id="resetDocEmail" style="color:#2A835F;"></span>).
+          <span data-i18n="admin.pinResetFor">Directly assigning a new PIN for</span> <b id="resetDocName" style="color:var(--ink);"></b> (<span id="resetDocEmail" style="color:#2A835F;"></span>).
         </p>
         <div class="field" style="margin-bottom:14px;">
-          <label class="label">New 4-Digit PIN</label>
+          <label class="label" data-i18n="admin.newPin">New 4-Digit PIN</label>
           <input class="input" id="newDoctorPin" type="password" maxlength="4" placeholder="••••" style="text-align:center;letter-spacing:6px;font-size:1.3rem;font-weight:800;" />
         </div>
         <button class="btn btn-green btn-block" id="btnConfirmDoctorReset" onclick="executeDoctorPinReset()">
-          <i class="fa-solid fa-lock"></i> Update & Secure PIN
+          <i class="fa-solid fa-lock"></i> <span data-i18n="admin.updatePin">Update &amp; Secure PIN</span>
         </button>
       </div>
     </div>
@@ -252,27 +252,27 @@
     <div id="recoveryModal" class="hidden" style="position:fixed;inset:0;background:rgba(0,0,0,0.6);display:flex;align-items:center;justify-content:center;z-index:999;padding:16px;">
       <div class="card" style="max-width:420px;width:100%;border-radius:20px;">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
-          <h3 style="font-size:1.1rem;font-weight:800;margin:0;"><i class="fa-solid fa-key" style="color:var(--green);margin-right:6px;"></i> Recover Hospital Code</h3>
+          <h3 style="font-size:1.1rem;font-weight:800;margin:0;"><i class="fa-solid fa-key" style="color:var(--green);margin-right:6px;"></i> <span data-i18n="admin.recover">Recover Hospital Code</span></h3>
           <button class="icn-btn" onclick="toggleRecoveryModal(false)"><i class="fa-solid fa-xmark"></i></button>
         </div>
-        <p class="muted" style="font-size:0.84rem;line-height:1.45;">Enter your admin email and private Recovery Key to view your hospital's patient booking code.</p>
+        <p class="muted" style="font-size:0.84rem;line-height:1.45;" data-i18n="admin.recoverSub">Enter your admin email and private Recovery Key to view your hospital's patient booking code.</p>
         
-        <div class="field mt-14"><label class="label">Admin Email</label><input class="input" id="rcvEmail" type="email" placeholder="admin@hospital.com" /></div>
-        <div class="field"><label class="label">Recovery Key (RCV-XXXX-XXXX)</label><input class="input" id="rcvKey" type="text" placeholder="RCV-..." style="text-transform:uppercase;font-weight:700;" /></div>
+        <div class="field mt-14"><label class="label" data-i18n="admin.email">Admin Email</label><input class="input" id="rcvEmail" type="email" placeholder="admin@hospital.com" data-i18n-ph="admin.emailPh" /></div>
+        <div class="field"><label class="label" data-i18n="admin.recoveryKey">Recovery Key (RCV-XXXX-XXXX)</label><input class="input" id="rcvKey" type="text" placeholder="RCV-..." style="text-transform:uppercase;font-weight:700;" /></div>
         
         <div id="recoveryResultBox" class="hidden" style="margin:12px 0;"></div>
 
-        <button class="btn btn-green btn-block mt-14" id="btnRecover" onclick="executeRecovery()"><i class="fa-solid fa-magnifying-glass"></i> Retrieve Code</button>
+        <button class="btn btn-green btn-block mt-14" id="btnRecover" onclick="executeRecovery()"><i class="fa-solid fa-magnifying-glass"></i> <span data-i18n="admin.retrieve">Retrieve Code</span></button>
       </div>
     </div>
 
     <!-- Print Container For QR Standee -->
     <div id="qrPrintArea" style="display:none;">
       <h1 id="prtHospTitle" style="font-size:28px;margin-bottom:6px;">Hospital Name</h1>
-      <p style="font-size:16px;margin-bottom:20px;">Scan below to view live OPD token progress</p>
+      <p style="font-size:16px;margin-bottom:20px;" data-i18n="admin.printScan">Scan below to view live OPD token progress</p>
       <div id="printQrTarget" style="display:inline-block;padding:10px;"></div>
       <h2 style="font-size:22px;letter-spacing:2px;margin-top:20px;" id="prtHospCode">HOSP-CODE</h2>
-      <p style="font-size:14px;color:#555;">Powered by TokMark Smart Hospital Engine</p>
+      <p style="font-size:14px;color:#555;" data-i18n="admin.printPowered">Powered by TokMark Smart Hospital Engine</p>
     </div>
 
   </div>
@@ -286,6 +286,7 @@
   <script src="js/i18n.js"></script>
   <script>
     if (window.I18N) I18N.init();
+    function l10n(key, fb) { return (window.I18N && window.I18N.t) ? window.I18N.t(key) : fb; }
     // Robust Global Toast Failsafe
     window.showToast = window.showToast || function(msg, isErr, ms) {
       let w = document.getElementById('hkToastWrap');
@@ -368,18 +369,18 @@
       const pass = document.getElementById('loginPass').value;
       const btn = document.getElementById('btnLogin');
 
-      if (!email || !pass) return showToast('Enter email and password.', true);
+      if (!email || !pass) return showToast(l10n('admin.err.emailPass', 'Enter email and password.'), true);
 
       btn.disabled = true;
-      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Signing in...';
+      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> ' + l10n('admin.signingIn', 'Signing in...');
       try {
         await window._useAuth.signInWithEmailAndPassword(window._auth, email, pass);
-        showToast('Signed in successfully.');
+        showToast(l10n('admin.ok.signedIn', 'Signed in successfully.'));
       } catch (e) {
-        showToast('Login Error: ' + (e.message || e.code), true, 4000);
+        showToast(l10n('admin.err.login', 'Login Error: ') + (e.message || e.code), true, 4000);
       } finally {
         btn.disabled = false;
-        btn.innerHTML = '<i class="fa-solid fa-right-to-bracket"></i> Sign In';
+        btn.innerHTML = '<i class="fa-solid fa-right-to-bracket"></i> ' + l10n('admin.signIn', 'Sign In');
       }
     }
 
@@ -395,27 +396,27 @@
     async function resendVerificationEmail() {
       const btn = document.getElementById('btnResendVerify');
       btn.disabled = true;
-      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Sending...';
+      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> ' + l10n('admin.sending', 'Sending...');
       try {
         const u = window._auth.currentUser;
-        if (!u) throw new Error('Session expired — sign in again first.');
+        if (!u) throw new Error(l10n('admin.err.session', 'Session expired — sign in again.'));
         await window._useAuth.sendEmailVerification(u);
-        showToast('Verification email sent — check inbox & spam.', false, 4500);
+        showToast(l10n('admin.ok.verifySend', 'Verification email sent — check inbox & spam.'), false, 4500);
       } catch (e) {
-        showToast('Could not send: ' + (e.message || e.code), true, 4500);
+        showToast(l10n('admin.err.verifySend', 'Could not send: ') + (e.message || e.code), true, 4500);
       } finally {
         btn.disabled = false;
-        btn.innerHTML = '<i class="fa-solid fa-paper-plane"></i> Resend Verification Email';
+        btn.innerHTML = '<i class="fa-solid fa-paper-plane"></i> ' + l10n('admin.verify.resend', 'Resend Verification Email');
       }
     }
 
     async function continueAfterVerify() {
       const btn = document.getElementById('btnIVerified');
       btn.disabled = true;
-      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Checking...';
+      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> ' + l10n('admin.checking', 'Checking...');
       try {
         const u = window._auth.currentUser;
-        if (!u) throw new Error('Session expired — sign in again.');
+        if (!u) throw new Error(l10n('admin.err.session', 'Session expired — sign in again.'));
         await u.reload();
         const fresh = window._auth.currentUser;
         if (fresh && fresh.emailVerified) {
@@ -423,12 +424,12 @@
           await resolveAdminHospital(fresh);
           return;
         }
-        showToast('Not verified yet — open the email link or resend.', true, 5000);
+        showToast(l10n('admin.err.notVerified', 'Not verified yet — open the email link or resend.'), true, 5000);
       } catch (e) {
-        showToast('Check failed: ' + (e.message || e.code), true, 4500);
+        showToast(l10n('admin.err.check', 'Check failed: ') + (e.message || e.code), true, 4500);
       } finally {
         btn.disabled = false;
-        btn.innerHTML = '<i class="fa-solid fa-rotate-right"></i> I\'ve Verified — Continue';
+        btn.innerHTML = '<i class="fa-solid fa-rotate-right"></i> ' + l10n('admin.verify.continue', 'I\'ve Verified — Continue');
       }
     }
 
@@ -441,7 +442,7 @@
       try {
         await window._useAuth.signOut(window._auth);
         showLoggedOutState();
-        showToast('Logged out.');
+        showToast(l10n('admin.ok.loggedOut', 'Logged out.'));
       } catch(e) {
         showToast(e.message, true);
       }
@@ -466,24 +467,24 @@
       const email = document.getElementById('resetEmailInput').value.trim().toLowerCase();
       const btn = document.getElementById('btnSendReset');
 
-      if (!email) return showToast('Please enter your admin email address.', true);
+      if (!email) return showToast(l10n('admin.err.resetEmail', 'Please enter your admin email address.'), true);
 
       btn.disabled = true;
-      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Sending link...';
+      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> ' + l10n('admin.sendingLink', 'Sending link...');
 
       try {
         await window._useAuth.sendPasswordResetEmail(window._auth, email);
-        showToast('Password reset link sent! Check your inbox.');
+        showToast(l10n('admin.ok.resetSent', 'Password reset link sent! Check your inbox.'));
         toggleResetPasswordModal(false);
       } catch (err) {
         console.error('Password reset error:', err);
         let msg = err.message;
-        if (err.code === 'auth/user-not-found') msg = 'No admin account found with this email.';
-        if (err.code === 'auth/invalid-email') msg = 'Please enter a valid email address.';
+        if (err.code === 'auth/user-not-found') msg = l10n('admin.err.noAccount', 'No admin account found with this email.');
+        if (err.code === 'auth/invalid-email') msg = l10n('admin.err.invalidEmail', 'Please enter a valid email address.');
         showToast(msg, true, 4000);
       } finally {
         btn.disabled = false;
-        btn.innerHTML = '<i class="fa-solid fa-paper-plane"></i> Send Reset Link';
+        btn.innerHTML = '<i class="fa-solid fa-paper-plane"></i> ' + l10n('admin.sendReset', 'Send Reset Link');
       }
     }
 
@@ -494,7 +495,7 @@
       document.getElementById('adminEmailBadge').textContent = user.email;
 
       const infoBox = document.getElementById('hospitalInfoBox');
-      infoBox.innerHTML = '<div class="muted"><i class="fa-solid fa-spinner fa-spin"></i> Fetching hospital records...</div>';
+      infoBox.innerHTML = '<div class="muted"><i class="fa-solid fa-spinner fa-spin"></i> ' + l10n('admin.fetchingHosp', 'Fetching hospital records...') + '</div>';
 
       try {
         let matchedDoc = null;
@@ -512,14 +513,14 @@
         if (!matchedDoc) {
           infoBox.innerHTML = `
             <div style="padding:20px;background:var(--bg);border-radius:14px;border:1px dashed var(--line);text-align:center;">
-              <h3 style="margin:0 0 6px;font-size:1.05rem;">No Hospital Profile Linked</h3>
-              <p class="muted" style="font-size:0.84rem;margin:0 0 14px;">No hospital record found for <b>${escHtml(user.email)}</b>.</p>
+              <h3 style="margin:0 0 6px;font-size:1.05rem;">${l10n('admin.err.noProfile', 'No Hospital Profile Linked')}</h3>
+              <p class="muted" style="font-size:0.84rem;margin:0 0 14px;">${l10n('admin.err.noProfileSub', 'No hospital record found for')} <b>${escHtml(user.email)}</b>.</p>
               <button class="btn btn-green" onclick="createInitialHospital('${user.uid}', '${user.email}')">
-                <i class="fa-solid fa-plus"></i> Set Up Hospital Now
+                <i class="fa-solid fa-plus"></i> ${l10n('admin.setupHospital', 'Set Up Hospital Now')}
               </button>
             </div>
           `;
-          document.getElementById('doctorList').innerHTML = '<div class="empty">Doctors will appear once hospital is configured.</div>';
+          document.getElementById('doctorList').innerHTML = '<div class="empty">' + l10n('admin.err.noDoctorsYet', 'Doctors will appear once hospital is configured.') + '</div>';
           return;
         }
 
@@ -545,14 +546,14 @@
 
       } catch (err) {
         console.error('Resolution Error:', err);
-        infoBox.innerHTML = `<div class="empty red">Access Error: ${escHtml(err.message)}</div>`;
+        infoBox.innerHTML = `<div class="empty red">${l10n('admin.err.access', 'Access Error: ')}${escHtml(err.message)}</div>`;
       }
     }
 
     async function createInitialHospital(uid, email) {
-      const name = prompt('Enter Hospital Name (e.g. Apollo Clinic):');
+      const name = prompt(l10n('admin.promptHospName', 'Enter Hospital Name (e.g. Apollo Clinic):'));
       if (!name || !name.trim()) return;
-      const city = prompt('Enter City (e.g. Chennai):') || '';
+      const city = prompt(l10n('admin.promptCity', 'Enter City (e.g. Chennai):')) || '';
 
       const slug = name.toLowerCase().replace(/[^a-z0-9]/g, '-').replace(/-+/g, '-').slice(0, 30);
       const hCode = 'HOSP-' + Math.floor(1000 + Math.random() * 9000);
@@ -566,10 +567,10 @@
           hospitalCode: hCode,
           createdAt: window._fs.serverTimestamp()
         });
-        showToast('Hospital created successfully!');
+        showToast(l10n('admin.ok.hospCreated', 'Hospital created successfully!'));
         await resolveAdminHospital(activeAdminUser);
       } catch(e) {
-        alert('Creation failed: ' + e.message);
+        alert(l10n('admin.err.create', 'Creation failed: ') + e.message);
       }
     }
 
@@ -579,19 +580,19 @@
           <div>
             <div style="font-weight:800;font-size:1.15rem;color:var(--ink);">${escHtml(data.name || slug)}</div>
             <div class="muted" style="font-size:.82rem;margin-top:2px;">
-              System ID: <b>${escHtml(slug)}</b> ${data.city ? ' · ' + escHtml(data.city) : ''}
+              ${l10n('admin.systemId', 'System ID: ')}<b>${escHtml(slug)}</b> ${data.city ? ' · ' + escHtml(data.city) : ''}
             </div>
           </div>
-          <span class="badge green">Authorized Station</span>
+          <span class="badge green">${l10n('admin.authorizedStation', 'Authorized Station')}</span>
         </div>
 
         <div style="display:grid;grid-template-columns:1fr;gap:12px;margin-top:14px;">
           <div class="key-box">
             <div>
-              <div class="muted" style="font-size:0.75rem;font-weight:700;text-transform:uppercase;">Patient Booking Code</div>
+              <div class="muted" style="font-size:0.75rem;font-weight:700;text-transform:uppercase;">${l10n('admin.bookingCode', 'Patient Booking Code')}</div>
               <div style="font-size:1.2rem;font-weight:900;color:var(--green);margin-top:2px;letter-spacing:1px;">${escHtml(data.hospitalCode)}</div>
             </div>
-            <span class="badge-code">Share with Patients</span>
+            <span class="badge-code">${l10n('admin.shareWithPatients', 'Share with Patients')}</span>
           </div>
         </div>
       `;
@@ -622,7 +623,7 @@
 
     function printStandeeQr() {
       const qrImg = document.querySelector('#qrcode img') || document.querySelector('#qrcode canvas');
-      if (!qrImg) return showToast('QR Code is still rendering, please wait.', true);
+      if (!qrImg) return showToast(l10n('admin.err.qrWait', 'QR Code is still rendering, please wait.'), true);
 
       const target = document.getElementById('printQrTarget');
       target.innerHTML = '';
@@ -638,20 +639,20 @@
     async function loadDoctorList() {
       if (!assignedHospitalSlug) return;
       const list = document.getElementById('doctorList');
-      list.innerHTML = '<div class="muted"><i class="fa-solid fa-spinner fa-spin"></i> Loading doctors...</div>';
+      list.innerHTML = '<div class="muted"><i class="fa-solid fa-spinner fa-spin"></i> ' + l10n('admin.doctorsLoading', 'Loading doctors...') + '</div>';
 
       try {
         const snap = await window._fs.getDocs(window._fs.collection(window._db, 'hospitals', assignedHospitalSlug, 'doctors'));
         list.innerHTML = '';
         if (snap.empty) {
-          list.innerHTML = '<div class="empty">No doctors onboarded yet. Add your first doctor below.</div>';
+          list.innerHTML = '<div class="empty">' + l10n('admin.err.noDoctors', 'No doctors onboarded yet. Add your first doctor below.') + '</div>';
           return;
         }
 
         snap.docs.forEach(d => {
           const doc = d.data();
           const docId = d.id;
-          const statusBadge = doc.status === 'closed' ? '<span class="badge red">closed</span>' : '<span class="badge green">open</span>';
+          const statusBadge = doc.status === 'closed' ? '<span class="badge red">' + l10n('common.closed', 'Closed') + '</span>' : '<span class="badge green">' + l10n('common.open', 'Open') + '</span>';
           const pinBadge = '';
           const roomBadge = doc.room ? `<span class="badge blue">${escHtml(doc.room)}</span>` : '';
 
@@ -659,14 +660,14 @@
             <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
               <div style="flex:1;min-width:200px;">
                 <div style="font-weight:700;color:var(--ink);">${escHtml(doc.name || docId)} ${statusBadge} ${pinBadge} ${roomBadge}</div>
-                <div class="muted" style="font-size:.82rem;margin-top:2px;">${escHtml(doc.department || 'General')} ${doc.email ? '· ' + escHtml(doc.email) : ''}</div>
+                <div class="muted" style="font-size:.82rem;margin-top:2px;">${escHtml(doc.department || l10n('admin.general', 'General'))} ${doc.email ? '· ' + escHtml(doc.email) : ''}</div>
                 <div class="muted" style="font-size:.78rem;margin-top:2px;"><i class="fa-solid fa-clock"></i> ${scheduleSummary(doc.schedule)}</div>
               </div>
               <div style="display:flex;gap:6px;flex-wrap:wrap;">
-                <button class="btn btn-sm btn-slate" onclick="editDoctor('${docId}')" title="Edit Doctor Details"><i class="fa-solid fa-pen"></i> Edit</button>
-                <button class="btn btn-sm btn-slate" onclick="openScheduleEditor('${docId}')" title="Set weekly consultation hours"><i class="fa-solid fa-calendar-week"></i> Schedule</button>
-                <button class="btn btn-sm btn-danger" onclick="revokeDoctorAccess('${docId}', '${escHtml(doc.name || 'Doctor')}', '${escHtml(doc.email || '')}')" title="Relieve & Permanently Revoke Access" style="background:#fee2e2;color:#b91c1c;border:1px solid #fca5a5;font-weight:700;">
-                  <i class="fa-solid fa-user-xmark"></i> Relieve / Revoke
+                <button class="btn btn-sm btn-slate" onclick="editDoctor('${docId}')" title="${l10n('admin.editDoctorTitle', 'Edit Doctor Details')}"><i class="fa-solid fa-pen"></i> ${l10n('admin.edit', 'Edit')}</button>
+                <button class="btn btn-sm btn-slate" onclick="openScheduleEditor('${docId}')" title="${l10n('admin.scheduleBtnTitle', 'Set weekly consultation hours')}"><i class="fa-solid fa-calendar-week"></i> ${l10n('admin.schedule', 'Schedule')}</button>
+                <button class="btn btn-sm btn-danger" onclick="revokeDoctorAccess('${docId}', '${escHtml(doc.name || 'Doctor')}', '${escHtml(doc.email || '')}')" title="${l10n('admin.revokeTitle', 'Relieve & Permanently Revoke Access')}" style="background:#fee2e2;color:#b91c1c;border:1px solid #fca5a5;font-weight:700;">
+                  <i class="fa-solid fa-user-xmark"></i> ${l10n('admin.revoke', 'Relieve / Revoke')}
                 </button>
               </div>
             </div>
@@ -674,15 +675,15 @@
         });
       } catch (e) {
         console.error(e);
-        list.innerHTML = '<div class="muted">Could not load doctors list: ' + escHtml(e.message) + '</div>';
+        list.innerHTML = '<div class="muted">' + l10n('admin.err.doctorsLoad', 'Could not load doctors list: ') + escHtml(e.message) + '</div>';
       }
     }
 
     async function loadAuditLog() {
       const box = document.getElementById('auditLogBox');
       if (!box) return;
-      if (!assignedHospitalSlug) { box.innerHTML = '<div class="muted">Hospital not linked yet.</div>'; return; }
-      box.innerHTML = '<div class="muted"><i class="fa-solid fa-spinner fa-spin"></i> Loading audit events...</div>';
+      if (!assignedHospitalSlug) { box.innerHTML = '<div class="muted">' + l10n('admin.err.noHospLinked', 'Hospital not linked yet.') + '</div>'; return; }
+      box.innerHTML = '<div class="muted"><i class="fa-solid fa-spinner fa-spin"></i> ' + l10n('admin.auditLoading', 'Loading audit events...') + '</div>';
       try {
         let rows = [];
         if (FUNC) {
@@ -699,7 +700,7 @@
         }
 
         if (!rows.length) {
-          box.innerHTML = '<div class="empty" style="padding:18px;text-align:center;">No audit events yet — this trail fills once the hospital runs on the trusted backend.</div>';
+          box.innerHTML = '<div class="empty" style="padding:18px;text-align:center;">' + l10n('admin.err.noAudit', 'No audit events yet — this trail fills once the hospital runs on the trusted backend.') + '</div>';
           return;
         }
 
@@ -720,13 +721,13 @@
           `;
         }).join('');
       } catch (err) {
-        box.innerHTML = `<div class="empty red" style="padding:14px;">Audit log unavailable: ${escHtml(err.message)}</div>`;
+        box.innerHTML = `<div class="empty red" style="padding:14px;">${l10n('admin.err.audit', 'Audit log unavailable: ')}${escHtml(err.message)}</div>`;
       }
     }
 
     function showDoctorForm() { 
       editDoctorId = null;
-      document.getElementById('formTitle').textContent = 'Add New Doctor';
+      document.getElementById('formTitle').textContent = l10n('admin.addNewDoc', 'Add New Doctor');
       document.getElementById('docName').value = '';
       document.getElementById('docDept').value = '';
       document.getElementById('docEmail').value = '';
@@ -741,10 +742,10 @@
       editDoctorId = null; 
     }
 
-    const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    const WEEKDAYS = l10n('admin.weekdays', 'Sun,Mon,Tue,Wed,Thu,Fri,Sat').split(',');
 
     function scheduleSummary(schedule) {
-      if (!Array.isArray(schedule) || !schedule.length) return 'No weekly schedule set — defaults apply';
+      if (!Array.isArray(schedule) || !schedule.length) return l10n('admin.err.noSchedule', 'No weekly schedule set — defaults apply');
       return schedule.map((s) => `${WEEKDAYS[Number(s.day) % 7] || s.day} ${s.start}–${s.end}`).join(' · ');
     }
 
@@ -758,12 +759,12 @@
         wrap.style.cssText = 'position:fixed;inset:0;background:rgba(2,6,23,0.7);display:flex;align-items:center;justify-content:center;z-index:1000;';
         wrap.innerHTML = `
           <div style="background:#fff;border-radius:16px;max-width:520px;width:92%;padding:22px;box-shadow:0 24px 60px rgba(0,0,0,0.35);color:#0f172a;">
-            <div style="font-weight:800;font-size:1.05rem;margin-bottom:14px;"><i class="fa-solid fa-calendar-week"></i> Weekly Consultation Schedule</div>
-            <div class="muted" style="font-size:.82rem;margin-bottom:14px;color:#64748b;">Patients book advanced slots only inside these windows. First window of each selected day.</div>
+            <div style="font-weight:800;font-size:1.05rem;margin-bottom:14px;"><i class="fa-solid fa-calendar-week"></i> ${l10n('admin.scheduleTitle', 'Weekly Consultation Schedule')}</div>
+            <div class="muted" style="font-size:.82rem;margin-bottom:14px;color:#64748b;">${l10n('admin.scheduleNote', 'Patients book advanced slots only inside these windows. First window of each selected day.')}</div>
             <div id="scheduleModalBody"></div>
             <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;">
-              <button class="btn btn-sm btn-slate" onclick="closeScheduleEditor()">Cancel</button>
-              <button class="btn btn-sm btn-green" onclick="saveSchedule()"><i class="fa-solid fa-check"></i> Save Schedule</button>
+              <button class="btn btn-sm btn-slate" onclick="closeScheduleEditor()">${l10n('common.cancel', 'Cancel')}</button>
+              <button class="btn btn-sm btn-green" onclick="saveSchedule()"><i class="fa-solid fa-check"></i> ${l10n('admin.saveSchedule', 'Save Schedule')}</button>
             </div>
           </div>`;
         document.body.appendChild(wrap);
@@ -772,17 +773,17 @@
         overlay.style.display = 'flex';
       }
 
-      body.innerHTML = '<div class="muted">Loading…</div>';
+      body.innerHTML = '<div class="muted">' + l10n('admin.loading', 'Loading…') + '</div>';
       window._fs.getDoc(window._fs.doc(window._db, 'hospitals', assignedHospitalSlug, 'doctors', doctorId)).then((snap) => {
         const schedule = snap.data().schedule || [];
         const byDay = {};
         schedule.forEach((s) => { byDay[Number(s.day)] = s; });
         body.innerHTML = `
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;">
-            <label style="font-size:.82rem;font-weight:700;">Start time <input type="time" id="schedStart" style="width:100%;padding:8px;border:1px solid #cbd5e1;border-radius:8px;margin-top:4px;" value="${(byDay[0] && byDay[0].start) || '09:00'}" /></label>
-            <label style="font-size:.82rem;font-weight:700;">End time <input type="time" id="schedEnd" style="width:100%;padding:8px;border:1px solid #cbd5e1;border-radius:8px;margin-top:4px;" value="${(byDay[0] && byDay[0].end) || '13:00'}" /></label>
+            <label style="font-size:.82rem;font-weight:700;">${l10n('admin.startTime', 'Start time')} <input type="time" id="schedStart" style="width:100%;padding:8px;border:1px solid #cbd5e1;border-radius:8px;margin-top:4px;" value="${(byDay[0] && byDay[0].start) || '09:00'}" /></label>
+            <label style="font-size:.82rem;font-weight:700;">${l10n('admin.endTime', 'End time')} <input type="time" id="schedEnd" style="width:100%;padding:8px;border:1px solid #cbd5e1;border-radius:8px;margin-top:4px;" value="${(byDay[0] && byDay[0].end) || '13:00'}" /></label>
           </div>
-          <div style="font-size:.82rem;font-weight:700;margin-bottom:6px;">Days (repeat weekly)</div>
+          <div style="font-size:.82rem;font-weight:700;margin-bottom:6px;">${l10n('admin.days', 'Days (repeat weekly)')}</div>
           <div style="display:flex;gap:8px;flex-wrap:wrap;">${WEEKDAYS.map((w, i) => `
             <label style="display:flex;align-items:center;gap:5px;border:1px solid #cbd5e1;border-radius:8px;padding:6px 10px;font-size:.8rem;font-weight:600;cursor:pointer;">
               <input type="checkbox" value="${i}" ${byDay[i] ? 'checked' : ''} /> ${w}
@@ -803,11 +804,11 @@
       if (!scheduleDoctorId) return;
       const start = document.getElementById('schedStart').value;
       const end = document.getElementById('schedEnd').value;
-      if (!start || !end) return showToast('Select start and end time.', true);
-      if (start >= end) return showToast('End time must be after start time.', true);
+      if (!start || !end) return showToast(l10n('admin.err.scheduleTimes', 'Select start and end time.'), true);
+      if (start >= end) return showToast(l10n('admin.err.scheduleOrder', 'End time must be after start time.'), true);
 
       const checked = Array.from(document.querySelectorAll('#scheduleModal input[type=checkbox]:checked')).map((c) => Number(c.value));
-      if (!checked.length) return showToast('Select at least one day.', true);
+      if (!checked.length) return showToast(l10n('admin.err.scheduleDay', 'Select at least one day.'), true);
 
       const schedule = checked.map((day) => ({ day, start, end }));
       const btn = document.querySelector('#scheduleModal .btn-green');
@@ -817,18 +818,18 @@
           window._fs.doc(window._db, 'hospitals', assignedHospitalSlug, 'doctors', scheduleDoctorId),
           { schedule, updatedAt: window._fs.serverTimestamp ? window._fs.serverTimestamp() : new Date().toISOString() }
         );
-        showToast('Schedule saved. Patients can book advanced slots inside these hours.');
+        showToast(l10n('admin.ok.scheduleSaved', 'Schedule saved. Patients can book advanced slots inside these hours.'));
         closeScheduleEditor();
         loadDoctorList();
       } catch (e) {
         btn.disabled = false;
-        showToast('Could not save schedule: ' + e.message, true);
+        showToast(l10n('admin.err.scheduleSave', 'Could not save schedule: ') + e.message, true);
       }
     }
 
     async function editDoctor(id) {
       editDoctorId = id;
-      document.getElementById('formTitle').textContent = 'Edit Doctor Details';
+      document.getElementById('formTitle').textContent = l10n('admin.editDoctorTitle', 'Edit Doctor Details');
       document.getElementById('doctorForm').classList.remove('hidden');
       try {
         const snap = await window._fs.getDoc(window._fs.doc(window._db, 'hospitals', assignedHospitalSlug, 'doctors', id));
@@ -838,7 +839,7 @@
         document.getElementById('docEmail').value = doc.email || '';
         document.getElementById('docEmail').disabled = true;
         document.getElementById('docPin').value = '';
-        document.getElementById('docPin').placeholder = 'Disabled pending secure account provisioning';
+        document.getElementById('docPin').placeholder = l10n('admin.docPinPh', 'Disabled pending secure account provisioning');
         document.getElementById('docRoom').value = doc.room || doc.counter || '';
         document.getElementById('docStatus').value = doc.status || 'open';
       } catch (e) { console.error(e); }
@@ -853,12 +854,12 @@
       const status = document.getElementById('docStatus').value;
       const btn = document.getElementById('btnSaveDoctor');
 
-      if (!name) return showToast('Enter doctor name.', true);
-      if (!assignedHospitalSlug) return showToast('No hospital assigned.', true);
-      if (!editDoctorId && !email) return showToast('Enter doctor email.', true);
+      if (!name) return showToast(l10n('admin.err.docName', 'Enter doctor name.'), true);
+      if (!assignedHospitalSlug) return showToast(l10n('admin.err.noHosp', 'No hospital assigned.'), true);
+      if (!editDoctorId && !email) return showToast(l10n('admin.err.docEmail', 'Enter doctor email.'), true);
 
       btn.disabled = true;
-      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Syncing to Cloud Database...';
+      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> ' + l10n('admin.syncing', 'Syncing to Cloud Database...');
 
       try {
         // Secure backend mode: creating a doctor provisions a Firebase
@@ -872,14 +873,14 @@
               name, department: dept || 'Consultation', room: room || 'Room 1',
               counter: room || 'Room 1', updatedAt: window._fs.serverTimestamp(),
             });
-            showToast('Doctor profile updated.');
+            showToast(l10n('admin.ok.docUpdated', 'Doctor profile updated.'));
           } else {
-            if (!email) return showToast('Enter doctor email to provision secure sign-in.', true);
+            if (!email) return showToast(l10n('admin.err.docEmailProvision', 'Enter doctor email to provision secure sign-in.'), true);
             const doctorId = String(email.split('@')[0]).replace(/[^a-z0-9]/gi, '-').toLowerCase();
             const res = await window.TokSpotAPI.provisionDoctor({
               slug: assignedHospitalSlug, doctorId, email, name, department: dept, room,
             });
-            showToast(`Doctor provisioned. Temp credentials were issued to ${email} (authUid ${res.authUid.slice(0, 6)}…).`);
+            showToast(l10n('admin.ok.docProvisioned', 'Doctor provisioned. Temp credentials were issued to %s (authUid %s…).').replace('%s', email).replace('%s', res.authUid.slice(0, 6)));
           }
           cancelDoctorEdit();
           loadDoctorList();
@@ -891,7 +892,7 @@
         // Base Doctor Document
         const data = { 
           name, 
-          department: dept || 'Consultation', 
+          department: dept || l10n('token.consultation', 'Consultation'), 
           room: room || 'Room 1',
           counter: room || 'Room 1',
           status, 
@@ -916,7 +917,7 @@
             console.warn('Root sync note:', e);
           }
 
-          showToast('Doctor profile saved; secure doctor sign-in still requires server provisioning.');
+          showToast(l10n('admin.ok.docSavedProto', 'Doctor profile saved; secure doctor sign-in still requires server provisioning.'));
         } else {
           data.createdAt = window._fs.serverTimestamp();
           
@@ -933,24 +934,24 @@
             console.warn('Root create mirror note:', e);
           }
 
-          showToast('Doctor profile created; secure doctor sign-in still requires server provisioning.');
+          showToast(l10n('admin.ok.docCreatedProto', 'Doctor profile created; secure doctor sign-in still requires server provisioning.'));
         }
 
         cancelDoctorEdit();
         loadDoctorList();
       } catch (e) {
         console.error('Doctor Save Error:', e);
-        showToast('Sync Error: ' + e.message, true);
+        showToast(l10n('admin.err.sync', 'Sync Error: ') + e.message, true);
       } finally {
         btn.disabled = false;
-        btn.innerHTML = '<i class="fa-solid fa-floppy-disk"></i> Save Doctor';
+        btn.innerHTML = '<i class="fa-solid fa-floppy-disk"></i> ' + l10n('admin.saveDoctor', 'Save Doctor');
       }
     }
 
     function openDoctorResetModal(docId, docName, docEmail) {
       targetResetDoctorId = docId;
       document.getElementById('resetDocName').textContent = docName;
-      document.getElementById('resetDocEmail').textContent = docEmail || 'No Email';
+      document.getElementById('resetDocEmail').textContent = docEmail || l10n('admin.noEmail', 'No Email');
       document.getElementById('newDoctorPin').value = '';
       document.getElementById('doctorResetModal').classList.remove('hidden');
     }
@@ -961,16 +962,12 @@
     }
 
     async function executeDoctorPinReset() {
-      showToast('PIN login is disabled. Provision doctor access through Firebase Auth before enabling this action.', true, 5000);
+      showToast(l10n('admin.err.pinDisabled', 'PIN login is disabled. Provision doctor access through Firebase Auth before enabling this action.'), true, 5000);
     }
 
     async function revokeDoctorAccess(id, name, email) {
       const confirmAction = confirm(
-        `WARNING: Are you sure you want to permanently revoke access for ${name} (${email})?\n\n` +
-        `• Doctor credentials will be decoupled from this hospital immediately.\n` +
-        `• Doctor will be unassigned from OPD rooms.\n` +
-        `• All active tablet or web sessions will terminate.\n\n` +
-        `Click OK to confirm.`
+        l10n('admin.confirm.revoke', 'WARNING: Are you sure you want to permanently revoke access for %s (%s)?\n\n• Doctor credentials will be decoupled from this hospital immediately.\n• Doctor will be unassigned from OPD rooms.\n• All active tablet or web sessions will terminate.\n\nClick OK to confirm.').replace('%s', name).replace('%s', email)
       );
 
       if (!confirmAction) return;
@@ -1004,10 +1001,10 @@
           console.warn('Room unassign note:', e);
         }
 
-        showToast(`${name}'s access has been completely revoked.`);
+        showToast(l10n('admin.ok.revoked', '%s\'s access has been completely revoked.').replace('%s', name));
         loadDoctorList();
       } catch (e) {
-        showToast('Failed to revoke: ' + e.message, true);
+        showToast(l10n('admin.err.revoke', 'Failed to revoke: ') + e.message, true);
       }
     }
 
@@ -1019,7 +1016,7 @@
     }
 
     async function executeRecovery() {
-      showToast('Recovery-key lookup is disabled until it can be handled by an authenticated server endpoint.', true, 5000);
+      showToast(l10n('admin.err.recoveryDisabled', 'Recovery-key lookup is disabled until it can be handled by an authenticated server endpoint.'), true, 5000);
     }
   </script>
 </body>

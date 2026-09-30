@@ -86,15 +86,15 @@
 </head>
 <body>
   <div class="topbar">
-    <a class="brand" href="index.html"><span class="logomark"><img src="logo.png?v=2" alt="TokMark" /></span>TokMark Front Desk</a>
+    <a class="brand" href="index.html"><span class="logomark"><img src="logo.png?v=2" alt="TokMark" /></span><span data-i18n="desk.brand">TokMark Front Desk</span></a>
     <span class="spacer"></span>
-    <button class="icn-btn" onclick="location.href='staff.html'" title="Staff Portal"><i class="fa-solid fa-hospital-user"></i></button>
-    <button class="icn-btn" onclick="launchTvFromDesk()" title="Open Display Board"><i class="fa-solid fa-tv"></i></button>
+    <button class="icn-btn" onclick="location.href='staff.html'" title="Staff Portal" data-i18n-title="desk.staffPortal"><i class="fa-solid fa-hospital-user"></i></button>
+    <button class="icn-btn" onclick="launchTvFromDesk()" title="Open Display Board" data-i18n-title="desk.openDisplay"><i class="fa-solid fa-tv"></i></button>
     <button class="icn-btn" onclick="hk.toggleDark()"><i class="fa-solid fa-moon"></i></button>
   </div>
 
   <div class="page wide">
-    <div class="hsub mt-12">Front Desk — Issue tokens, call queue &amp; manage absentees.</div>
+    <div class="hsub mt-12" data-i18n="desk.tagline">Front Desk — Issue tokens, call queue &amp; manage absentees.</div>
 
     <!-- 1. Station Gate: Lock into Hospital using Code -->
     <section class="card mt-12" id="stationGate">
@@ -102,12 +102,12 @@
         <div style="width:56px;height:56px;border-radius:18px;background:var(--green-050);color:var(--green);display:flex;align-items:center;justify-content:center;font-size:1.6rem;margin:0 auto 14px;">
           <i class="fa-solid fa-hospital"></i>
         </div>
-        <div style="font-weight:800;font-size:1.25rem;">Front Desk Station Setup</div>
-        <p class="muted" style="font-size:0.86rem;margin:6px 0 18px;">Enter your Hospital Code to initialize this desk.</p>
+        <div style="font-weight:800;font-size:1.25rem;" data-i18n="desk.stationSetup">Front Desk Station Setup</div>
+        <p class="muted" style="font-size:0.86rem;margin:6px 0 18px;" data-i18n="desk.stationSub">Enter your Hospital Code to initialize this desk.</p>
         
         <div style="display:flex;gap:8px;">
-          <input class="input" id="gateCodeInput" placeholder="e.g. HOSP-1234" style="text-transform:uppercase;font-weight:800;letter-spacing:1px;" />
-          <button class="btn btn-green" id="btnAuthStation" onclick="authStation()"><i class="fa-solid fa-check"></i> Authorize</button>
+          <input class="input" id="gateCodeInput" placeholder="e.g. HOSP-1234" style="text-transform:uppercase;font-weight:800;letter-spacing:1px;" data-i18n-ph="desk.gatePh" />
+          <button class="btn btn-green" id="btnAuthStation" onclick="authStation()"><i class="fa-solid fa-check"></i> <span data-i18n="desk.authorize">Authorize</span></button>
         </div>
       </div>
     </section>
@@ -116,22 +116,22 @@
     <section class="card mt-12 hidden" id="selectors">
       <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:16px;border-bottom:1px dashed var(--line);padding-bottom:12px;">
         <div>
-          <div style="font-weight:800;font-size:1.15rem;color:var(--ink);" id="stationHospitalTitle">Hospital Station</div>
+          <div style="font-weight:800;font-size:1.15rem;color:var(--ink);" id="stationHospitalTitle" data-i18n="desk.stationHospitalTitle">Hospital Station</div>
           <div class="muted" style="font-size:0.82rem;" id="stationCitySubtitle">—</div>
         </div>
         <div style="display:flex;gap:8px;align-items:center;">
           <span class="badge-code" id="stationHospitalCode">HOSP-CODE</span>
-          <button class="btn btn-slate btn-sm" onclick="disconnectStation()"><i class="fa-solid fa-arrow-right-from-bracket"></i> Exit Station</button>
+          <button class="btn btn-slate btn-sm" onclick="disconnectStation()"><i class="fa-solid fa-arrow-right-from-bracket"></i> <span data-i18n="desk.exitStation">Exit Station</span></button>
         </div>
       </div>
 
       <div class="field" style="margin:0;">
-        <label class="label"><i class="fa-solid fa-user-doctor"></i> Active Consultation Doctor</label>
+        <label class="label"><i class="fa-solid fa-user-doctor"></i> <span data-i18n="desk.activeDoctor">Active Consultation Doctor</span></label>
         <select class="input" id="doctorSelect" onchange="onDoctor()">
-          <option value="">Select Doctor for this station…</option>
+          <option value="" data-i18n="desk.selectDoctor">Select Doctor for this station…</option>
         </select>
       </div>
-      <div class="mt-14 center" id="pickMsg"><span class="muted">Select a doctor above to manage queue tokens.</span></div>
+      <div class="mt-14 center" id="pickMsg"><span class="muted" data-i18n="desk.pickMsg">Select a doctor above to manage queue tokens.</span></div>
     </section>
 
     <!-- 3. Active Desk Panel -->
@@ -140,95 +140,95 @@
       <div class="card">
         <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;">
           <span style="width:38px;height:38px;border-radius:12px;background:var(--green-050);color:var(--green);display:flex;align-items:center;justify-content:center;font-size:1.2rem;"><i class="fa-solid fa-ticket"></i></span>
-          <h2 style="font-size:1.05rem;font-weight:800;margin:0;">Issue New Token</h2>
+          <h2 style="font-size:1.05rem;font-weight:800;margin:0;" data-i18n="desk.issueNew">Issue New Token</h2>
           <span class="spacer"></span>
           <span class="chip gray" id="deskActiveDoctorLabel">Dr. Name</span>
         </div>
-        <div class="field"><label class="label">Patient Name <span class="req">*</span></label><input class="input" id="newName" placeholder="Patient name" /></div>
-        <div class="field"><label class="label">Mobile <span class="muted">(Max 2 tokens per phone number per day)</span></label><input class="input" id="newPhone" placeholder="10-digit mobile" maxlength="10" inputmode="numeric" /></div>
+        <div class="field"><label class="label"><span data-i18n="desk.patientName">Patient Name</span> <span class="req">*</span></label><input class="input" id="newName" placeholder="Patient name" data-i18n-ph="desk.patientNamePh" /></div>
+        <div class="field"><label class="label"><span data-i18n="desk.mobile">Mobile</span> <span class="muted">(<span data-i18n="desk.mobileHint">Max 2 tokens per phone number per day</span>)</span></label><input class="input" id="newPhone" placeholder="10-digit mobile" maxlength="10" inputmode="numeric" data-i18n-ph="desk.phonePh" /></div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
           <div class="field" style="margin-bottom:0;">
-            <label class="label">Type</label>
+            <label class="label" data-i18n="desk.type">Type</label>
             <select class="input" id="newMode">
-              <option value="walkin">Walk-in</option>
-              <option value="call">Phone</option>
-              <option value="self">Self-booked</option>
+              <option value="walkin" data-i18n="desk.walkin">Walk-in</option>
+              <option value="call" data-i18n="desk.phoneOpt">Phone</option>
+              <option value="self" data-i18n="desk.self">Self-booked</option>
             </select>
           </div>
           <div class="field" style="margin-bottom:0;">
-            <label class="label">Counter</label>
+            <label class="label" data-i18n="desk.counter">Counter</label>
             <select class="input" id="newCounter">
-              <option value="A">Counter A</option>
-              <option value="B">Counter B</option>
-              <option value="C">Counter C</option>
+              <option value="A" data-i18n="desk.counterA">Counter A</option>
+              <option value="B" data-i18n="desk.counterB">Counter B</option>
+              <option value="C" data-i18n="desk.counterC">Counter C</option>
             </select>
           </div>
         </div>
         <div class="field" style="display:flex;align-items:center;gap:10px;background:#fff7ed;border:1px solid #fed7aa;border-radius:12px;padding:12px 14px;margin-top:14px;">
           <input type="checkbox" id="newPriority" style="width:20px;height:20px;accent-color:var(--red);" />
           <div style="flex:1;">
-            <div style="font-weight:700;font-size:.9rem;color:#c2410c;"><i class="fa-solid fa-truck-medical"></i> Emergency / Priority</div>
-            <div class="muted" style="font-size:.78rem;">Fast-track ahead of normal tokens.</div>
+            <div style="font-weight:700;font-size:.9rem;color:#c2410c;"><i class="fa-solid fa-truck-medical"></i> <span data-i18n="desk.priority">Emergency / Priority</span></div>
+            <div class="muted" style="font-size:.78rem;" data-i18n="desk.prioritySub">Fast-track ahead of normal tokens.</div>
           </div>
         </div>
 
         <div style="display:flex;align-items:center;gap:8px;margin-top:10px;padding:4px;">
           <input type="checkbox" id="autoPrintSlip" checked style="width:16px;height:16px;accent-color:var(--green);" />
           <label for="autoPrintSlip" style="font-size:0.85rem;font-weight:600;color:var(--ink);cursor:pointer;">
-            <i class="fa-solid fa-print"></i> Auto-print 58mm thermal slip
+            <i class="fa-solid fa-print"></i> <span data-i18n="desk.autoPrint">Auto-print 58mm thermal slip</span>
           </label>
         </div>
 
         <div class="btn-row mt-16">
-          <button class="btn btn-green" id="btnIssue" onclick="issueToken()" style="flex:1;"><i class="fa-solid fa-ticket"></i> Issue Token</button>
-          <button class="btn btn-slate" onclick="resetDoctorSelection()"><i class="fa-solid fa-user-doctor"></i> Switch Doctor</button>
+          <button class="btn btn-green" id="btnIssue" onclick="issueToken()" style="flex:1;"><i class="fa-solid fa-ticket"></i> <span data-i18n="desk.issue">Issue Token</span></button>
+          <button class="btn btn-slate" onclick="resetDoctorSelection()"><i class="fa-solid fa-user-doctor"></i> <span data-i18n="desk.switchDoctor">Switch Doctor</span></button>
         </div>
 
         <div class="hotkey-bar">
-          <span><kbd>F2</kbd> Focus Name</span>
-          <span><kbd>Enter</kbd> Issue Token</span>
-          <span><kbd>F4</kbd> Call Next</span>
-          <span><kbd>F8</kbd> Recall</span>
-          <span><kbd>F9</kbd> Skip</span>
-          <span><kbd>F10</kbd> Done</span>
-          <span><kbd>Alt + P</kbd> Reprint</span>
+          <span><kbd>F2</kbd> <span data-i18n="desk.hot.name">Focus Name</span></span>
+          <span><kbd>Enter</kbd> <span data-i18n="desk.hot.issue">Issue Token</span></span>
+          <span><kbd>F4</kbd> <span data-i18n="desk.hot.call">Call Next</span></span>
+          <span><kbd>F8</kbd> <span data-i18n="desk.hot.recall">Recall</span></span>
+          <span><kbd>F9</kbd> <span data-i18n="desk.hot.skip">Skip</span></span>
+          <span><kbd>F10</kbd> <span data-i18n="desk.hot.done">Done</span></span>
+          <span><kbd>Alt + P</kbd> <span data-i18n="desk.hot.reprint">Reprint</span></span>
         </div>
       </div>
 
       <!-- Now Serving Card -->
       <div class="token-hero mt-16" style="padding:24px 16px;">
-        <div class="t-label"><i class="fa-solid fa-bullhorn"></i> Now Serving</div>
+        <div class="t-label"><i class="fa-solid fa-bullhorn"></i> <span data-i18n="desk.nowServing">Now Serving</span></div>
         <div class="t-num" id="currentToken" style="font-size:4.6rem;">—</div>
-        <div class="t-name" id="currentPatient" style="font-size:1.05rem;">Waiting for next token…</div>
+        <div class="t-name" id="currentPatient" style="font-size:1.05rem;" data-i18n="desk.waitNext">Waiting for next token…</div>
 
         <!-- Command Buttons -->
         <div class="command-bar">
-          <button class="btn btn-green btn-lg" onclick="callNextWaiting()" title="Call the next patient in line">
-            <i class="fa-solid fa-bullhorn"></i> Call Next (F4)
+          <button class="btn btn-green btn-lg" onclick="callNextWaiting()" title="Call the next patient in line" data-i18n-title="desk.cmd.callNextTitle">
+            <i class="fa-solid fa-bullhorn"></i> <span data-i18n="desk.callNext">Call Next (F4)</span>
           </button>
-          <button class="btn btn-green btn-lg" onclick="recallActiveToken()" title="Repeat announcement for current patient">
-            <i class="fa-solid fa-volume-high"></i> Recall (F8)
+          <button class="btn btn-green btn-lg" onclick="recallActiveToken()" title="Repeat announcement for current patient" data-i18n-title="desk.cmd.recallTitle">
+            <i class="fa-solid fa-volume-high"></i> <span data-i18n="desk.recall">Recall (F8)</span>
           </button>
-          <button class="btn btn-slate btn-lg" onclick="skipActiveToken()" style="color:#dc2626;border-color:#fca5a5;" title="Mark current patient absent and move to skipped list">
-            <i class="fa-solid fa-user-xmark"></i> Skip / Absent (F9)
+          <button class="btn btn-slate btn-lg" onclick="skipActiveToken()" style="color:#dc2626;border-color:#fca5a5;" title="Mark current patient absent and move to skipped list" data-i18n-title="desk.cmd.skipTitle">
+            <i class="fa-solid fa-user-xmark"></i> <span data-i18n="desk.skipAbsent">Skip / Absent (F9)</span>
           </button>
-          <button class="btn btn-mint btn-lg" onclick="completeActiveToken()" title="Mark consultation completed">
-            <i class="fa-solid fa-check"></i> Done (F10)
+          <button class="btn btn-mint btn-lg" onclick="completeActiveToken()" title="Mark consultation completed" data-i18n-title="desk.cmd.doneTitle">
+            <i class="fa-solid fa-check"></i> <span data-i18n="desk.done">Done (F10)</span>
           </button>
         </div>
       </div>
 
       <!-- Overview Stats -->
-      <h2 style="font-size:1.05rem;font-weight:800;margin:22px 0 12px;">Today's Overview</h2>
+      <h2 style="font-size:1.05rem;font-weight:800;margin:22px 0 12px;" data-i18n="desk.overview">Today's Overview</h2>
       <div class="stats" style="grid-template-columns: repeat(4, 1fr);">
-        <div class="stat"><div class="n amber" id="stWaiting">0</div><div class="k">Waiting</div><div class="k" id="waitEstimate" style="color:#d97706;font-size:0.72rem;"></div></div>
-        <div class="stat"><div class="n" id="stCalled">0</div><div class="k">Called</div></div>
-        <div class="stat"><div class="n red" id="stSkipped" style="color:#dc2626;">0</div><div class="k">Skipped</div></div>
-        <div class="stat"><div class="n green" id="stDone">0</div><div class="k">Served</div></div>
+        <div class="stat"><div class="n amber" id="stWaiting">0</div><div class="k" data-i18n="desk.waiting">Waiting</div><div class="k" id="waitEstimate" style="color:#d97706;font-size:0.72rem;"></div></div>
+        <div class="stat"><div class="n" id="stCalled">0</div><div class="k" data-i18n="desk.called">Called</div></div>
+        <div class="stat"><div class="n red" id="stSkipped" style="color:#dc2626;">0</div><div class="k" data-i18n="desk.skipped">Skipped</div></div>
+        <div class="stat"><div class="n green" id="stDone">0</div><div class="k" data-i18n="desk.served">Served</div></div>
       </div>
 
       <!-- Waiting Queue -->
-      <h2 style="font-size:1.05rem;font-weight:800;margin:22px 0 12px;">Waiting Queue</h2>
+      <h2 style="font-size:1.05rem;font-weight:800;margin:22px 0 12px;" data-i18n="desk.queue">Waiting Queue</h2>
       <div class="card" style="padding:10px 12px;margin-bottom:12px;">
         <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
           <i class="fa-solid fa-arrows-turn-to-dots" style="color:var(--green);"></i>
@@ -242,29 +242,29 @@
         </div>
       </div>
       <div id="queueList"></div>
-      <div class="empty hidden" id="queueEmpty"><div class="e-ic"><i class="fa-regular fa-clock"></i></div><div class="e-t">No tokens waiting</div><div class="e-s">Issue a token to get started.</div></div>
+      <div class="empty hidden" id="queueEmpty"><div class="e-ic"><i class="fa-regular fa-clock"></i></div><div class="e-t" data-i18n="desk.emptyTitle">No tokens waiting</div><div class="e-s" data-i18n="desk.emptySub">Issue a token to get started.</div></div>
 
       <!-- Today's Appointments -->
-      <h2 style="font-size:1.05rem;font-weight:800;margin:22px 0 12px;">Today's Appointments <span class="badge green" id="apptCount">0</span>
+      <h2 style="font-size:1.05rem;font-weight:800;margin:22px 0 12px;"><span data-i18n="desk.appointments">Today's Appointments</span> <span class="badge green" id="apptCount">0</span>
         <button class="btn btn-sm btn-ghost" style="float:right;" onclick="scanAppointments()"><i class="fa-solid fa-bell"></i> <span data-i18n="desk.remind">Reminders &amp; No-shows</span></button>
       </h2>
       <div id="apptList"></div>
-      <div class="empty hidden" id="apptEmpty"><div class="e-ic"><i class="fa-regular fa-calendar-check"></i></div><div class="e-t">No advanced bookings for today</div><div class="e-s">Patients booking on the website appear here for check-in.</div></div>
+      <div class="empty hidden" id="apptEmpty"><div class="e-ic"><i class="fa-regular fa-calendar-check"></i></div><div class="e-t" data-i18n="desk.apptEmpty">No advanced bookings for today</div><div class="e-s" data-i18n="desk.apptEmptySub">Patients booking on the website appear here for check-in.</div></div>
 
       <!-- Absent / Skipped Patients Recovery Section -->
       <div id="skippedSection" class="hidden mt-24">
         <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;">
           <span style="color:#dc2626;font-size:1.1rem;"><i class="fa-solid fa-user-clock"></i></span>
-          <h2 style="font-size:1.05rem;font-weight:800;color:#991b1b;margin:0;">Skipped / Absent Patients</h2>
+          <h2 style="font-size:1.05rem;font-weight:800;color:#991b1b;margin:0;" data-i18n="desk.skippedTitle">Skipped / Absent Patients</h2>
         </div>
         <div class="card" style="border: 1px dashed #f87171; background: #fff5f5;" id="skippedList"></div>
       </div>
 
       <!-- History -->
-      <h2 style="font-size:1.05rem;font-weight:800;margin:24px 0 12px;">Served Recently</h2>
+      <h2 style="font-size:1.05rem;font-weight:800;margin:24px 0 12px;" data-i18n="desk.servedRecently">Served Recently</h2>
       <div id="historyList"></div>
 
-      <button class="btn btn-ghost btn-block mt-24" onclick="resetDoctorSelection()"><i class="fa-solid fa-rotate-left"></i> Change Doctor</button>
+      <button class="btn btn-ghost btn-block mt-24" onclick="resetDoctorSelection()"><i class="fa-solid fa-rotate-left"></i> <span data-i18n="desk.changeDoctor">Change Doctor</span></button>
     </section>
   </div>
 
@@ -273,18 +273,18 @@
     <div class="slip-title" id="slpHospital">HOSPITAL NAME</div>
     <div class="slip-sub" id="slpDoctor">Doctor Name</div>
     <div class="slip-divider"></div>
-    <div style="font-size:11px;font-weight:700;">TOKEN NUMBER</div>
+    <div style="font-size:11px;font-weight:700;" data-i18n="desk.slip.tokenLabel">TOKEN NUMBER</div>
     <div class="slip-token" id="slpNumber">000</div>
     <div style="font-size:12px;font-weight:700;" id="slpPatient">Patient Name</div>
     <div class="slip-divider"></div>
-    <div class="slip-row"><span>Counter:</span><b id="slpCounter">Counter A</b></div>
-    <div class="slip-row"><span>Date:</span><span id="slpDate">--/--/----</span></div>
-    <div class="slip-row"><span>Time:</span><span id="slpTime">--:--</span></div>
+    <div class="slip-row"><span data-i18n="desk.slip.counter">Counter:</span><b id="slpCounter">Counter A</b></div>
+    <div class="slip-row"><span data-i18n="desk.slip.date">Date:</span><span id="slpDate">--/--/----</span></div>
+    <div class="slip-row"><span data-i18n="desk.slip.time">Time:</span><span id="slpTime">--:--</span></div>
     <div class="slip-divider"></div>
     <div class="slip-footer">
-      <div>Live Tracker Link:</div>
+      <div data-i18n="desk.slip.trackLink">Live Tracker Link:</div>
       <div id="slpTrackUrl" style="font-size:8px;word-break:break-all;margin-top:2px;"></div>
-      <div style="margin-top:6px;font-weight:700;">Please wait for announcement</div>
+      <div style="margin-top:6px;font-weight:700;" data-i18n="desk.slip.wait">Please wait for announcement</div>
     </div>
   </div>
 
@@ -298,6 +298,7 @@
   <script src="js/i18n.js"></script>
   <script>
     if (window.I18N) I18N.init();
+    function l10n(key, fb) { return (window.I18N && window.I18N.t) ? window.I18N.t(key) : fb; }
     window.escHtml = window.escHtml || function(s) {
       return String(s == null ? '' : s)
         .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
@@ -397,11 +398,11 @@
     async function authStation() {
       const rawCode = document.getElementById('gateCodeInput').value.trim();
       const codeInput = rawCode.toUpperCase();
-      if (!codeInput) return showToast('Enter hospital code to authorize station.', true);
+      if (!codeInput) return showToast(l10n('desk.err.code', 'Enter hospital code to authorize station.'), true);
 
       const btn = document.getElementById('btnAuthStation');
       btn.disabled = true;
-      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Authorizing...';
+      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> ' + l10n('desk.authorizing', 'Authorizing...');
 
       try {
         await ensureAuth();
@@ -425,7 +426,7 @@
         }
 
         if (!targetDoc) {
-          showToast('Invalid Hospital Code. Access denied.', true);
+          showToast(l10n('desk.err.invalid', 'Invalid Hospital Code. Access denied.'), true);
           return;
         }
 
@@ -437,7 +438,7 @@
         sessionStorage.setItem('tokmark_frontdesk_hospital', currentHospitalCode);
 
         document.getElementById('stationHospitalTitle').textContent = currentHospitalName;
-        document.getElementById('stationCitySubtitle').textContent = hData.city ? `Station: ${hData.city}` : 'Reception Station';
+        document.getElementById('stationCitySubtitle').textContent = hData.city ? l10n('desk.stationPrefix', 'Station: %s').replace('%s', hData.city) : l10n('desk.reception', 'Reception Station');
         document.getElementById('stationHospitalCode').textContent = currentHospitalCode;
 
         await loadHospitalDoctors(currentHospital);
@@ -447,15 +448,15 @@
 
       } catch (err) {
         console.error(err);
-        showToast('Authorization error: ' + err.message, true);
+        showToast(l10n('desk.err.auth', 'Authorization error: ') + err.message, true);
       } finally {
         btn.disabled = false;
-        btn.innerHTML = '<i class="fa-solid fa-check"></i> Authorize';
+        btn.innerHTML = '<i class="fa-solid fa-check"></i> ' + l10n('desk.authorize', 'Authorize');
       }
     }
 
     function disconnectStation() {
-      if (!confirm('Disconnect this station from this hospital?')) return;
+      if (!confirm(l10n('desk.confirm.exit', 'Disconnect this station from this hospital?'))) return;
       sessionStorage.removeItem('tokmark_frontdesk_hospital');
       currentHospital = null;
       currentHospitalCode = null;
@@ -470,9 +471,9 @@
 
     async function loadHospitalDoctors(hospitalSlug) {
       const ds = document.getElementById('doctorSelect');
-      ds.innerHTML = '<option value="">Select Doctor for this station…</option>';
+      ds.innerHTML = '<option value="">' + l10n('desk.selectDoctor', 'Select Doctor for this station…') + '</option>';
       const handoverSel = document.getElementById('handoverTarget');
-      handoverSel.innerHTML = '<option value="">Select doctor…</option>';
+      handoverSel.innerHTML = '<option value="">' + l10n('desk.selectTarget', 'Select doctor…') + '</option>';
       try {
         let doctors = [];
         if (FUNC) {
@@ -501,7 +502,7 @@
         rebuildHandoverList();
       } catch (e) {
         console.error(e);
-        showToast('Error loading doctors: ' + e.message, true);
+        showToast(l10n('desk.err.doctors', 'Error loading doctors: ') + e.message, true);
       }
     }
 
@@ -522,9 +523,9 @@
 
     async function handoverQueue() {
       const target = document.getElementById('handoverTarget').value;
-      if (!currentDoctor || !target) return showToast('Pick a handover doctor first.', true);
-      if (target === currentDoctor) return showToast('Choose a different doctor.', true);
-      if (!confirm(`Move all waiting tokens from ${currentDoctorName} to the selected doctor?`)) return;
+      if (!currentDoctor || !target) return showToast(l10n('desk.err.pickHandover', 'Pick a handover doctor first.'), true);
+      if (target === currentDoctor) return showToast(l10n('desk.err.sameDoctor', 'Choose a different doctor.'), true);
+      if (!confirm(l10n('desk.confirm.handover', 'Move all waiting tokens from %s to the selected doctor?').replace('%s', currentDoctorName))) return;
       try {
         await ensureAuth();
         let moved = 0;
@@ -547,12 +548,12 @@
           })));
           moved = waiting.length;
         }
-        showToast(`Handover complete: ${moved} waiting token(s) moved.`);
+        showToast(l10n('desk.ok.handover', 'Handover complete: %s waiting token(s) moved.').replace('%s', moved));
         document.getElementById('handoverTarget').value = '';
         rebuildHandoverList();
       } catch (e) {
         console.error(e);
-        showToast('Handover failed: ' + e.message, true);
+        showToast(l10n('desk.err.handover', 'Handover failed: ') + e.message, true);
       }
     }
 
@@ -560,12 +561,12 @@
     // prototype: mark overdue no-shows client-side and surface a note).
     async function scanAppointments() {
       const btn = document.querySelector('button[onclick="scanAppointments()"]');
-      if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Scanning…'; }
+      if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> ' + l10n('desk.scanning', 'Scanning…'); }
       try {
         await ensureAuth();
         if (FUNC) {
           const res = await window.TokSpotAPI.appointmentReminderScan({ code: currentHospitalCode });
-          showToast(`Done — ${res.remindersSent || 0} reminder(s) queued, ${res.noShowsMarked || 0} no-show(s) marked.`);
+          showToast(l10n('desk.ok.scan', 'Done — %s reminder(s) queued, %s no-show(s) marked.').replace('%s', res.remindersSent || 0).replace('%s', res.noShowsMarked || 0));
         } else {
           // Prototype has no SMS outbox; still mark overdue no-shows.
           const today = window.todayStr ? window.todayStr() : new Date().toISOString().slice(0, 10);
@@ -587,14 +588,14 @@
               noShow++;
             }
           }));
-          showToast(`Prototype: ${noShow} overdue booking(s) marked no-show. SMS reminders need functions mode.`);
+          showToast(l10n('desk.ok.scanProto', 'Prototype: %s overdue booking(s) marked no-show. SMS reminders need functions mode.').replace('%s', noShow));
         }
         loadAppointments();
       } catch (e) {
         console.error(e);
-        showToast('Scan failed: ' + e.message, true);
+        showToast(l10n('desk.err.scan', 'Scan failed: ') + e.message, true);
       } finally {
-        if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-bell"></i> ' + (I18N && I18N.t ? I18N.t('desk.remind') : 'Reminders & No-shows'); }
+        if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-bell"></i> ' + l10n('desk.remind', 'Reminders & No-shows'); }
       }
     }
 
@@ -602,7 +603,7 @@
     async function markApptNoShow(apptId) {
       const appt = apptRows.find(a => a.id === apptId);
       if (!appt) return;
-      if (!confirm(`Mark ${appt.patientName || 'patient'}'s ${appt.slotStart || ''} booking as no-show?`)) return;
+      if (!confirm(l10n('desk.confirm.noShow', 'Mark %s\'s %s booking as no-show?').replace('%s', appt.patientName || 'patient').replace('%s', appt.slotStart || ''))) return;
       try {
         await ensureAuth();
         if (FUNC) {
@@ -613,10 +614,10 @@
             { status: 'no-show', noShowAt: window._fs.serverTimestamp ? window._fs.serverTimestamp() : new Date() }
           );
         }
-        showToast('Marked as no-show.');
+        showToast(l10n('desk.ok.noShow', 'Marked as no-show.'));
         loadAppointments();
       } catch (e) {
-        showToast('No-show failed: ' + e.message, true);
+        showToast(l10n('desk.err.noShow', 'No-show failed: ') + e.message, true);
       }
     }
 
@@ -741,7 +742,7 @@
           const avg = window.TokspotQueue.averageWaitMinutes(served);
           ewt = window.TokspotQueue.estimateWaitMinutes({ waitingCount: waiting.length, avgServeMinutes: avg });
         }
-        estEl.textContent = (ewt !== null && ewt > 0) ? `~${ewt} min wait` : '';
+        estEl.textContent = (ewt !== null && ewt > 0) ? l10n('display.waitChip', '~%s min wait').replace('%s', ewt) : '';
       }
 
       called.sort((a, b) => {
@@ -756,11 +757,11 @@
       if (activeCurrent) {
         currentlyServingToken = activeCurrent;
         document.getElementById('currentToken').textContent = `#${activeCurrent.number}`;
-        document.getElementById('currentPatient').textContent = (activeCurrent.priority ? '[EMERGENCY] ' : '') + (activeCurrent.patientName || 'Patient') + (activeCurrent.counter ? ' · ' + activeCurrent.counter : '');
+        document.getElementById('currentPatient').textContent = (activeCurrent.priority ? l10n('desk.emergencyPrefix', '[EMERGENCY] ') : '') + (activeCurrent.patientName || l10n('doctor.patient', 'Patient')) + (activeCurrent.counter ? ' · ' + activeCurrent.counter : '');
       } else {
         currentlyServingToken = null;
         document.getElementById('currentToken').textContent = '—';
-        document.getElementById('currentPatient').textContent = 'Waiting for next token…';
+        document.getElementById('currentPatient').textContent = l10n('desk.waitNext', 'Waiting for next token…');
       }
 
       const empty = document.getElementById('queueEmpty');
@@ -772,20 +773,20 @@
         empty.classList.add('hidden');
         list.innerHTML = waiting.map((t, i) => {
           const pos = i + 1;
-          const pri = t.priority ? '<span class="badge red"><i class="fa-solid fa-truck-medical"></i> EMERGENCY</span>' : '';
+          const pri = t.priority ? '<span class="badge red"><i class="fa-solid fa-truck-medical"></i> ' + l10n('desk.emergency', 'EMERGENCY') + '</span>' : '';
           const ctr = t.counter ? '<span class="badge blue">' + escHtml(t.counter) + '</span>' : '';
           return `
           <div class="qrow" style="${t.priority ? 'border-color:var(--red);background:#fef2f2;' : ''}">
             <div class="qnum" style="${t.priority ? 'background:#fee2e2;color:#b91c1c;' : ''}">#${escHtml(t.number)}</div>
             <div class="qbody">
-              <div class="qname">${escHtml(t.patientName||'Patient')} <span class="qpos ${pos===1?'top':''}">${pos===1?'Next':'Pos '+pos}</span> ${pri} ${ctr}</div>
-              <div class="qmeta">${t.phone?('<i class="fa-solid fa-phone"></i> '+escHtml(t.phone)):''}${t.source?' · '+t.source:''}</div>
+              <div class="qname">${escHtml(t.patientName||l10n('doctor.patient', 'Patient'))} <span class="qpos ${pos===1?'top':''}">${pos===1 ? l10n('desk.nextLabel', 'Next') : l10n('doctor.pos', 'Pos') + ' ' + pos}</span> ${pri} ${ctr}</div>
+              <div class="qmeta">${t.phone?('<i class="fa-solid fa-phone"></i> '+escHtml(t.phone)):''}${t.source?' · '+escHtml(t.source):''}</div>
               <div class="btn-row mt-12" style="flex-wrap:wrap;">
-                <button class="btn btn-green btn-sm" onclick="setStatus('${t.id}','called')"><i class="fa-solid fa-bullhorn"></i> Call</button>
-                <button class="btn btn-slate btn-sm" onclick="printSingleSlip('${t.id}')"><i class="fa-solid fa-print"></i> Print</button>
+                <button class="btn btn-green btn-sm" onclick="setStatus('${t.id}','called')"><i class="fa-solid fa-bullhorn"></i> ${l10n('desk.call', 'Call')}</button>
+                <button class="btn btn-slate btn-sm" onclick="printSingleSlip('${t.id}')"><i class="fa-solid fa-print"></i> ${l10n('desk.print', 'Print')}</button>
                 <button class="btn btn-slate btn-sm" onclick="notifyPatient('${t.id}','sms')"><i class="fa-solid fa-message"></i> SMS</button>
                 <button class="btn btn-slate btn-sm" onclick="notifyPatient('${t.id}','wa')"><i class="fa-brands fa-whatsapp"></i> WA</button>
-                <button class="icn-btn danger" onclick="cancelToken('${t.id}')" title="Cancel"><i class="fa-solid fa-xmark"></i></button>
+                <button class="icn-btn danger" onclick="cancelToken('${t.id}')" title="${l10n('common.cancel', 'Cancel')}"><i class="fa-solid fa-xmark"></i></button>
               </div>
             </div>
           </div>`;
@@ -800,11 +801,11 @@
           <div class="qrow" style="background:#fff;border-color:#fca5a5;margin-bottom:8px;">
             <div class="qnum" style="background:#fee2e2;color:#b91c1c;">#${escHtml(t.number)}</div>
             <div class="qbody">
-              <div class="qname">${escHtml(t.patientName||'Patient')} <span class="badge red">Absent / Skipped</span></div>
-              <div class="qmeta">${t.phone?('<i class="fa-solid fa-phone"></i> '+escHtml(t.phone)):''} (Skipped when called)</div>
+              <div class="qname">${escHtml(t.patientName||l10n('doctor.patient', 'Patient'))} <span class="badge red">${l10n('desk.absentSkipped', 'Absent / Skipped')}</span></div>
+              <div class="qmeta">${t.phone?('<i class="fa-solid fa-phone"></i> '+escHtml(t.phone)):''} (${l10n('desk.skippedWhen', 'Skipped when called')})</div>
               <div class="btn-row mt-8">
-                <button class="btn btn-green btn-sm" onclick="recoverPatient('${t.id}')"><i class="fa-solid fa-rotate-left"></i> Re-queue (Priority)</button>
-                <button class="btn btn-slate btn-sm" onclick="cancelToken('${t.id}')">Cancel</button>
+                <button class="btn btn-green btn-sm" onclick="recoverPatient('${t.id}')"><i class="fa-solid fa-rotate-left"></i> ${l10n('desk.requeueLabel', 'Re-queue (Priority)')}</button>
+                <button class="btn btn-slate btn-sm" onclick="cancelToken('${t.id}')">${l10n('common.cancel', 'Cancel')}</button>
               </div>
             </div>
           </div>
@@ -819,26 +820,26 @@
       if (firstWaitingToken) {
         setStatus(firstWaitingToken.id, 'called');
       } else {
-        showToast('No waiting patients in queue.', true);
+        showToast(l10n('doctor.err.noWait', 'No waiting patients in queue.'), true);
       }
     }
 
     function recallActiveToken() {
-      if (!currentlyServingToken) return showToast('No active token to recall.', true);
+      if (!currentlyServingToken) return showToast(l10n('desk.err.noActiveRecall', 'No active token to recall.'), true);
       playBeep();
       maybeAnnounce(currentlyServingToken.id);
-      showToast(`Recalled Token #${currentlyServingToken.number}`);
+      showToast(l10n('doctor.ok.recalled', 'Recalled Token #%s').replace('%s', currentlyServingToken.number));
     }
 
     function completeActiveToken() {
-      if (!currentlyServingToken) return showToast('No active token to complete.', true);
+      if (!currentlyServingToken) return showToast(l10n('doctor.err.noActive', 'No active patient.'), true);
       setStatus(currentlyServingToken.id, 'completed');
     }
 
     function skipActiveToken() {
-      if (!currentlyServingToken) return showToast('No active token to skip.', true);
+      if (!currentlyServingToken) return showToast(l10n('desk.err.noActiveSkip', 'No active token to skip.'), true);
       setStatus(currentlyServingToken.id, 'skipped');
-      showToast(`Token #${currentlyServingToken.number} marked Absent/Skipped`);
+      showToast(l10n('desk.ok.absent', 'Token #%s marked Absent/Skipped').replace('%s', currentlyServingToken.number));
     }
 
     async function recoverPatient(id) {
@@ -852,8 +853,8 @@
             recoveredAt: window._fs.serverTimestamp()
           }
         });
-        showToast('Patient restored to queue with priority!');
-      } catch (e) { showToast('Recovery failed: ' + e.message, true); }
+        showToast(l10n('desk.ok.recovered', 'Patient restored to queue with priority!'));
+      } catch (e) { showToast(l10n('desk.err.recover', 'Recovery failed: ') + e.message, true); }
     }
 
     // Check if phone number reached 2-token daily quota
@@ -880,7 +881,7 @@
           return {
             allowed: false,
             count: existingCount,
-            message: `Limit Exceeded: Already 2 tokens issued for ${phone} today.`
+            message: l10n('desk.err.quota', 'Limit Exceeded: Already 2 tokens issued for %s today.').replace('%s', phone)
           };
         }
 
@@ -937,19 +938,19 @@
           const isBooked = a.status === 'booked';
           const arrived = a.status === 'arrived';
           const badge = arrived
-            ? '<span class="badge green">Checked in</span>'
-            : (isBooked ? '<span class="badge amber">Booked</span>' : '<span class="badge slate">' + escHtml(a.status || '') + '</span>');
+            ? '<span class="badge green">' + l10n('desk.checkedIn', 'Checked in') + '</span>'
+            : (isBooked ? '<span class="badge amber">' + l10n('desk.booked', 'Booked') + '</span>' : '<span class="badge slate">' + escHtml(a.status || '') + '</span>');
           const numStyle = isBooked ? 'background:#e0e7ff;color:#4338ca;' : (arrived ? 'background:#dcfce7;color:#166534;' : '');
           const overdue = isBooked && !a.tokenId && appointmentOverdue(a.slotStart);
           return `
           <div class="qrow" style="${isBooked ? 'border-color:' + (overdue ? '#fca5a5;background:#fff5f5' : '#c7d2fe') + ';' : (arrived ? 'border-color:#86efac;' : '')}">
             <div class="qnum" style="${numStyle}">${escHtml(a.slotStart || '--:--')}</div>
             <div class="qbody">
-              <div class="qname">${escHtml(a.patientName || 'Patient')} <span class="badge blue">${escHtml(a.phone || '')}</span> ${overdue ? '<span class="badge red">Overdue</span>' : badge}</div>
-              <div class="qmeta">Advanced booking${a.createdBy ? ' · ' + a.createdBy : ''}${a.tokenId ? ' · Token issued' : ''}${overdue ? ' · missed slot — mark no-show' : ''}</div>
+              <div class="qname">${escHtml(a.patientName || l10n('doctor.patient', 'Patient'))} <span class="badge blue">${escHtml(a.phone || '')}</span> ${overdue ? '<span class="badge red">' + l10n('desk.overdue', 'Overdue') + '</span>' : badge}</div>
+              <div class="qmeta">${l10n('desk.advancedBook', 'Advanced booking')}${a.createdBy ? ' · ' + escHtml(a.createdBy) : ''}${a.tokenId ? ' · ' + l10n('desk.tokenIssued', 'Token issued') : ''}${overdue ? ' · ' + l10n('desk.missedSlot', 'missed slot — mark no-show') : ''}</div>
               <div class="btn-row mt-12">
-                ${isBooked ? `<button class="btn btn-sm btn-green" onclick="checkInAppt('${a.id}')"><i class="fa-solid fa-user-check"></i> Check-in → Token</button>` : ''}
-                ${overdue ? `<button class="btn btn-sm btn-danger" onclick="markApptNoShow('${a.id}')"><i class="fa-solid fa-user-slash"></i> ${I18N && I18N.t ? I18N.t('desk.noShow') : 'No-Show'}</button>` : ''}
+                ${isBooked ? `<button class="btn btn-sm btn-green" onclick="checkInAppt('${a.id}')"><i class="fa-solid fa-user-check"></i> ${l10n('desk.checkin', 'Check-in → Token')}</button>` : ''}
+                ${overdue ? `<button class="btn btn-sm btn-danger" onclick="markApptNoShow('${a.id}')"><i class="fa-solid fa-user-slash"></i> ${l10n('desk.noShow', 'No-Show')}</button>` : ''}
               </div>
             </div>
           </div>`;
@@ -963,12 +964,12 @@
     async function checkInAppt(apptId) {
       const appt = apptRows.find(a => a.id === apptId);
       if (!appt) return;
-      if (!confirm(`Check in ${appt.patientName || 'patient'} (${appt.slotStart || ''}) and issue a walk-in token now?`)) return;
+      if (!confirm(l10n('desk.confirm.checkIn', 'Check in %s (%s) and issue a walk-in token now?').replace('%s', appt.patientName || 'patient').replace('%s', appt.slotStart || ''))) return;
       try {
         await ensureAuth();
         if (FUNC) {
           const res = await window.TokSpotAPI.checkInAppointment({ code: currentHospitalCode, appointmentId: apptId });
-          showToast(`Checked in → Token #${res.number}`);
+          showToast(l10n('desk.ok.checkedIn', 'Checked in → Token #%s').replace('%s', res.number));
         } else {
           const issued = await window.TokSpotAPI.issueToken({
             slug: currentHospital,
@@ -984,12 +985,12 @@
             window._fs.doc(window._db, 'hospitals', currentHospital, 'appointments', apptId),
             { status: 'arrived', tokenId: issued.tokenId, checkedInAt: window._fs.serverTimestamp ? window._fs.serverTimestamp() : new Date() }
           );
-          showToast(`Checked in → Token #${issued.tokenNum}`);
+          showToast(l10n('desk.ok.checkedIn', 'Checked in → Token #%s').replace('%s', issued.tokenNum));
           lastIssuedTokenId = issued.tokenId;
         }
         loadAppointments();
       } catch (e) {
-        showToast('Check-in failed: ' + e.message, true);
+        showToast(l10n('desk.err.checkIn', 'Check-in failed: ') + e.message, true);
       }
     }
 
@@ -997,9 +998,9 @@
       const name = document.getElementById('newName').value.trim();
       const phone = document.getElementById('newPhone').value.trim().replace(/\D/g,'');
       const mode = document.getElementById('newMode').value;
-      if (!name) return showToast('Enter patient name.', true);
-      if (!currentDoctor) return showToast('Select a doctor first.', true);
-      if (phone && phone.length !== 10) return showToast('Enter a valid 10-digit mobile.', true);
+      if (!name) return showToast(l10n('desk.err.name', 'Enter patient name.'), true);
+      if (!currentDoctor) return showToast(l10n('desk.err.doctorFirst', 'Select a doctor first.'), true);
+      if (phone && phone.length !== 10) return showToast(l10n('desk.err.phone', 'Enter a valid 10-digit mobile.'), true);
 
       const btn = document.getElementById('btnIssue');
       btn.disabled = true;
@@ -1008,20 +1009,20 @@
 
       // Validate 2-token limit per phone number for the day
       if (phone) {
-        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Checking quota...';
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> ' + l10n('desk.checkingQuota', 'Checking quota...');
         const quota = await validatePhoneTokenQuota(currentHospital, phone, today);
         if (!quota.allowed) {
           btn.disabled = false;
-          btn.innerHTML = '<i class="fa-solid fa-ticket"></i> Issue Token';
+          btn.innerHTML = '<i class="fa-solid fa-ticket"></i> ' + l10n('desk.issue', 'Issue Token');
           alert(quota.message);
           return showToast(quota.message, true, 4000);
         }
         if (quota.isSecondToken) {
-          showToast('Notice: Issuing 2nd token for this phone number.', false, 2500);
+          showToast(l10n('desk.ok.secondToken', 'Notice: Issuing 2nd token for this phone number.'), false, 2500);
         }
       }
 
-      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Issuing...';
+      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> ' + l10n('desk.issuing', 'Issuing...');
 
       const isPriority = document.getElementById('newPriority').checked;
       const counter = document.getElementById('newCounter').value;
@@ -1048,7 +1049,7 @@
         document.getElementById('newPhone').value = '';
         document.getElementById('newPriority').checked = false;
         playBeep();
-        showToast('Token #' + tokenNum + ' issued');
+        showToast(l10n('desk.ok.issued', 'Token #%s issued').replace('%s', tokenNum));
 
         if (document.getElementById('autoPrintSlip').checked) {
           triggerPrintSlip(tokenNum, name, counter, createdTokenId);
@@ -1059,10 +1060,10 @@
           queueFreeSMS(phone, `TokMark Alert: Hello ${name}, your Token #${tokenNum} is booked. Live pass: ${trackLink}`);
         }
       } catch (e) {
-        showToast('Failed: ' + e.message, true);
+        showToast(l10n('desk.err.failed', 'Failed: ') + e.message, true);
       } finally {
         btn.disabled = false;
-        btn.innerHTML = '<i class="fa-solid fa-ticket"></i> Issue Token';
+        btn.innerHTML = '<i class="fa-solid fa-ticket"></i> ' + l10n('desk.issue', 'Issue Token');
       }
     }
 
@@ -1115,7 +1116,7 @@
           }
         }
         if (status === 'completed') loadHistory();
-      } catch (e) { showToast('Failed: ' + e.message, true); }
+      } catch (e) { showToast(l10n('desk.err.failed', 'Failed: ') + e.message, true); }
     }
 
     async function maybeAnnounce(id) {
@@ -1126,14 +1127,14 @@
     }
 
     async function cancelToken(id) {
-      if (!confirm('Cancel this token?')) return;
+      if (!confirm(l10n('desk.confirm.cancel', 'Cancel this token?'))) return;
       setStatus(id, 'canceled');
     }
 
     async function notifyPatient(id, method) {
       try {
         const t = lastKnownTokenData[id] || (await window._fs.getDoc(window._fs.doc(window._db, 'hospitals', currentHospital, 'tokens', id))).data();
-        if (!t.phone) return showToast('No phone number.', true);
+        if (!t.phone) return showToast(l10n('desk.err.noPhone', 'No phone number.'), true);
 
         let cleanPhone = String(t.phone).replace(/\D/g, '');
         if (cleanPhone.length === 10) cleanPhone = '91' + cleanPhone;
@@ -1148,7 +1149,7 @@
           if (isMobile) {
             window.location.href = `sms:${cleanPhone.replace(/^91/, '')}?body=${text}`;
           } else {
-            showToast('Opening WhatsApp Web...', false, 2000);
+            showToast(l10n('desk.openWA', 'Opening WhatsApp Web...'), false, 2000);
             window.open(`https://web.whatsapp.com/send/?phone=${cleanPhone}&text=${text}&type=phone_number&app_absent=0`, '_blank');
           }
         } else {
@@ -1159,7 +1160,7 @@
           }
         }
       } catch (e) {
-        showToast('Notify failed: ' + e.message, true);
+        showToast(l10n('desk.err.notify', 'Notify failed: ') + e.message, true);
       }
     }
 
@@ -1196,9 +1197,9 @@
         hl.innerHTML = history.slice(-8).reverse().map(t => `
           <div class="qrow" style="opacity:.8;padding:12px 16px;">
             <div class="qnum" style="width:44px;height:44px;font-size:1.05rem;">#${escHtml(t.number)}</div>
-            <div class="qbody"><div class="qname">${escHtml(t.patientName||'Patient')}</div><div class="qmeta">${t.source||'walk-in'}</div></div>
-            <span class="badge green"><i class="fa-solid fa-check"></i> served</span>
-          </div>`).join('') || '<div class="empty" style="padding:20px;"><div class="e-s">No patients served yet.</div></div>';
+            <div class="qbody"><div class="qname">${escHtml(t.patientName||l10n('doctor.patient', 'Patient'))}</div><div class="qmeta">${escHtml(t.source||'walk-in')}</div></div>
+            <span class="badge green"><i class="fa-solid fa-check"></i> ${l10n('desk.servedBadge', 'served')}</span>
+          </div>`).join('') || '<div class="empty" style="padding:20px;"><div class="e-s">' + l10n('desk.err.noServed', 'No patients served yet.') + '</div></div>';
       } catch (e) { console.error(e); }
     }
 

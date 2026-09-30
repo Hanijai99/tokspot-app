@@ -299,11 +299,11 @@
     </a>
     <div class="nav-actions">
       <a href="javascript:void(0)" onclick="togglePrivacyModal(true)" class="btn btn-slate btn-sm" style="background:transparent;border:none;">
-        <i class="fa-solid fa-shield-halved"></i> Privacy
+        <i class="fa-solid fa-shield-halved"></i> <span data-i18n="index.nav.privacy">Privacy</span>
       </a>
-      <a href="admin.html" class="btn btn-slate btn-sm"><i class="fa-solid fa-lock"></i> Login</a>
-      <a href="signup.html" class="btn btn-green btn-sm"><i class="fa-solid fa-bolt"></i> Register Hospital</a>
-      <button class="icn-btn" onclick="hk.toggleDark()" title="Switch Theme"><i class="fa-solid fa-moon"></i></button>
+      <a href="admin.html" class="btn btn-slate btn-sm"><i class="fa-solid fa-lock"></i> <span data-i18n="index.nav.login">Login</span></a>
+      <a href="signup.html" class="btn btn-green btn-sm"><i class="fa-solid fa-bolt"></i> <span data-i18n="index.nav.signup">Register Hospital</span></a>
+      <button class="icn-btn" onclick="hk.toggleDark()" title="Switch Theme" data-i18n-title="index.nav.theme"><i class="fa-solid fa-moon"></i></button>
     </div>
   </header>
 
@@ -316,19 +316,19 @@
           <img src="logo.png" alt="TokSpot Logo" />
         </div>
         
-        <h1 class="main-title">
+        <h1 class="main-title" data-i18n-html="index.hero.mainTitleHtml">
           Smart Hospital Queue & <span>Multilingual TV Display</span>
         </h1>
-        <p class="main-subtitle">
+        <p class="main-subtitle" data-i18n="index.hero.mainSub">
           Eliminate noisy waiting rooms with automated bilingual voice calling (Tamil + English), live smart TV displays, and zero-hardware OPD desks.
         </p>
 
         <div class="cta-row">
           <a href="signup.html" class="btn btn-green btn-lg" style="text-decoration:none;">
-            <i class="fa-solid fa-hospital"></i> Create Hospital Free
+            <i class="fa-solid fa-hospital"></i> <span data-i18n="index.hero.createFree">Create Hospital Free</span>
           </a>
           <a href="book.html" class="btn btn-slate btn-lg" style="text-decoration:none;">
-            <i class="fa-solid fa-qrcode"></i> Patient Booking
+            <i class="fa-solid fa-qrcode"></i> <span data-i18n="index.hero.patientBooking">Patient Booking</span>
           </a>
         </div>
       </div>
@@ -336,11 +336,11 @@
       <!-- Right: Realtime Preview Mockup -->
       <div class="preview-box">
         <div style="display:flex;justify-content:space-between;align-items:center;">
-          <span class="preview-badge"><i class="fa-solid fa-circle fa-beat" style="font-size:8px;"></i> LIVE TV BOARD</span>
-          <span style="font-size:0.75rem;color:#94a3b8;">Tamil + English Audio</span>
+          <span class="preview-badge"><i class="fa-solid fa-circle fa-beat" style="font-size:8px;"></i> <span data-i18n="index.preview.live">LIVE TV BOARD</span></span>
+          <span style="font-size:0.75rem;color:#94a3b8;"><span data-i18n="index.preview.audio">Tamil + English Audio</span></span>
         </div>
         <div class="preview-token">
-          <div style="font-size:0.75rem;color:#94a3b8;text-transform:uppercase;letter-spacing:1px;font-weight:700;">Now Calling</div>
+          <div style="font-size:0.75rem;color:#94a3b8;text-transform:uppercase;letter-spacing:1px;font-weight:700;"><span data-i18n="index.preview.calling">Now Calling</span></div>
           <div class="preview-num">#014</div>
           <div class="preview-doc">Dr. Rajesh · Consultation Room 1</div>
           <div style="font-size:0.8rem;color:#cbd5e1;margin-top:6px;">
@@ -349,11 +349,11 @@
         </div>
         <div style="display:flex;gap:8px;text-align:center;">
           <div style="flex:1;background:#092328;padding:10px;border-radius:10px;border:1px solid #1E5C50;">
-            <div style="font-size:0.7rem;color:#94a3b8;">NEXT IN LINE</div>
+            <div style="font-size:0.7rem;color:#94a3b8;"><span data-i18n="index.preview.next">NEXT IN LINE</span></div>
             <div style="font-weight:800;color:#8BBB92;font-size:1.15rem;">#015</div>
           </div>
           <div style="flex:1;background:#092328;padding:10px;border-radius:10px;border:1px solid #1E5C50;">
-            <div style="font-size:0.7rem;color:#94a3b8;">EMERGENCY</div>
+            <div style="font-size:0.7rem;color:#94a3b8;"><span data-i18n="index.preview.emergency">EMERGENCY</span></div>
             <div style="font-weight:800;color:#ef4444;font-size:1.15rem;">#016</div>
           </div>
         </div>
@@ -362,27 +362,27 @@
 
     <!-- Quick Portal Launch Bar for Hospital Staff -->
     <div class="portals-banner">
-      <div class="portals-title">Instant Station Launcher</div>
+      <div class="portals-title" data-i18n="index.portal.title">Instant Station Launcher</div>
       <div class="portals-grid">
         <a href="signup.html" class="portal-link">
           <i class="fa-solid fa-hospital-user"></i>
-          <div>Register Hospital</div>
-          <span style="font-size:0.72rem;color:var(--slate-400);">New Setup</span>
+          <div data-i18n="index.portal.signup">Register Hospital</div>
+          <span style="font-size:0.72rem;color:var(--slate-400);" data-i18n="index.portal.signupSub">New Setup</span>
         </a>
         <a href="admin.html" class="portal-link">
           <i class="fa-solid fa-gauge-high"></i>
-          <div>Admin Desk</div>
-          <span style="font-size:0.72rem;color:var(--slate-400);">Doctors &amp; Codes</span>
+          <div data-i18n="index.portal.admin">Admin Desk</div>
+          <span style="font-size:0.72rem;color:var(--slate-400);" data-i18n="index.portal.adminSub">Doctors &amp; Codes</span>
         </a>
         <a href="doctor-login.html" class="portal-link">
           <i class="fa-solid fa-stethoscope"></i>
-          <div>Doctor Station</div>
-          <span style="font-size:0.72rem;color:var(--slate-400);">PIN Consultation</span>
+          <div data-i18n="index.portal.doctor">Doctor Station</div>
+          <span style="font-size:0.72rem;color:var(--slate-400);" data-i18n="index.portal.doctorSub">Doctor Consultation</span>
         </a>
         <a href="frontdesk.html" class="portal-link">
           <i class="fa-solid fa-ticket"></i>
-          <div>Front Desk</div>
-          <span style="font-size:0.72rem;color:var(--slate-400);">Print Tokens</span>
+          <div data-i18n="index.portal.desk">Front Desk</div>
+          <span style="font-size:0.72rem;color:var(--slate-400);" data-i18n="index.portal.deskSub">Print Tokens</span>
         </a>
       </div>
     </div>
@@ -395,13 +395,13 @@
           <div class="ac-header">
             <div class="ac-icon"><i class="fa-solid fa-ticket"></i></div>
             <div>
-              <div class="ac-title" data-i18n="index.cta.book">Book a Consultation Token</div>
-              <div class="ac-sub">Choose your hospital, doctor &amp; get your live digital pass.</div>
+              <div class="ac-title" data-i18n="index.action.bookTitle">Book a Consultation Token</div>
+              <div class="ac-sub" data-i18n="index.action.bookSub">Choose your hospital, doctor &amp; get your live digital pass.</div>
             </div>
           </div>
         </div>
         <a href="book.html" class="btn btn-green btn-block btn-lg" style="margin-top:14px;text-decoration:none;">
-          <i class="fa-solid fa-calendar-check"></i> <span data-i18n="index.cta.book">Book Online Token</span>
+          <i class="fa-solid fa-calendar-check"></i> <span data-i18n="index.action.bookBtn">Book Online Token</span>
         </a>
       </div>
 
@@ -411,15 +411,15 @@
           <div class="ac-header">
             <div class="ac-icon"><i class="fa-solid fa-clock-rotate-left"></i></div>
             <div>
-              <div class="ac-title" data-i18n="index.cta.track">Track My Token Status</div>
-              <div class="ac-sub">See your waiting position and doctor progress live.</div>
+              <div class="ac-title" data-i18n="index.action.trackTitle">Track My Token Status</div>
+              <div class="ac-sub" data-i18n="index.action.trackSub">See your waiting position and doctor progress live.</div>
             </div>
           </div>
         </div>
         <form id="trackForm" onsubmit="trackToken(event)">
           <div class="track-input-row">
-            <input id="tokenInput" type="text" placeholder="e.g. 5 or HOSP-1234" autocomplete="off" required />
-            <button type="submit" class="btn btn-slate"><i class="fa-solid fa-magnifying-glass"></i> Track</button>
+            <input id="tokenInput" type="text" placeholder="e.g. 5 or HOSP-1234" autocomplete="off" required data-i18n-ph="index.track.hint" />
+            <button type="submit" class="btn btn-slate"><i class="fa-solid fa-magnifying-glass"></i> <span data-i18n="index.track.btn">Track</span></button>
           </div>
         </form>
       </div>
@@ -432,22 +432,22 @@
         <div class="hiw-step">
           <i class="fa-solid fa-mobile-screen"></i>
           <div>
-            <b>1. Book or Walk-in</b>
-            <span>Get your token online via QR or from front reception.</span>
+            <b data-i18n="index.how.s1">1. Book or Walk-in</b>
+            <span data-i18n="index.how.s1sub">Get your token online via QR or from front reception.</span>
           </div>
         </div>
         <div class="hiw-step">
           <i class="fa-solid fa-hourglass-half"></i>
           <div>
-            <b>2. Live Smart TV Sync</b>
-            <span>Patients follow waiting numbers on screen with voice call chimes.</span>
+            <b data-i18n="index.how.s2">2. Live Smart TV Sync</b>
+            <span data-i18n="index.how.s2sub">Patients follow waiting numbers on screen with voice call chimes.</span>
           </div>
         </div>
         <div class="hiw-step">
           <i class="fa-solid fa-user-doctor"></i>
           <div>
-            <b>3. 1-Click Consultation</b>
-            <span>Doctors call patients via PIN login without shouting or crowding.</span>
+            <b data-i18n="index.how.s3">3. 1-Click Consultation</b>
+            <span data-i18n="index.how.s3sub">Doctors call patients without shouting or crowding.</span>
           </div>
         </div>
       </div>
@@ -455,13 +455,13 @@
 
     <!-- Footer with Privacy Policy Links -->
     <footer class="landing-footer">
-      <div>
+      <div data-i18n="index.footer.rights">
         &copy; 2026 TokSpot Healthcare Systems. All rights reserved.
       </div>
       <div class="footer-links">
-        <a onclick="togglePrivacyModal(true)"><i class="fa-solid fa-shield-halved"></i> Privacy Policy</a>
-        <a href="admin.html">Hospital Admin</a>
-        <a href="book.html">Book Token</a>
+        <a onclick="togglePrivacyModal(true)"><i class="fa-solid fa-shield-halved"></i> <span data-i18n="index.footer.privacy">Privacy Policy</span></a>
+        <a href="admin.html"><span data-i18n="index.footer.admin">Hospital Admin</span></a>
+        <a href="book.html"><span data-i18n="index.footer.book">Book Token</span></a>
       </div>
     </footer>
 
@@ -473,7 +473,7 @@
       
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;border-bottom:1px solid var(--line, #e2e8f0);padding-bottom:12px;">
         <div style="font-weight:900;font-size:1.3rem;display:flex;align-items:center;gap:10px;">
-          <i class="fa-solid fa-shield-halved" style="color:var(--primary);"></i> TokSpot Privacy Policy
+          <i class="fa-solid fa-shield-halved" style="color:var(--primary);"></i> <span data-i18n="index.privacy.title">TokSpot Privacy Policy</span>
         </div>
         <button class="icn-btn" onclick="togglePrivacyModal(false)" style="font-size:1.1rem;"><i class="fa-solid fa-xmark"></i></button>
       </div>
@@ -503,7 +503,7 @@
       </div>
 
       <div style="margin-top:20px;text-align:right;">
-        <button class="btn btn-green" onclick="togglePrivacyModal(false)" style="padding:10px 24px;">I Understand</button>
+        <button class="btn btn-green" onclick="togglePrivacyModal(false)" style="padding:10px 24px;"><span data-i18n="index.privacy.understand">I Understand</span></button>
       </div>
     </div>
   </div>
@@ -524,8 +524,9 @@
       e.preventDefault();
       const num = document.getElementById('tokenInput').value.trim();
       if (!num) {
-        if (typeof showToast === 'function') showToast('Please enter your token or hospital code', true);
-        else alert('Please enter your token or hospital code');
+        const msg = (window.I18N && I18N.t) ? I18N.t('index.err.enter') : 'Please enter your token or hospital code';
+        if (typeof showToast === 'function') showToast(msg, true);
+        else alert(msg);
         return;
       }
       window.location.href = `token.html?t=${encodeURIComponent(num)}`;

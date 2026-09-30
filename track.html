@@ -25,12 +25,12 @@
 </head>
 <body>
   <div class="tracker-card">
-    <div class="token-badge" id="hospName">Connecting to Hospital…</div>
-    <div style="font-size: 0.9rem; color: #64748b; margin-top: 14px;">Your Token</div>
+    <div class="token-badge" id="hospName" data-i18n="track.connecting">Connecting to Hospital…</div>
+    <div style="font-size: 0.9rem; color: #64748b; margin-top: 14px;" data-i18n="track.yourToken">Your Token</div>
     <div class="hero-number" id="myToken">—</div>
     
     <div id="statusWrap">
-      <span class="status-pill status-waiting" id="myStatus"><i class="fa-solid fa-clock"></i> In Queue</span>
+      <span class="status-pill status-waiting" id="myStatus"><i class="fa-solid fa-clock"></i> <span data-i18n="track.inQueue">In Queue</span></span>
     </div>
 
     <div class="meta-grid">
@@ -45,12 +45,12 @@
     </div>
 
     <div class="meta-box mt-16" style="margin-top:12px;background:#ECF6EF;border:1px solid #D3E9DB;">
-      <div class="meta-val" id="estWait" style="font-size:1.15rem;color:#1F6B4C;">Calculating…</div>
-      <div class="meta-lbl" style="color:#2A835F;">Queue Update</div>
+      <div class="meta-val" id="estWait" style="font-size:1.15rem;color:#1F6B4C;" data-i18n="track.calc">Calculating…</div>
+      <div class="meta-lbl" style="color:#2A835F;" data-i18n="track.queueUpdate">Queue Update</div>
     </div>
 
     <div id="calledAlert" class="hidden" style="margin-top: 16px; padding: 14px; border-radius: 12px; background: #fee2e2; border: 1px solid #f87171; color: #b91c1c; font-weight: 700;">
-      <i class="fa-solid fa-bullhorn"></i> It is your turn! Proceed to counter.
+      <i class="fa-solid fa-bullhorn"></i> <span data-i18n="track.calledAlert">It is your turn! Proceed to counter.</span>
     </div>
   </div>
 
@@ -61,6 +61,7 @@
   <script src="js/i18n.js"></script>
   <script>
     if (window.I18N) I18N.init();
+    function l10n(key, fb) { return (window.I18N && window.I18N.t) ? window.I18N.t(key) : fb; }
     const params = new URLSearchParams(window.location.search);
     const hospitalId = params.get('h');
     const tokenId = params.get('t');
@@ -70,7 +71,7 @@
     window.addEventListener('load', async () => {
       await initFirebase();
       if (!hospitalId || !tokenId) {
-        document.getElementById('hospName').textContent = 'Invalid tracking link.';
+        document.getElementById('hospName').textContent = l10n('track.invalid', 'Invalid tracking link.');
         return;
       }
       startTracking();
@@ -85,27 +86,27 @@
         if (!docSnap.exists()) return;
         const data = docSnap.data();
         document.getElementById('myToken').textContent = data.number;
-        document.getElementById('hospName').textContent = (data.patientName ? data.patientName + ' · ' : '') + 'Token Status';
+        document.getElementById('hospName').textContent = (data.patientName ? data.patientName + ' · ' : '') + l10n('track.tokenStatus', 'Token Status');
         
         const statusEl = document.getElementById('myStatus');
         const alertEl = document.getElementById('calledAlert');
         
         if (data.status === 'called') {
           statusEl.className = 'status-pill status-called';
-          statusEl.innerHTML = '<i class="fa-solid fa-bullhorn"></i> Called to Counter ' + (data.counter || 'A');
+          statusEl.innerHTML = '<i class="fa-solid fa-bullhorn"></i> ' + l10n('track.calledTo', 'Called to Counter %s').replace('%s', data.counter || 'A');
           alertEl.classList.remove('hidden');
           if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
         } else if (data.status === 'completed') {
           statusEl.className = 'status-pill status-done';
-          statusEl.innerHTML = '<i class="fa-solid fa-check"></i> Completed';
+          statusEl.innerHTML = '<i class="fa-solid fa-check"></i> ' + l10n('track.completed', 'Completed');
           alertEl.classList.add('hidden');
         } else if (data.status === 'skipped') {
           statusEl.className = 'status-pill status-waiting';
-          statusEl.innerHTML = '<i class="fa-solid fa-user-xmark"></i> Skipped / On-Hold';
+          statusEl.innerHTML = '<i class="fa-solid fa-user-xmark"></i> ' + l10n('track.skipped', 'Skipped / On-Hold');
           alertEl.classList.add('hidden');
         } else {
           statusEl.className = 'status-pill status-waiting';
-          statusEl.innerHTML = '<i class="fa-solid fa-clock"></i> Waiting';
+          statusEl.innerHTML = '<i class="fa-solid fa-clock"></i> ' + l10n('track.waiting', 'Waiting');
           alertEl.classList.add('hidden');
         }
 
@@ -120,28 +121,28 @@
       const alertEl = document.getElementById('calledAlert');
 
       document.getElementById('myToken').textContent = st.number;
-      document.getElementById('hospName').textContent = 'Token Status';
+      document.getElementById('hospName').textContent = l10n('track.tokenStatus', 'Token Status');
 
       if (st.status === 'called') {
         statusEl.className = 'status-pill status-called';
-        statusEl.innerHTML = '<i class="fa-solid fa-bullhorn"></i> Called to Counter ' + (st.counter || 'A');
+        statusEl.innerHTML = '<i class="fa-solid fa-bullhorn"></i> ' + l10n('track.calledTo', 'Called to Counter %s').replace('%s', st.counter || 'A');
         alertEl.classList.remove('hidden');
         if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
       } else if (st.status === 'completed') {
         statusEl.className = 'status-pill status-done';
-        statusEl.innerHTML = '<i class="fa-solid fa-check"></i> Completed';
+        statusEl.innerHTML = '<i class="fa-solid fa-check"></i> ' + l10n('track.completed', 'Completed');
         alertEl.classList.add('hidden');
       } else if (st.status === 'skipped') {
         statusEl.className = 'status-pill status-waiting';
-        statusEl.innerHTML = '<i class="fa-solid fa-user-xmark"></i> Skipped / On-Hold';
+        statusEl.innerHTML = '<i class="fa-solid fa-user-xmark"></i> ' + l10n('track.skipped', 'Skipped / On-Hold');
         alertEl.classList.add('hidden');
       } else if (st.status === 'canceled') {
         statusEl.className = 'status-pill status-waiting';
-        statusEl.innerHTML = '<i class="fa-solid fa-circle-xmark"></i> Canceled';
+        statusEl.innerHTML = '<i class="fa-solid fa-circle-xmark"></i> ' + l10n('track.canceled', 'Canceled');
         alertEl.classList.add('hidden');
       } else {
         statusEl.className = 'status-pill status-waiting';
-        statusEl.innerHTML = '<i class="fa-solid fa-clock"></i> Waiting';
+        statusEl.innerHTML = '<i class="fa-solid fa-clock"></i> ' + l10n('track.waiting', 'Waiting');
         alertEl.classList.add('hidden');
       }
 
@@ -150,8 +151,8 @@
       document.getElementById('peopleAhead').textContent = ahead;
       const ewt = Number.isFinite(st.waitEstimateMinutes) ? st.waitEstimateMinutes : null;
       document.getElementById('estWait').textContent = ahead === 0
-        ? 'No one is ahead of you'
-        : (ewt > 0 ? `${ahead} people ahead · ~${ewt} min estimated` : `${ahead} people ahead; no reliable time estimate`);
+        ? l10n('track.noAhead', 'No one is ahead of you')
+        : (ewt > 0 ? l10n('track.aheadEwt', `${ahead} people ahead · ~${ewt} min estimated`).replace('%s', ahead).replace('%s', ewt) : l10n('track.aheadNoEwt', `${ahead} people ahead; no reliable time estimate`).replace('%s', ahead));
     }
 
     function startStatusPolling() {
@@ -163,7 +164,7 @@
           const statusEl = document.getElementById('myStatus');
           if (statusEl) {
             statusEl.className = 'status-pill status-waiting';
-            statusEl.innerHTML = '<i class="fa-solid fa-triangle-exclamation"></i> Tracking stalled';
+            statusEl.innerHTML = '<i class="fa-solid fa-triangle-exclamation"></i> ' + l10n('track.stalled', 'Tracking stalled');
           }
         }
       };
@@ -199,8 +200,8 @@
             ewt = window.TokspotQueue.estimateWaitMinutes({ waitingCount: aheadCount, avgServeMinutes: avg });
           }
           document.getElementById('estWait').textContent = aheadCount === 0
-            ? 'No one is ahead of you'
-            : (ewt > 0 ? `${aheadCount} people ahead · ~${ewt} min estimated` : `${aheadCount} people ahead; no reliable time estimate`);
+            ? l10n('track.noAhead', 'No one is ahead of you')
+            : (ewt > 0 ? l10n('track.aheadEwt', `${aheadCount} people ahead · ~${ewt} min estimated`).replace('%s', aheadCount).replace('%s', ewt) : l10n('track.aheadNoEwt', `${aheadCount} people ahead; no reliable time estimate`).replace('%s', aheadCount));
         }
       );
     }

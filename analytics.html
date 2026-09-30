@@ -44,78 +44,78 @@
   <div class="page" id="printableArea">
     <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;" class="mt-12">
       <div>
-        <div class="htitle"><i class="fa-solid fa-chart-column"></i> Analytics &amp; Daily Reports</div>
-        <div class="hsub">Live insights and exportable audit records.</div>
+        <div class="htitle"><i class="fa-solid fa-chart-column"></i> <span data-i18n="analytics.title">Analytics &amp; Daily Reports</span></div>
+        <div class="hsub" data-i18n="analytics.sub">Live insights and exportable audit records.</div>
       </div>
       <div class="btn-row no-print" style="margin:0;">
         <button class="btn btn-green btn-sm" id="btnExport" onclick="exportDailyReportCSV()" disabled>
-          <i class="fa-solid fa-file-excel"></i> Export CSV
+          <i class="fa-solid fa-file-excel"></i> <span data-i18n="analytics.export">Export CSV</span>
         </button>
         <button class="btn btn-slate btn-sm" id="btnPrint" onclick="printDailySummary()" disabled>
-          <i class="fa-solid fa-print"></i> Print Report
+          <i class="fa-solid fa-print"></i> <span data-i18n="analytics.print">Print Report</span>
         </button>
       </div>
     </div>
 
     <div class="card mt-16 no-print">
       <div class="field" style="margin:0;">
-        <label class="label">Hospital</label>
+        <label class="label" data-i18n="analytics.hospital">Hospital</label>
         <select class="input" id="hospitalSelect" onchange="loadAnalytics()">
-          <option value="">Choose…</option>
+          <option value="" data-i18n="analytics.choose">Choose…</option>
         </select>
       </div>
     </div>
 
     <div class="stats mt-16" style="grid-template-columns: repeat(3, 1fr);">
-      <div class="stat"><div class="n" id="kTotal">0</div><div class="k">Tokens Today</div></div>
-      <div class="stat"><div class="n" id="kAvg">0m</div><div class="k">Avg Wait</div></div>
-      <div class="stat"><div class="n" id="kPeak">—</div><div class="k">Peak Hour</div></div>
+      <div class="stat"><div class="n" id="kTotal">0</div><div class="k" data-i18n="analytics.tokensToday">Tokens Today</div></div>
+      <div class="stat"><div class="n" id="kAvg">0m</div><div class="k" data-i18n="analytics.avgWait">Avg Wait</div></div>
+      <div class="stat"><div class="n" id="kPeak">—</div><div class="k" data-i18n="analytics.peakHour">Peak Hour</div></div>
     </div>
 
     <div class="card mt-16 no-print">
-      <div class="htitle" style="font-size:1.05rem;">Token Volume by Hour</div>
-      <div class="hsub" style="margin-top:4px;">Today · peak hour highlighted in amber</div>
+      <div class="htitle" style="font-size:1.05rem;" data-i18n="analytics.hourly">Token Volume by Hour</div>
+      <div class="hsub" style="margin-top:4px;" data-i18n="analytics.hourlySub">Today · peak hour highlighted in amber</div>
       <div class="chart" id="chartBox"></div>
       <div class="legend">
-        <span class="lg"><span class="sw" style="background:#2A835F;"></span>Normal hour</span>
-        <span class="lg"><span class="sw" style="background:#f59e0b;"></span>Peak hour</span>
+        <span class="lg"><span class="sw" style="background:#2A835F;"></span><span data-i18n="analytics.normalHour">Normal hour</span></span>
+        <span class="lg"><span class="sw" style="background:#f59e0b;"></span><span data-i18n="analytics.peak">Peak hour</span></span>
       </div>
     </div>
 
     <div class="card mt-16">
-      <div class="htitle" style="font-size:1.05rem;">Serving Status Breakdown</div>
+      <div class="htitle" style="font-size:1.05rem;" data-i18n="analytics.breakdown">Serving Status Breakdown</div>
       <div class="stats mt-16" style="grid-template-columns: repeat(4, 1fr);">
-        <div class="stat"><div class="n green" id="kDone">0</div><div class="k">Served</div></div>
-        <div class="stat"><div class="n" id="kWait">0</div><div class="k">Waiting</div></div>
-        <div class="stat"><div class="n" id="kSkip" style="color:#d97706;">0</div><div class="k">Skipped</div></div>
-        <div class="stat"><div class="n" id="kCanc" style="color:#dc2626;">0</div><div class="k">Canceled</div></div>
+        <div class="stat"><div class="n green" id="kDone">0</div><div class="k" data-i18n="analytics.served">Served</div></div>
+        <div class="stat"><div class="n" id="kWait">0</div><div class="k" data-i18n="analytics.waiting">Waiting</div></div>
+        <div class="stat"><div class="n" id="kSkip" style="color:#d97706;">0</div><div class="k" data-i18n="analytics.skipped">Skipped</div></div>
+        <div class="stat"><div class="n" id="kCanc" style="color:#dc2626;">0</div><div class="k" data-i18n="analytics.canceled">Canceled</div></div>
       </div>
     </div>
 
     <div class="card mt-16 no-print">
-      <div class="htitle" style="font-size:1.05rem;">Source &amp; Quality</div>
-      <div class="hsub" style="margin-top:4px;">Today · walk-in vs appointment · serve time · feedback</div>
+      <div class="htitle" style="font-size:1.05rem;" data-i18n="analytics.sourceQuality">Source &amp; Quality</div>
+      <div class="hsub" style="margin-top:4px;" data-i18n="analytics.sourceQualitySub">Today · walk-in vs appointment · serve time · feedback</div>
       <div class="stats mt-16" style="grid-template-columns: repeat(4, 1fr);">
-        <div class="stat"><div class="n" id="kSourceAppt">0</div><div class="k">Appointments</div></div>
-        <div class="stat"><div class="n" id="kSourceWalkin">0</div><div class="k">Walk-ins</div></div>
-        <div class="stat"><div class="n" id="kAvgServe">0m</div><div class="k">Avg Serve</div></div>
-        <div class="stat"><div class="n" id="kRating">—</div><div class="k">Avg Rating</div></div>
+        <div class="stat"><div class="n" id="kSourceAppt">0</div><div class="k" data-i18n="analytics.appts">Appointments</div></div>
+        <div class="stat"><div class="n" id="kSourceWalkin">0</div><div class="k" data-i18n="analytics.walkins">Walk-ins</div></div>
+        <div class="stat"><div class="n" id="kAvgServe">0m</div><div class="k" data-i18n="analytics.colAvgServe">Avg Serve</div></div>
+        <div class="stat"><div class="n" id="kRating">—</div><div class="k" data-i18n="analytics.avgRating">Avg Rating</div></div>
       </div>
     </div>
 
     <div class="card mt-16 no-print">
-      <div class="htitle" style="font-size:1.05rem;">Per-Doctor Performance</div>
-      <div class="hsub" style="margin-top:4px;">Waiting / served · avg serve · EWT accuracy · avg rating</div>
+      <div class="htitle" style="font-size:1.05rem;" data-i18n="analytics.perDoctor">Per-Doctor Performance</div>
+      <div class="hsub" style="margin-top:4px;" data-i18n="analytics.perDoctorSub">Waiting / served · avg serve · EWT accuracy · avg rating</div>
       <div style="overflow-x:auto;" class="mt-12">
         <table style="width:100%;border-collapse:collapse;font-size:0.82rem;" id="doctorTable">
           <thead>
             <tr style="text-align:left;border-bottom:1px solid var(--line);">
-              <th style="padding:6px 8px;">Doctor</th>
-              <th style="padding:6px 8px;">Waiting</th>
-              <th style="padding:6px 8px;">Served</th>
-              <th style="padding:6px 8px;">Avg Serve</th>
-              <th style="padding:6px 8px;">EWT Err</th>
-              <th style="padding:6px 8px;">Rating</th>
+              <th style="padding:6px 8px;" data-i18n="analytics.colDoctor">Doctor</th>
+              <th style="padding:6px 8px;" data-i18n="analytics.colWaiting">Waiting</th>
+              <th style="padding:6px 8px;" data-i18n="analytics.colServed">Served</th>
+              <th style="padding:6px 8px;" data-i18n="analytics.colAvgServe">Avg Serve</th>
+              <th style="padding:6px 8px;" data-i18n="analytics.colEwt">EWT Err</th>
+              <th style="padding:6px 8px;" data-i18n="analytics.colRating">Rating</th>
             </tr>
           </thead>
           <tbody id="doctorBody"></tbody>
@@ -125,7 +125,7 @@
 
     <div class="card mt-16 no-print">
       <div class="htitle" style="font-size:1.05rem;"><i class="fa-regular fa-comment"></i> <span data-i18n="analytics.feedback">Patient Feedback</span></div>
-      <div id="feedbackBox" class="mt-12"><div class="muted">No feedback yet today.</div></div>
+      <div id="feedbackBox" class="mt-12"><div class="muted" data-i18n="analytics.noFeedback">No feedback yet today.</div></div>
     </div>
   </div>
 
@@ -135,11 +135,14 @@
     if ('serviceWorker' in navigator) { window.addEventListener('load', () => navigator.serviceWorker.register('/sw.js').catch(()=>{})); }
   </script>
   <script src="js/firebase-config.js"></script>
+  <script src="js/i18n.js"></script>
   <script src="js/app.js"></script>
   <script src="js/firebase.js"></script>
   <script src="js/queue-domain.js"></script>
   <script src="js/api.js"></script>
   <script>
+    if (window.I18N) I18N.init();
+    function l10n(key, fb) { return (window.I18N && window.I18N.t) ? window.I18N.t(key) : fb; }
     let currentTokensCache = [];
     let currentHospitalSlug = '';
     let currentHospitalName = '';
@@ -177,7 +180,7 @@
           sel.value = requestedHospital;
           await loadAnalytics();
         }
-      } catch (e) { showToast('Failed to load: ' + e.message, true); }
+      } catch (e) { showToast(l10n('analytics.err.load', 'Failed to load: ') + e.message, true); }
     }
 
     async function loadAnalytics() {
@@ -208,7 +211,7 @@
 
         const selectedHospital = await window._fs.getDoc(window._fs.doc(window._db, 'hospitals', currentHospitalSlug));
         if (!selectedHospital.exists() || !window.TokspotQueue.isHospitalAdmin(window._auth.currentUser, selectedHospital.data())) {
-          throw new Error('You are not authorized to view this hospital report.');
+          throw new Error(l10n('analytics.err.unauthorized', 'You are not authorized to view this hospital report.'));
         }
         const snap = await window._fs.getDocs(window._fs.query(
           window._fs.collection(window._db, 'hospitals', currentHospitalSlug, 'tokens'),
@@ -298,7 +301,7 @@
 
         btnExport.disabled = total === 0;
         btnPrint.disabled = total === 0;
-      } catch (e) { showToast('Failed: ' + e.message, true); }
+      } catch (e) { showToast(l10n('analytics.err.failed', 'Failed: ') + e.message, true); }
     }
 
     // Render the full dashboard from a normalized stats object shared by
@@ -339,7 +342,7 @@
       const body = document.getElementById('doctorBody');
       if (!body) return;
       if (!rows.length) {
-        body.innerHTML = '<tr><td colspan="6" class="muted" style="padding:10px 8px;">No tokens issued yet today.</td></tr>';
+        body.innerHTML = '<tr><td colspan="6" class="muted" style="padding:10px 8px;">' + l10n('analytics.err.noTokens', 'No tokens issued yet today.') + '</td></tr>';
         return;
       }
       body.innerHTML = rows.map(r => `
@@ -357,7 +360,7 @@
       const box = document.getElementById('feedbackBox');
       if (!box) return;
       if (!rows || !rows.length) {
-        box.innerHTML = '<div class="muted">No feedback yet today.</div>';
+        box.innerHTML = '<div class="muted">' + l10n('analytics.noFeedback', 'No feedback yet today.') + '</div>';
         return;
       }
       const sorted = [...rows].sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
@@ -366,7 +369,7 @@
         return `<div style="padding:10px 0;border-bottom:1px dashed var(--line);">
           <div style="display:flex;align-items:center;gap:8px;">
             <span style="color:#f59e0b;letter-spacing:2px;">${stars}</span>
-            <b style="font-size:0.82rem;">${esc(f.doctorName || 'Doctor')}</b>
+            <b style="font-size:0.82rem;">${esc(f.doctorName || l10n('analytics.colDoctor', 'Doctor'))}</b>
           </div>
           ${f.comment ? `<div style="font-size:0.8rem;color:var(--slate-500);margin-top:4px;">${esc(f.comment)}</div>` : ''}
         </div>`;
@@ -394,7 +397,7 @@
         col.className = 'bar-col';
         col.innerHTML = `<div class="bar-h"><div class="bar-t">${h === 0 ? '' : fmtH(h)}</div></div>
           <div class="bar ${isPeak ? 'peak' : ''}" style="height:${height}px;"></div>`;
-        col.title = fmtH(h) + ': ' + v + ' tokens';
+        col.title = fmtH(h) + ': ' + v + ' ' + l10n('analytics.tokenUnit', 'tokens');
         box.appendChild(col);
       }
     }
@@ -403,7 +406,7 @@
 
     // Feature 2: End-of-Day CSV / Excel Daily Summary Export
     function exportDailyReportCSV() {
-      if (!currentTokensCache.length) return showToast('No records to export.', true);
+      if (!currentTokensCache.length) return showToast(l10n('analytics.noRecords', 'No records to export.'), true);
 
       const today = window.todayStr();
       const headers = ['Token Number', 'Patient Name', 'Phone', 'Doctor ID', 'Counter', 'Status', 'Time Booked', 'Type', 'Priority'];
@@ -435,7 +438,7 @@
       link.click();
       document.body.removeChild(link);
 
-      showToast('Daily CSV Report downloaded successfully!');
+      showToast(l10n('analytics.csvOk', 'Daily CSV Report downloaded successfully!'));
     }
 
     // Daily Print Summary
