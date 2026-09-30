@@ -132,19 +132,22 @@
       </label>
 
       <!-- Prescription Writer -->
-      <div id="rxPanel" style="display:none;margin-top:14px;border-top:1px dashed #334155;padding-top:14px;text-align:left;">
+      <div id="rxPanel" style="margin-top:14px;border-top:1px dashed #334155;padding-top:14px;text-align:left;">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
           <span style="font-weight:800;color:#f8fafc;font-size:0.95rem;"><i class="fa-solid fa-prescription-bottle-medical" style="color:#4FB286;"></i> <span data-i18n="doctor.rx.title">Prescription</span> <span id="rxForLabel" style="color:#8BBB92;font-size:0.8rem;font-weight:700;"></span></span>
           <button type="button" onclick="printPrescription()" class="sec-btn" style="background:#334155;color:#fff;border:none;padding:4px 10px;font-size:0.72rem;border-radius:8px;height:auto;font-weight:800;cursor:pointer;"><i class="fa-solid fa-print"></i> <span data-i18n="doctor.rx.print">Print</span></button>
         </div>
+        <div id="rxEmptyHint" class="muted" style="font-size:0.8rem;color:#94a3b8;margin-bottom:8px;display:none;" data-i18n="doctor.rx.noPatient">Call your next patient to write a prescription.</div>
         <div class="muted" style="font-size:0.78rem;color:#94a3b8;margin-bottom:8px;" data-i18n="doctor.rx.hint">Type a medicine name and pick from the list, or add it as a new medicine.</div>
-        <div style="position:relative;">
-          <input id="rxSearch" class="rx-in" type="text" autocomplete="off" style="width:100%;padding:8px 10px;font-size:0.9rem;" data-i18n-ph="doctor.rx.searchPh" placeholder="Search medicines…" oninput="rxSearchInput(this.value)" />
-          <div id="rxResults" class="search-dropdown hidden" style="left:0;right:0;max-height:220px;overflow-y:auto;z-index:20;"></div>
+        <div id="rxEditorWrap">
+          <div style="position:relative;">
+            <input id="rxSearch" class="rx-in" type="text" autocomplete="off" style="width:100%;padding:8px 10px;font-size:0.9rem;" data-i18n-ph="doctor.rx.searchPh" placeholder="Search medicines…" oninput="rxSearchInput(this.value)" />
+            <div id="rxResults" class="search-dropdown hidden" style="left:0;right:0;max-height:220px;overflow-y:auto;z-index:20;"></div>
+          </div>
+          <div id="rxItems" style="margin-top:10px;display:flex;flex-direction:column;gap:8px;"></div>
+          <textarea id="rxNotes" rows="2" class="note-box" style="margin-top:10px;" data-i18n-ph="doctor.rx.notes" placeholder="Doctor's notes / advice (optional)"></textarea>
+          <button class="call-btn" onclick="savePrescription()" style="margin-top:10px;height:52px;font-size:1rem;"><i class="fa-solid fa-check-double"></i> <span data-i18n="doctor.rx.done">Done</span></button>
         </div>
-        <div id="rxItems" style="margin-top:10px;display:flex;flex-direction:column;gap:8px;"></div>
-        <textarea id="rxNotes" rows="2" class="note-box" style="margin-top:10px;" data-i18n-ph="doctor.rx.notes" placeholder="Doctor's notes / advice (optional)"></textarea>
-        <button class="call-btn" onclick="savePrescription()" style="margin-top:10px;height:52px;font-size:1rem;"><i class="fa-solid fa-check-double"></i> <span data-i18n="doctor.rx.done">Done</span></button>
         <datalist id="rxFreqList"></datalist>
         <datalist id="rxStrengthList"></datalist>
       </div>
@@ -570,21 +573,34 @@
     function rxSyncActive() {
       const panel = document.getElementById('rxPanel');
       const t = currentActiveToken;
+      const wrap = document.getElementById('rxEditorWrap');
+      const hint = document.getElementById('rxEmptyHint');
+      const label = document.getElementById('rxForLabel');
       if (!panel) return;
       if (!rxFreqInited) {
         rxFreqInited = true;
         const dl = document.getElementById('rxFreqList');
         if (dl) dl.innerHTML = RX_FREQ.map((f) => `<option value="${escHtml(f)}">`).join('');
       }
-      if (t && rxDraft.tokenId === t.id) return; // same patient — keep the doctor's draft
-      if (!t) {
-        panel.style.display = 'none';
-        rxDraft = { tokenId: null, items: [] };
+      if (t && rxDraft.tokenId === t.id) {
+        if (wrap) wrap.style.display = '';
+        if (hint) hint.style.display = 'none';
+        if (label) label.textContent = `#${t.number} · ${t.patientName || l10n('doctor.patient', 'Patient')}`;
         return;
       }
-      panel.style.display = '';
+      if (!t) {
+        rxDraft = { tokenId: null, items: [] };
+        if (wrap) wrap.style.display = 'none';
+        if (hint) hint.style.display = '';
+        if (label) label.textContent = '';
+        const notes = document.getElementById('rxNotes');
+        if (notes) notes.value = '';
+        rxRenderItems();
+        return;
+      }
+      if (wrap) wrap.style.display = '';
+      if (hint) hint.style.display = 'none';
       rxDraft = { tokenId: t.id, items: [] };
-      const label = document.getElementById('rxForLabel');
       if (label) label.textContent = `#${t.number} · ${t.patientName || l10n('doctor.patient', 'Patient')}`;
       if (t.prescription && Array.isArray(t.prescription.items)) {
         rxDraft.items = t.prescription.items.map((i) => ({
