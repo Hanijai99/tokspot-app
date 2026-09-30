@@ -330,13 +330,18 @@
 
         window._useAuth.onAuthStateChanged(window._auth, async (u) => {
           if (u) {
-            if (!u.emailVerified) {
-              activeAdminUser = u;
-              renderEmailVerificationState(u);
+            // Firebase caches emailVerified locally until a token refresh.
+            // Force a fresh profile so a just-verified admin is not bounced
+            // back to the verify card on every login (stale-flag loop).
+            try { await u.reload(); } catch (_) {}
+            const fresh = window._auth.currentUser || u;
+            if (!fresh.emailVerified) {
+              activeAdminUser = fresh;
+              renderEmailVerificationState(fresh);
               return;
             }
-            activeAdminUser = u;
-            await resolveAdminHospital(u);
+            activeAdminUser = fresh;
+            await resolveAdminHospital(fresh);
           } else {
             showLoggedOutState();
           }
