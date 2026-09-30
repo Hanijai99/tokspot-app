@@ -62,6 +62,7 @@ const RL = {
   transition: { maxCalls: 240, periodSeconds: 60 },
   pharmacy: { maxCalls: 120, periodSeconds: 60 },
   pharmacyQueue: { maxCalls: 120, periodSeconds: 60 },
+  prescription: { maxCalls: 60, periodSeconds: 60 },
   cancel: { maxCalls: 60, periodSeconds: 60 },
   tokenStatus: { maxCalls: 120, periodSeconds: 60 },
   doctorQueue: { maxCalls: 120, periodSeconds: 60 },
@@ -447,10 +448,61 @@ exports.getPharmacyQueue = onCall({ rateLimiting: RL.pharmacyQueue }, async (req
       pharmacyCalledAt: t.pharmacyCalledAt ? t.pharmacyCalledAt.toMillis() : null,
       pharmacyDispensedAt: t.pharmacyDispensedAt ? t.pharmacyDispensedAt.toMillis() : null,
       pharmacyRecallCount: Number(t.pharmacyRecallCount) || 0,
+      prescription: t.prescription || null,
     });
   });
   rows.sort((a, b) => Number(a.number) - Number(b.number));
   return { rows };
+});
+
+// ------------------------------------------------------------------
+//  savePrescription — doctor desk saves the consultation prescription
+//  onto the token doc. The pharmacy queue reads it to dispense and the
+//  patient pass displays/prints it. Clinical data only ever lives on the
+//  token doc under the app's rules posture.
+// ------------------------------------------------------------------
+exports.savePrescription = onCall({ maxInstances: 10, rateLimiting: RL.prescription }, async (request) => {
+  const { slug, tokenId, prescription } = request.data || {};
+  if (!slug || !tokenId) throw new HttpsError('invalid-argument', 'slug + tokenId required.');
+  const uid = request.auth && request.auth.uid;
+  if (!uid) throw new HttpsError('unauthenticated', 'Sign in required.');
+
+  const rawItems = Array.isArray(prescription && prescription.items) ? prescription.items : [];
+  if (!rawItems.length) throw new HttpsError('invalid-argument', 'At least one medicine is required.');
+  if (rawItems.length > 50) throw new HttpsError('invalid-argument', 'Maximum 50 medicines per prescription.');
+
+  const s = (v) => String(v == null ? '' : v).trim().slice(0, 120);
+  const items = rawItems.map((it) => ({
+    name: s(it && it.name),
+    strength: s(it && it.strength),
+    dose: s(it && it.dose),
+    frequency: s(it && it.frequency),
+    duration: s(it && it.duration),
+    instructions: s(it && it.instructions),
+  })).filter((it) => it.name);
+  if (!items.length) throw new HttpsError('invalid-argument', 'At least one named medicine is required.');
+  const notes = String(prescription ? prescription.notes || '' : '').slice(0, 500);
+
+  const hospital = await loadHospital(slug);
+  if (!hospital) throw new HttpsError('not-found', 'Hospital not found.');
+  const ref = db.doc(`hospitals/${slug}/tokens/${tokenId}`);
+  const snap = await ref.get();
+  if (!snap.exists) throw new HttpsError('not-found', 'Token not found.');
+  const status = normalizeStatus(snap.data().status || '');
+  if (!['called', 'in-consultation', 'completed'].includes(status)) {
+    throw new HttpsError('failed-precondition', 'Prescriptions can only be added while the patient is in consultation.');
+  }
+
+  await ref.update({
+    prescription: {
+      items,
+      notes,
+      prescribedBy: s(prescription && prescription.prescribedBy),
+      prescribedAt: new Date(),
+    },
+  });
+  await audit(uid, slug, 'token:prescription', tokenId, 'ok', { number: snap.data().number, items: items.length });
+  return { ok: true, tokenId };
 });
 
 // ------------------------------------------------------------------
@@ -751,6 +803,7 @@ exports.getTokenStatus = onCall({ rateLimiting: RL.tokenStatus }, async (request
     nowServing: serving || 0,
     avgServeMinutes: stats.avgServeMinutes,
     waitEstimateMinutes: estimateWaitMinutes({ waitingCount: ahead, avgServeMinutes: stats.avgServeMinutes }),
+    prescription: t.prescription || null,
   };
 });
 

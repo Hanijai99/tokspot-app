@@ -62,6 +62,20 @@
       background: #0f172a; color: #8BBB92; padding: 2px 6px; border-radius: 4px;
       font-weight: 800; border: 1px solid #334155; font-family: monospace;
     }
+
+    /* ---- Prescription writer ---- */
+    .rx-in { background: #0B1120; color: #f8fafc; border: 1px solid #334155; border-radius: 8px; padding: 5px 8px; font-size: 0.8rem; font-weight: 700; box-sizing: border-box; }
+    .rx-in:focus { outline: 2px solid #2A835F; border-color: #2A835F; }
+    details.rx-block summary { list-style: none; cursor: pointer; }
+    details.rx-block summary::-webkit-details-marker { display: none; }
+
+    /* ---- Print slip (only the slip prints) ---- */
+    .print-slip { display: none; font-family: system-ui, -apple-system, sans-serif; color: #0f172a; }
+    @media print {
+      body * { visibility: hidden !important; }
+      #printArea, #printArea * { visibility: visible !important; }
+      #printArea { display: block !important; position: absolute; left: 0; top: 0; width: 100%; background: #fff; color: #0f172a; padding: 24px; box-sizing: border-box; }
+    }
   </style>
 </head>
 <body>
@@ -117,6 +131,24 @@
         <i class="fa-solid fa-prescription-bottle-medical"></i> <span data-i18n="doctor.pharmacySend">Send to Pharmacy after completion</span>
       </label>
 
+      <!-- Prescription Writer -->
+      <div id="rxPanel" style="display:none;margin-top:14px;border-top:1px dashed #334155;padding-top:14px;text-align:left;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+          <span style="font-weight:800;color:#f8fafc;font-size:0.95rem;"><i class="fa-solid fa-prescription-bottle-medical" style="color:#4FB286;"></i> <span data-i18n="doctor.rx.title">Prescription</span> <span id="rxForLabel" style="color:#8BBB92;font-size:0.8rem;font-weight:700;"></span></span>
+          <button type="button" onclick="printPrescription()" class="sec-btn" style="background:#334155;color:#fff;border:none;padding:4px 10px;font-size:0.72rem;border-radius:8px;height:auto;font-weight:800;cursor:pointer;"><i class="fa-solid fa-print"></i> <span data-i18n="doctor.rx.print">Print</span></button>
+        </div>
+        <div class="muted" style="font-size:0.78rem;color:#94a3b8;margin-bottom:8px;" data-i18n="doctor.rx.hint">Type a medicine name and pick from the list, or add it as a new medicine.</div>
+        <div style="position:relative;">
+          <input id="rxSearch" class="rx-in" type="text" autocomplete="off" style="width:100%;padding:8px 10px;font-size:0.9rem;" data-i18n-ph="doctor.rx.searchPh" placeholder="Search medicines…" oninput="rxSearchInput(this.value)" />
+          <div id="rxResults" class="search-dropdown hidden" style="left:0;right:0;max-height:220px;overflow-y:auto;z-index:20;"></div>
+        </div>
+        <div id="rxItems" style="margin-top:10px;display:flex;flex-direction:column;gap:8px;"></div>
+        <textarea id="rxNotes" rows="2" class="note-box" style="margin-top:10px;" data-i18n-ph="doctor.rx.notes" placeholder="Doctor's notes / advice (optional)"></textarea>
+        <button class="call-btn" onclick="savePrescription()" style="margin-top:10px;height:52px;font-size:1rem;"><i class="fa-solid fa-check-double"></i> <span data-i18n="doctor.rx.done">Done</span></button>
+        <datalist id="rxFreqList"></datalist>
+        <datalist id="rxStrengthList"></datalist>
+      </div>
+
       <div class="hotkey-legend">
         <span><kbd>F4</kbd> <span data-i18n="doctor.hot.next">Next</span></span>
         <span><kbd>F8</kbd> <span data-i18n="doctor.hot.recall">Recall</span></span>
@@ -138,6 +170,9 @@
     </div>
   </div>
 
+  <!-- Prescription print slip (filled by printPrescription) -->
+  <div id="printArea" class="print-slip"></div>
+
   <audio id="docChime" preload="auto">
     <source src="https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3" type="audio/mpeg">
   </audio>
@@ -148,6 +183,7 @@
   <script src="js/queue-domain.js"></script>
   <script src="js/api.js"></script>
   <script src="js/i18n.js"></script>
+  <script src="js/medicines.js"></script>
   <script>
     if (window.I18N) I18N.init();
     function l10n(key, fb) { return (window.I18N && window.I18N.t) ? window.I18N.t(key) : fb; }
@@ -476,6 +512,7 @@
       renderQueueRows();
       refreshBreakUI();
       renderQueueMeta();
+      rxSyncActive();
     }
     // token reads — the target rules deny those for doctor roles).
     function startDoctorQueuePolling() {
@@ -521,6 +558,193 @@
           <span style="color:#64748b;font-size:0.85rem;font-weight:700;">${l10n('doctor.pos', 'Pos')} ${idx + 1}</span>
         </div>
       `).join('');
+    }
+
+    // ---------------------------------------------------------------
+    // Prescription writer (medicine catalog + item rows + print slip)
+    // ---------------------------------------------------------------
+    const RX_FREQ = ['1-0-1', '1-1-1', '2-0-2', '2-2-2', 'Once daily', 'Twice daily', '3 times a day', 'At bedtime', 'Every 4-6 hours'];
+    let rxDraft = { tokenId: null, items: [] };
+    let rxFreqInited = false;
+
+    function rxSyncActive() {
+      const panel = document.getElementById('rxPanel');
+      const t = currentActiveToken;
+      if (!panel) return;
+      if (!rxFreqInited) {
+        rxFreqInited = true;
+        const dl = document.getElementById('rxFreqList');
+        if (dl) dl.innerHTML = RX_FREQ.map((f) => `<option value="${escHtml(f)}">`).join('');
+      }
+      if (t && rxDraft.tokenId === t.id) return; // same patient — keep the doctor's draft
+      if (!t) {
+        panel.style.display = 'none';
+        rxDraft = { tokenId: null, items: [] };
+        return;
+      }
+      panel.style.display = '';
+      rxDraft = { tokenId: t.id, items: [] };
+      const label = document.getElementById('rxForLabel');
+      if (label) label.textContent = `#${t.number} · ${t.patientName || l10n('doctor.patient', 'Patient')}`;
+      if (t.prescription && Array.isArray(t.prescription.items)) {
+        rxDraft.items = t.prescription.items.map((i) => ({
+          name: i.name || '', strength: i.strength || '', dose: i.dose || '',
+          frequency: i.frequency || '', duration: i.duration || '', instructions: i.instructions || '',
+        }));
+        const notes = document.getElementById('rxNotes');
+        if (notes && t.prescription.notes) notes.value = t.prescription.notes;
+      }
+      const inp = document.getElementById('rxSearch');
+      if (inp) inp.value = '';
+      rxRenderItems();
+    }
+
+    function rxStrengthsFor(name) {
+      const nm = String(name || '').trim().toLowerCase();
+      const m = (window.TOKSPOT_MEDICINES || []).find((x) => String(x.name).toLowerCase() === nm);
+      return m && Array.isArray(m.strengths) ? m.strengths : [];
+    }
+
+    function rxSearchInput(q) {
+      const dd = document.getElementById('rxResults');
+      q = (q || '').trim();
+      if (!q) { if (dd) dd.classList.add('hidden'); return; }
+      const ql = q.toLowerCase();
+      const meds = (window.TOKSPOT_MEDICINES || []).filter((m) =>
+        String(m.name).toLowerCase().includes(ql) || String(m.category || '').toLowerCase().includes(ql)
+      ).slice(0, 8);
+      let html = meds.map((m) => `
+        <div class="search-item" data-name="${escHtml(m.name)}" onclick="rxPick(this)" style="cursor:pointer;">
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;">
+            <span style="font-weight:700;">${escHtml(m.name)}</span>
+            <span style="font-size:0.72rem;color:#8BBB92;font-weight:800;">${escHtml((m.strengths || []).join(' / '))}</span>
+          </div>
+          <div style="font-size:0.75rem;color:#64748b;">${escHtml(m.category || '')}</div>
+        </div>`).join('');
+      html += `<div class="search-item" data-name="${escHtml(q)}" onclick="rxPick(this)" style="cursor:pointer;">
+          <span style="font-weight:700;color:#4FB286;"><i class="fa-solid fa-plus"></i> ${escHtml(l10n('doctor.rx.addNew', 'Add new medicine:') + ' ' + q)}</span>
+        </div>`;
+      dd.innerHTML = html;
+      dd.classList.remove('hidden');
+    }
+
+    function rxPick(el) {
+      if (!el) return;
+      const name = (el.getAttribute('data-name') || '').trim();
+      if (name) rxAdd(name);
+    }
+
+    function rxAdd(name) {
+      if (!rxDraft.items.some((i) => i.name.toLowerCase() === name.toLowerCase())) {
+        rxDraft.items.push({ name, strength: '', dose: '', frequency: '', duration: '', instructions: '' });
+      }
+      const inp = document.getElementById('rxSearch');
+      if (inp) inp.value = '';
+      const dd = document.getElementById('rxResults');
+      if (dd) dd.classList.add('hidden');
+      rxRenderItems();
+      const panel = document.getElementById('rxPanel');
+      if (panel) panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+
+    function rxSet(i, key, val) { if (rxDraft.items[i]) rxDraft.items[i][key] = val; }
+    function rxRemove(i) { rxDraft.items.splice(i, 1); rxRenderItems(); }
+
+    function rxRenderItems() {
+      const box = document.getElementById('rxItems');
+      if (!box) return;
+      const strengths = [];
+      rxDraft.items.forEach((it) => rxStrengthsFor(it.name).forEach((s) => { if (!strengths.includes(s)) strengths.push(s); }));
+      const dl = document.getElementById('rxStrengthList');
+      if (dl) dl.innerHTML = strengths.map((s2) => `<option value="${escHtml(s2)}">`).join('');
+      if (!rxDraft.items.length) { box.innerHTML = ''; return; }
+      box.innerHTML = rxDraft.items.map((it, i) => `
+        <div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;background:rgba(255,255,255,0.05);border:1px solid #334155;border-radius:10px;padding:8px;">
+          <span style="font-weight:800;color:#f8fafc;font-size:0.88rem;min-width:140px;">${escHtml(it.name)}${it.strength ? ' <span style="color:#8BBB92;">' + escHtml(it.strength) + '</span>' : ''}</span>
+          <input class="rx-in" value="${escHtml(it.strength)}" placeholder="${escHtml(l10n('doctor.rx.strength', 'Strength'))}" list="rxStrengthList" oninput="rxSet(${i},'strength',this.value)" style="width:76px;" />
+          <input class="rx-in" value="${escHtml(it.dose)}" placeholder="${escHtml(l10n('doctor.rx.dose', 'Dose'))}" oninput="rxSet(${i},'dose',this.value)" style="width:74px;" />
+          <input class="rx-in" value="${escHtml(it.frequency)}" placeholder="${escHtml(l10n('doctor.rx.frequency', 'Frequency'))}" list="rxFreqList" oninput="rxSet(${i},'frequency',this.value)" style="width:96px;" />
+          <input class="rx-in" value="${escHtml(it.duration)}" placeholder="${escHtml(l10n('doctor.rx.duration', 'Duration'))}" oninput="rxSet(${i},'duration',this.value)" style="width:70px;" />
+          <input class="rx-in" value="${escHtml(it.instructions)}" placeholder="${escHtml(l10n('doctor.rx.instructions', 'Instructions'))}" oninput="rxSet(${i},'instructions',this.value)" style="flex:1;min-width:100px;" />
+          <button type="button" onclick="rxRemove(${i})" style="background:#dc2626;border:none;color:#fff;border-radius:8px;width:30px;height:30px;cursor:pointer;" aria-label="Remove"><i class="fa-solid fa-trash-can"></i></button>
+        </div>`).join('');
+    }
+
+    function rxCurrentPayload() {
+      const notes = document.getElementById('rxNotes') ? document.getElementById('rxNotes').value : '';
+      return {
+        items: rxDraft.items.map((i) => ({ ...i })),
+        notes,
+        prescribedBy: activeDoctorProfile ? (activeDoctorProfile.name || '') : '',
+      };
+    }
+
+    async function savePrescription() {
+      if (!currentActiveToken) return showToast(l10n('doctor.rx.errNoActive', 'No active patient in consultation.'), true);
+      if (!rxDraft.items.length) return showToast(l10n('doctor.rx.errEmpty', 'Add at least one medicine first.'), true);
+      const t = currentActiveToken;
+      const payload = rxCurrentPayload();
+      try {
+        await window.TokSpotAPI.savePrescription({ slug: currentHospitalSlug, tokenId: t.id, prescription: payload });
+        const cb = document.getElementById('chkSendPharmacy');
+        const wantPharmacy = !!(cb && cb.checked);
+        if (wantPharmacy) {
+          await window.TokSpotAPI.transition({ slug: currentHospitalSlug, tokenId: t.id, nextStatus: 'completed' });
+          await window.TokSpotAPI.routeToPharmacy({ slug: currentHospitalSlug, tokenId: t.id });
+          if (cb) cb.checked = false;
+          showToast(l10n('doctor.rx.okSent', 'Prescription saved — #%s sent to Pharmacy.').replace('%s', t.number));
+        } else {
+          showToast(l10n('doctor.rx.ok', 'Prescription saved for #%s.').replace('%s', t.number));
+        }
+      } catch (e) {
+        showToast(l10n('doctor.rx.err', 'Could not save prescription: ') + e.message, true);
+      }
+    }
+
+    function printPrescription() {
+      if (!currentActiveToken) return showToast(l10n('doctor.rx.errNoActive', 'No active patient in consultation.'), true);
+      if (!rxDraft.items.length) return showToast(l10n('doctor.rx.errEmpty', 'Add at least one medicine first.'), true);
+      const t = currentActiveToken;
+      const notes = document.getElementById('rxNotes') ? document.getElementById('rxNotes').value : '';
+      const rows = rxDraft.items.map((i) => `
+        <tr>
+          <td style="font-weight:700;">${escHtml(i.name)}${i.strength ? ' <span style="color:#475569;">' + escHtml(i.strength) + '</span>' : ''}</td>
+          <td>${escHtml(i.dose)}</td>
+          <td>${escHtml(i.frequency)}</td>
+          <td>${escHtml(i.duration)}</td>
+          <td>${escHtml(i.instructions)}</td>
+        </tr>`).join('');
+      const docName = activeDoctorProfile ? (activeDoctorProfile.name || '') : '';
+      const hospName = activeDoctorProfile && activeDoctorProfile.hospitalName ? activeDoctorProfile.hospitalName : currentHospitalSlug;
+      document.getElementById('printArea').innerHTML = `
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+          <div>
+            <div style="font-size:1.3rem;font-weight:900;letter-spacing:1px;">${escHtml(hospName)}</div>
+            <div style="font-size:0.9rem;color:#475569;">${escHtml(l10n('doctor.rx.title', 'Prescription'))}</div>
+            <div style="font-size:0.85rem;">Dr. ${escHtml(docName)}${activeDoctorProfile && activeDoctorProfile.department ? ' · ' + escHtml(activeDoctorProfile.department) : ''}</div>
+            <div style="font-size:0.85rem;">${escHtml(l10n('doctor.rx.date', 'Date'))}: ${escHtml(new Date().toLocaleDateString())}</div>
+          </div>
+          <div style="text-align:right;font-size:0.9rem;">
+            <div style="font-weight:800;font-size:1.05rem;">${escHtml(t.number ? '#' + t.number : '')}</div>
+            <div>${escHtml(t.patientName || l10n('doctor.patient', 'Patient'))}</div>
+            <div style="color:#475569;">${escHtml(t.phone || '')}</div>
+          </div>
+        </div>
+        <table style="width:100%;margin-top:18px;border-collapse:collapse;font-size:0.9rem;">
+          <thead>
+            <tr style="border-bottom:2px solid #0f172a;text-align:left;">
+              <th style="padding:6px 4px;">${escHtml(l10n('doctor.rx.medicine', 'Medicine'))}</th>
+              <th style="padding:6px 4px;">${escHtml(l10n('doctor.rx.dose', 'Dose'))}</th>
+              <th style="padding:6px 4px;">${escHtml(l10n('doctor.rx.frequency', 'Frequency'))}</th>
+              <th style="padding:6px 4px;">${escHtml(l10n('doctor.rx.duration', 'Duration'))}</th>
+              <th style="padding:6px 4px;">${escHtml(l10n('doctor.rx.instructions', 'Instructions'))}</th>
+            </tr>
+          </thead>
+          <tbody>${rows}</tbody>
+        </table>
+        ${notes ? `<div style="margin-top:14px;font-size:0.9rem;"><b>${escHtml(l10n('doctor.rx.notes', 'Notes'))}:</b> ${escHtml(notes)}</div>` : ''}
+        <div style="margin-top:26px;font-size:0.85rem;color:#475569;">${escHtml(l10n('doctor.rx.sign', 'Doctor signature'))}: ______________________</div>`;
+      window.print();
     }
 
     async function callNext() {
@@ -593,6 +817,14 @@
       const cb = document.getElementById('chkSendPharmacy');
       const wantPharmacy = !!(cb && cb.checked);
       try {
+        // Auto-save an in-progress prescription before completing.
+        if (rxDraft.tokenId === currentActiveToken.id && rxDraft.items.length) {
+          await window.TokSpotAPI.savePrescription({
+            slug: currentHospitalSlug,
+            tokenId: currentActiveToken.id,
+            prescription: rxCurrentPayload(),
+          });
+        }
         await window.TokSpotAPI.transition({ slug: currentHospitalSlug, tokenId: currentActiveToken.id, nextStatus: 'completed' });
         if (wantPharmacy) {
           await window.TokSpotAPI.routeToPharmacy({ slug: currentHospitalSlug, tokenId: currentActiveToken.id });

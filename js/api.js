@@ -275,6 +275,61 @@
     return callFunction('getPharmacyQueue', { slug });
   }
 
+  // ---- savePrescription (doctor → token prescription) --------------
+
+  function normalizeRxItem(it) {
+    const s = (v) => String(v == null ? '' : v).trim().slice(0, 120);
+    return {
+      name: s(it && it.name),
+      strength: s(it && it.strength),
+      dose: s(it && it.dose),
+      frequency: s(it && it.frequency),
+      duration: s(it && it.duration),
+      instructions: s(it && it.instructions),
+    };
+  }
+
+  /**
+   * Saves (or overwrites) the prescription written during consultation.
+   * Stored on the token doc so the pharmacy queue can dispense from it
+   * and the patient's pass can print it.
+   * @param {object} opts { slug, tokenId, prescription: { items, notes, prescribedBy } }
+   * @returns {Promise<{ok: boolean}>}
+   */
+  async function savePrescription(opts) {
+    const { slug, tokenId, prescription } = opts || {};
+    if (!slug || !tokenId || !prescription || !Array.isArray(prescription.items)) {
+      throw new Error('slug, tokenId and prescription.items are required.');
+    }
+    const items = prescription.items.map(normalizeRxItem).filter((it) => it.name);
+    const notes = String(prescription.notes || '').slice(0, 500);
+    if (!items.length) throw new Error('At least one medicine is required.');
+
+    if (apiMode() === 'functions') {
+      await ensureAuth();
+      return callFunction('savePrescription', {
+        slug, tokenId,
+        prescription: {
+          items,
+          notes,
+          prescribedBy: String(prescription.prescribedBy || '').slice(0, 120),
+        },
+      });
+    }
+
+    await ensureAuth();
+    requireFs();
+    await win._fs.updateDoc(win._fs.doc(win._db, 'hospitals', slug, 'tokens', tokenId), {
+      prescription: {
+        items,
+        notes,
+        prescribedBy: String(prescription.prescribedBy || '').slice(0, 120),
+        prescribedAt: win._fs.serverTimestamp ? win._fs.serverTimestamp() : new Date(),
+      },
+    });
+    return { ok: true };
+  }
+
   // ---- cancelToken (patient self-cancel, verified by phone) ---------
 
   async function cancelToken(opts) {
@@ -604,5 +659,6 @@
     routeToPharmacy,
     pharmacyAction,
     getPharmacyQueue,
+    savePrescription,
   };
 });

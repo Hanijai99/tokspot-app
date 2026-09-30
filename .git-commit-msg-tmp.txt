@@ -1,0 +1,17 @@
+Round 9.7: prescription writer + medicine catalog
+
+- Doctor desk: searchable medicine catalog (js/medicines.js, ~170 meds with
+  categories + strengths) + free-form "add new medicine"; per-item strength,
+  dose, frequency (presets), duration, instructions; doctor notes; Done button
+  saves onto the token doc and routes to pharmacy when the checkbox is set;
+  Complete auto-saves an in-progress prescription; draft survives refreshes,
+  resets on next patient; print-only slip via @media print.
+- Pharmacy: prescription block on the active patient + expandable list per
+  waiting row (token # + patient name already shown).
+- Patient pass (token.html): "Your Prescription" card + print slip.
+- Backend: savePrescription callable (rate-limited, audited, sanitized, <=50
+  items, only called/in-consultation/completed); prescription included in
+  getPharmacyQueue + getTokenStatus. No rules change needed (live token-update
+  rule already allows the field; hardened target writes via the callable).
+- i18n: 26 new keys en+ta (parity guarded). New tests/medicines.test.cjs.
+- PRODUCTION_READINESS.md: Round 9.7 entry; 9.5 guardrail superseded note.
