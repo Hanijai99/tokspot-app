@@ -352,6 +352,11 @@
             // back to the verify card on every login (stale-flag loop).
             try { await u.reload(); } catch (_) {}
             const fresh = window._auth.currentUser || u;
+            // Anonymous preview sessions (book/display/frontdesk share the
+            // browser auth state) have no email — they are not admins. Never
+            // route them to the verification card (would surface
+            // auth/missing-email on resend). Show the login card instead.
+            if (!fresh || !fresh.email) { showLoggedOutState(); return; }
             activeAdminUser = fresh;
             if (!fresh.emailVerified) {
               renderEmailVerificationState(fresh);
@@ -424,7 +429,7 @@
       btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> ' + l10n('admin.sending', 'Sending...');
       try {
         const u = window._auth.currentUser;
-        if (!u) throw new Error(l10n('admin.err.session', 'Session expired — sign in again.'));
+        if (!u || !u.email) throw new Error(l10n('admin.err.session', 'Session expired — sign in again.'));
         await window._useAuth.sendEmailVerification(u);
         showToast(l10n('admin.ok.verifySend', 'Verification email sent — check inbox & spam.'), false, 4500);
       } catch (e) {
@@ -441,7 +446,7 @@
       btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> ' + l10n('admin.checking', 'Checking...');
       try {
         const u = window._auth.currentUser;
-        if (!u) throw new Error(l10n('admin.err.session', 'Session expired — sign in again.'));
+        if (!u || !u.email) throw new Error(l10n('admin.err.session', 'Session expired — sign in again.'));
         await u.reload();
         const fresh = window._auth.currentUser;
         if (fresh && fresh.emailVerified) {
