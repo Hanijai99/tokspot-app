@@ -3,29 +3,162 @@ service cloud.firestore {
   match /databases/{database}/documents {
 
     // ============================================================
-    //  TokSpot Firestore rules — PROTOTYPE posture (live now)
+    //  TokSpot Firestore rules — LITE/PROTOTYPE posture (live now)
     // ============================================================
-    //  This is the ruleset the UN-MIGRATED prototype runs against
-    //  (the "old permissive security posture" referenced in
-    //  PRODUCTION_READINESS.md). Every page signs into Firebase
-    //  first — anonymously for public flows (book, frontdesk,
-    //  doctor-login, display, feedback, token, track, qr) or
-    //  email/password for admin/analytics — so signed-in users
-    //  may read and write tenant data.
+    //  This mirrors the rules currently deployed in the Firebase
+    //  console (tokenonspot) with MINIMAL additions needed for the
+    //  un-migrated prototype to work end-to-end:
+    //    1. doctors: doctor self-service updates (Break toggle and
+    //       Daily token limit) — field-restricted, was admin-only.
+    //    2. rooms:        were default-deny (admin.html room setup).
+    //    3. appointments: were default-deny (book + front-desk
+    //       advanced appointments / no-show / check-in).
+    //    4. feedback:     were default-deny (patient feedback form).
+    //    5. queueState:   were default-deny (doctor Call/Skip/Complete
+    //       active-token lock in js/queue-domain.js).
     //
-    //  SECURITY: cooperative-client posture only. No real patient
-    //  data may be loaded while this ruleset is live.
-    //
-    //  The hardened default-deny policy is preserved verbatim in
-    //  firestore.rules.target. It must be deployed ONLY TOGETHER
-    //  with the Functions migration (rules + functions together,
-    //  never rules alone). At that gate, point firebase.json at
-    //  firestore.rules.target and deploy both in one go.
+    //  Security posture: cooperative-client, signed-in users, no real
+    //  patient data. The hardened default-deny policy lives verbatim in
+    //  firestore.rules.target and is deployed ONLY TOGETHER with the
+    //  Functions migration (rules + functions together, never alone).
     // ============================================================
 
-    match /{document=**} {
-      allow read: if request.auth != null;
-      allow write: if request.auth != null;
+    // ---------- Helpers ----------
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    // Admin = the email/password account stored on the hospital doc.
+    function isAdmin(slug) {
+      return signedIn() && (
+        get(/databases/$(database)/documents/hospitals/$(slug)).data.adminUid == request.auth.uid ||
+        get(/databases/$(database)/documents/hospitals/$(slug)).data.adminEmail == request.auth.token.email
+      );
+    }
+
+    // Keys a doctor may change from their own desk (Break + Daily limit).
+    function isDoctorSelfServiceUpdate() {
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+        'onBreak', 'breakNote', 'breakUpdatedAt',
+        'dailyLimit', 'dailyLimitUpdatedAt'
+      ]);
+    }
+
+    // ---------- Booking codes ----------
+    match /codes/{codeId} {
+      allow get, list: if signedIn();
+      allow create, update: if signedIn() &&
+        request.resource.data.slug is string &&
+        isAdmin(request.resource.data.slug);
+      allow delete: if signedIn() &&
+        resource.data.slug is string &&
+        isAdmin(resource.data.slug);
+    }
+
+    // ---------- Hospitals ----------
+    match /hospitals/{slug} {
+      allow get, list: if signedIn();
+      allow create: if signedIn();
+      allow update: if signedIn();
+      allow delete: if isAdmin(slug);
+    }
+
+    // ---------- Doctors: subcollection ----------
+    match /hospitals/{slug}/doctors/{docId} {
+      allow get, list: if signedIn();
+      allow create, delete: if isAdmin(slug);
+      // Admin may change anything; any signed-in (prototype code-login
+      // desk) may update ONLY the doctor's own Break + Daily-limit fields.
+      allow update: if isAdmin(slug) || isDoctorSelfServiceUpdate();
+    }
+
+    // ---------- Doctors: root mirror ----------
+    match /doctors/{docId} {
+      allow get, list: if signedIn();
+      allow create, update: if signedIn() &&
+        request.resource.data.hospitalSlug is string &&
+        get(/databases/$(database)/documents/hospitals/$(request.resource.data.hospitalSlug)).data.adminUid == request.auth.uid;
+      allow delete: if signedIn() &&
+        resource.data.hospitalSlug is string &&
+        get(/databases/$(database)/documents/hospitals/$(resource.data.hospitalSlug)).data.adminUid == request.auth.uid;
+    }
+
+    // ---------- Tokens ----------
+    match /hospitals/{slug}/tokens/{tokenId} {
+      allow get, list: if signedIn();
+      allow create: if signedIn() &&
+        request.resource.data.id == tokenId &&
+        request.resource.data.hospitalId == slug &&
+        request.resource.data.date is string &&
+        request.resource.data.status in ['waiting', 'called'];
+      allow update: if signedIn() &&
+        request.resource.data.id == tokenId &&
+        request.resource.data.status in ['waiting', 'called', 'completed', 'skipped', 'canceled', 'expired'];
+      allow delete: if isAdmin(slug);
+    }
+
+    // ---------- Counters ----------
+    match /hospitals/{slug}/counters/{date} {
+      allow get, write: if signedIn();
+    }
+
+    // ---------- Patients ----------
+    match /hospitals/{slug}/patients/{phone} {
+      allow get, list: if signedIn();
+      allow create, update: if signedIn();
+      allow delete: if isAdmin(slug);
+    }
+
+    // ---------- Rooms ----------
+    match /hospitals/{slug}/rooms/{roomId} {
+      allow get, list: if signedIn();
+      allow create, update, delete: if isAdmin(slug);
+    }
+
+    // ---------- Appointments (advanced booking) ----------
+    match /hospitals/{slug}/appointments/{apptId} {
+      allow get, list: if signedIn();
+      allow create: if signedIn() &&
+        request.resource.data.date is string &&
+        request.resource.data.status in ['booked', 'confirmed', 'arrived', 'no-show', 'canceled'];
+      allow update: if signedIn() &&
+        request.resource.data.status in ['booked', 'confirmed', 'arrived', 'no-show', 'canceled'];
+      allow delete: if isAdmin(slug);
+    }
+
+    // ---------- Feedback (patient survey) ----------
+    match /hospitals/{slug}/feedback/{fbId} {
+      allow get, list: if signedIn();
+      // One per token is enforced by the app; rating must be present.
+      allow create: if signedIn() && request.resource.data.rating is number;
+      allow update, delete: if false;
+    }
+
+    // ---------- queueState (active-token lock) ----------
+    // Prototype transitions (Call/Skip/Complete) keep the per-doctor/
+    // per-day active lock here; Functions owns it at the migration gate.
+    match /hospitals/{slug}/queueState/{lockId} {
+      allow get, list: if signedIn();
+      allow create, update, delete: if signedIn();
+    }
+
+    // ---------- Prescriptions (Pharmacy queue) ----------
+    match /hospitals/{slug}/prescriptions/{rxId} {
+      allow get, list: if signedIn();
+      allow create: if signedIn();
+      allow update: if signedIn();
+      allow delete: if isAdmin(slug);
+    }
+
+    // ---------- Users (patient profiles) ----------
+    match /users/{uid} {
+      allow get, list, create, update: if signedIn() && request.auth.uid == uid;
+    }
+
+    // ---------- SMS queue ----------
+    match /sms_queue/{docId} {
+      allow create: if signedIn();
+      allow read, update, delete: if false;
     }
   }
 }
