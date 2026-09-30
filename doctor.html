@@ -86,6 +86,15 @@
       <button class="sec-btn" id="btnBreakToggle" onclick="toggleBreak()" style="display:none;background:#7c3aed;color:#fff;border:none;padding:8px 14px;border-radius:10px;font-weight:800;cursor:pointer;"><i class="fa-solid fa-mug-hot"></i> <span id="btnBreakLabel" data-i18n="doctor.breakOn">Start Break</span></button>
     </div>
 
+    <!-- Daily Token Limit (doctor self-service — change any time) -->
+    <div class="limit-bar" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:#0f172a;border:1px solid #334155;border-radius:12px;padding:10px 14px;margin:12px 0;">
+      <span style="font-size:.78rem;font-weight:800;color:#94a3b8;letter-spacing:1px;text-transform:uppercase;"><i class="fa-solid fa-ticket"></i> <span data-i18n="doctor.dailyLimit.title">Daily Token Limit</span></span>
+      <input type="number" id="dailyLimitInput" min="0" max="999" style="width:86px;padding:7px 10px;border-radius:8px;border:1px solid #334155;background:#0B1120;color:#f8fafc;font-weight:800;" placeholder="0" data-i18n-ph="doctor.dailyLimit.ph" />
+      <span style="font-size:.8rem;color:#8BBB92;font-weight:700;" id="dailyLimitStatus"></span>
+      <span class="spacer"></span>
+      <button class="sec-btn" id="btnDailyLimit" onclick="saveDailyLimit()" style="background:#2A835F;color:#fff;border:none;padding:7px 14px;border-radius:8px;font-weight:800;cursor:pointer;"><i class="fa-solid fa-floppy-disk"></i> <span data-i18n="doctor.dailyLimit.save">Save Limit</span></button>
+    </div>
+
     <!-- Active Consultation Card -->
     <div class="current-card" id="activeCard">
       <div style="font-size:0.82rem;text-transform:uppercase;color:#94a3b8;letter-spacing:1.5px;font-weight:700;" data-i18n="doctor.current">
@@ -229,6 +238,11 @@
       doctorOnBreak = Boolean(activeDoctorProfile.onBreak);
       refreshBreakUI();
 
+      // Daily token limit control (doctor self-service — change any time)
+      const limInput = document.getElementById('dailyLimitInput');
+      if (limInput) limInput.value = activeDoctorProfile.dailyLimit || 0;
+      refreshDailyLimitStatus();
+
       // Start Security Listener & Queue Listener
       listenDoctorSecurity();
       listenDoctorQueue();
@@ -258,6 +272,37 @@
       }, (err) => {
         console.warn('Security watcher note:', err);
       });
+    }
+
+    // ---- Daily token limit (doctor self-service) ----
+    function refreshDailyLimitStatus() {
+      const n = Number(activeDoctorProfile.dailyLimit || 0);
+      const status = document.getElementById('dailyLimitStatus');
+      if (status) {
+        status.textContent = n > 0
+          ? l10n('doctor.dailyLimit.count', 'Max %s patients/day').replace('%s', n)
+          : l10n('doctor.dailyLimit.unlimited', 'Unlimited');
+      }
+    }
+
+    async function saveDailyLimit() {
+      const input = document.getElementById('dailyLimitInput');
+      const n = Math.floor(Number(String(input.value || '').trim()));
+      if (!Number.isFinite(n) || n < 0 || n > 999) {
+        return showToast(l10n('doctor.dailyLimit.err', 'Enter a number between 0 and 999 (0 = unlimited).'), true);
+      }
+      const btn = document.getElementById('btnDailyLimit');
+      if (btn) btn.disabled = true;
+      try {
+        await window.TokSpotAPI.setDoctorDailyLimit({ slug: currentHospitalSlug, doctorId: activeDoctorProfile.id, dailyLimit: n });
+        activeDoctorProfile.dailyLimit = n;
+        refreshDailyLimitStatus();
+        showToast(l10n('doctor.dailyLimit.saved', 'Daily token limit updated.'));
+      } catch (e) {
+        showToast(l10n('doctor.dailyLimit.err', 'Could not update limit: ') + e.message, true);
+      } finally {
+        if (btn) btn.disabled = false;
+      }
     }
 
     function toggleBreak() {

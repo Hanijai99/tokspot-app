@@ -73,6 +73,9 @@
       <div class="muted" style="font-size: 0.88rem; margin-bottom: 16px;" data-i18n="book.find.sub">
         Search by Hospital Name, City, or enter your 4-digit booking code.
       </div>
+
+      <!-- In-app appointment reminder (today / tomorrow) -->
+      <div class="hidden" id="myApptReminder" style="margin-bottom:16px;border:1px solid var(--green);background:#ECF6EF;border-radius:12px;padding:10px 14px;font-size:.85rem;font-weight:700;color:#0f766e;"></div>
       
       <div class="search-wrapper">
         <input class="input" id="hospitalSearchInput" type="text" placeholder="e.g. Apollo or HOSP-1234" autocomplete="off" oninput="handleSearch()" style="font-weight:700; padding:14px 16px;" data-i18n-ph="book.search.ph" />
@@ -120,6 +123,9 @@
       <div class="field">
         <label class="label"><span data-i18n="book.step.phone">Mobile Number</span> <span class="req">*</span> <span class="muted" data-i18n="book.step.phone.sub">(for live queue alerts)</span></label>
         <input class="input" id="patPhone" type="tel" maxlength="10" placeholder="10-digit mobile number" data-i18n-ph="book.phone.ph" />
+
+        <label class="label" style="margin-top:12px;"><i class="fa-solid fa-envelope"></i> <span data-i18n="book.email.label">Email (optional — for advanced-appointment reminders by email)</span></label>
+        <input class="input" id="patEmail" type="email" placeholder="you@example.com" data-i18n-ph="book.email.ph" />
       </div>
 
       <button class="btn btn-green btn-block btn-lg mt-20" id="btnSubmitToken" onclick="generatePatientToken()">
@@ -177,6 +183,44 @@
     const FUNC = window.TokSpotAPI && window.TokSpotAPI.mode() === 'functions';
     const resolvedHospitalCache = {};
 
+    // ---- In-app appointment reminders (my upcoming bookings) ----
+    const MY_APPTS_KEY = 'tokspot_my_appts';
+    function loadMyAppts() {
+      try { return JSON.parse(localStorage.getItem(MY_APPTS_KEY) || '[]'); } catch (_) { return []; }
+    }
+    function saveMyAppts(list) {
+      localStorage.setItem(MY_APPTS_KEY, JSON.stringify(list.slice(-12)));
+    }
+    function addMyAppt(a) {
+      const list = loadMyAppts().filter((x) => x.id !== a.id);
+      list.push({ ...a, at: Date.now() });
+      saveMyAppts(list);
+      renderMyApptReminder();
+    }
+    function removeMyAppt(id) {
+      saveMyAppts(loadMyAppts().filter((x) => x.id !== id));
+      renderMyApptReminder();
+    }
+    function renderMyApptReminder() {
+      const wrap = document.getElementById('myApptReminder');
+      if (!wrap) return;
+      const today = window.todayStr ? window.todayStr() : new Date().toISOString().slice(0, 10);
+      const tomorrow = new Date(new Date(today + 'T00:00:00Z').getTime() + 86400000).toISOString().slice(0, 10);
+      const soon = loadMyAppts().filter((a) => a.date === today || a.date === tomorrow).slice(0, 2);
+      if (!soon.length) { wrap.classList.add('hidden'); return; }
+      wrap.classList.remove('hidden');
+      wrap.innerHTML = soon.map((a) => {
+        const when = a.date === today
+          ? l10n('book.reminder.today', 'Appointment TODAY at %s').replace('%s', a.slotStart)
+          : l10n('book.reminder.tomorrow', 'Appointment TOMORROW at %s').replace('%s', a.slotStart);
+        const place = [a.hospitalName, a.doctorName].filter(Boolean).join(' · ');
+        return '<div style="display:flex;align-items:center;gap:10px;justify-content:space-between;">' +
+          '<span><i class="fa-solid fa-calendar-check"></i> <b>' + escHtml(when) + '</b>' +
+          (place ? ' — ' + escHtml(place) : '') + '</span>' +
+          '<button class="btn btn-sm btn-slate" style="padding:4px 8px;border-radius:8px;font-weight:700;" onclick="removeMyAppt(\'' + escHtml(a.id) + '\')">' + l10n('book.reminder.remove', 'Remove') + '</button></div>';
+      }).join('<div style="height:8px;"></div>');
+    }
+
     async function ensureAuth() {
       if (!window._auth.currentUser) {
         try { await window._useAuth.signInAnonymously(window._auth); } catch (e) {}
@@ -193,6 +237,7 @@
 
       await ensureAuth();
       await loadHospitalDirectory();
+      renderMyApptReminder();
 
       const params = new URLSearchParams(window.location.search);
       const urlCode = params.get('code') || params.get('h');
@@ -583,6 +628,7 @@
     async function generatePatientToken() {
       const name = document.getElementById('patName').value.trim();
       const phone = document.getElementById('patPhone').value.trim().replace(/\D/g, '');
+      const email = document.getElementById('patEmail').value.trim();
       const btn = document.getElementById('btnSubmitToken');
 
       if (!name) return showToast(l10n('book.err.name', 'Please enter patient name.'), true);
@@ -590,6 +636,9 @@
       if (!selectedDoctorId) return showToast(l10n('book.err.doctor', 'Please select a doctor.'), true);
 
       const isAppointment = Boolean(apptDate && apptSlot);
+      if (isAppointment && email && !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) {
+        return showToast(l10n('book.err.email', 'Please enter a valid email address.'), true);
+      }
 
       btn.disabled = true;
 
@@ -605,6 +654,7 @@
               slotStart: apptSlot,
               name,
               phone,
+              email,
             });
           } else {
             await window._fs.addDoc(
@@ -616,6 +666,7 @@
                 slotStart: apptSlot,
                 patientName: name,
                 phone,
+                email: email || null,
                 status: 'booked',
                 tokenId: null,
                 createdBy: 'patient',
@@ -623,6 +674,13 @@
               }
             );
           }
+          addMyAppt({
+            id: apptDate + '_' + apptSlot,
+            date: apptDate,
+            slotStart: apptSlot,
+            doctorName: selectedDoctorName || 'Doctor',
+            hospitalName: document.getElementById('dispHospitalName') ? document.getElementById('dispHospitalName').textContent : '',
+          });
           const parts = apptDate.split('-');
           const niceDate = `${parts[2]}/${parts[1]}/${parts[0]}`;
           showToast(l10n('book.ok.appt', `Appointment booked for ${niceDate} at ${apptSlot}!`).replace('%s', niceDate).replace('%s', apptSlot));

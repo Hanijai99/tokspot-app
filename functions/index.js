@@ -186,6 +186,26 @@ async function enqueueNotify(slug, phone, body, channel) {
   }
 }
 
+// Email reminder outbox: same design as sms_queue but for addresses.
+// Consumed by flushEmailOutbox (provider adapter plugs in there).
+async function enqueueEmailNotify(slug, to, subject, body) {
+  if (!to) return;
+  try {
+    await db.collection('email_queue').add({
+      slug,
+      to: String(to).trim().slice(0, 120),
+      subject: String(subject || '').slice(0, 140),
+      body: String(body || '').slice(0, 600),
+      status: 'pending',
+      provider: null,
+      attempts: 0,
+      createdAt: new Date(),
+    });
+  } catch (err) {
+    console.error('email enqueue failed', slug, err.message);
+  }
+}
+
 // Enqueue every channel the hospital has enabled (default: SMS only).
 // `hospital.notifyChannels` is set by the admin, e.g. ['sms','whatsapp'].
 function channelsFor(hospital) {
@@ -249,21 +269,40 @@ exports.issueToken = onCall({ maxInstances: 10, rateLimiting: RL.issue }, async 
         }
       }
 
-      // 1) Number uniqueness: single counter, incremented inside the txn.
+      // 1) Doctor's daily token limit (0/unset = unlimited). Counted inside
+      //    the txn so concurrent calls cannot exceed the cap; canceled rows
+      //    free a slot. The doctor can adjust the limit any time via
+      //    setDoctorDailyLimit (self-service) or the admin desk.
+      const dSnap = await tx.get(db.doc(`hospitals/${slug}/doctors/${doctorId}`));
+      const dailyLimit = dSnap.exists ? Number(dSnap.data().dailyLimit || 0) : 0;
+      if (dailyLimit > 0) {
+        const dayTokens = await tx.get(db.collection(`hospitals/${slug}/tokens`)
+          .where('doctorId', '==', doctorId).where('date', '==', today));
+        let issuedToday = 0;
+        dayTokens.forEach((d) => {
+          if (normalizeStatus(d.data().status) !== 'canceled') issuedToday++;
+        });
+        if (issuedToday >= dailyLimit) {
+          throw new HttpsError('resource-exhausted',
+            `This doctor's daily token limit of ${dailyLimit} has been reached. Please try again tomorrow.`);
+        }
+      }
+
+      // 2) Number uniqueness: single counter, incremented inside the txn.
       const counterRef = db.doc(`hospitals/${slug}/counters/${today}`);
       const cSnap = await tx.get(counterRef);
       const next = (cSnap.exists ? Number(cSnap.data().count || 0) : 0) + 1;
       if (!Number.isSafeInteger(next)) throw new Error('Counter overflow.');
       tx.set(counterRef, { count: next }, { merge: true });
 
-      // 2) Per-day per-phone quota (client check is advisory only).
+      // 3) Per-day per-phone quota (client check is advisory only).
       if (cleanPhone) {
         const q = await tx.get(db.collection(`hospitals/${slug}/tokens`)
           .where('phone', '==', cleanPhone).where('date', '==', today));
         if (q.size >= 2) throw new HttpsError('resource-exhausted', 'Phone number reached its 2-token daily limit.');
       }
 
-      // 3) Unguessable document id = the patient's live-pass capability.
+      // 4) Unguessable document id = the patient's live-pass capability.
       tokenId = db.collection(`hospitals/${slug}/tokens`).doc().id;
       number = String(next).padStart(3, '0');
       tx.set(db.doc(`hospitals/${slug}/tokens/${tokenId}`), {
@@ -463,6 +502,38 @@ exports.setDoctorBreak = onCall({ rateLimiting: RL.myProfile }, async (request) 
   await db.doc(`hospitals/${slug}/doctors/${doctorId}`).update(update);
   await audit(uid, slug, onBreak ? 'doctor:break-on' : 'doctor:break-off', doctorId, 'ok', { breakNote: update.breakNote });
   return { ok: true, onBreak: update.onBreak };
+});
+
+// ------------------------------------------------------------------
+//  setDoctorDailyLimit — doctor self-service or admin: sets the cap on
+//  how many tokens the doctor accepts per day (0 = unlimited). The
+//  doctor can change it at any time; every change is audited. Enforced
+//  server-side in issueToken and checkInAppointment.
+// ------------------------------------------------------------------
+exports.setDoctorDailyLimit = onCall({ rateLimiting: RL.myProfile }, async (request) => {
+  const { slug, doctorId, dailyLimit } = request.data || {};
+  if (!slug || !doctorId) throw new HttpsError('invalid-argument', 'slug + doctorId required.');
+  const uid = request.auth && request.auth.uid;
+  if (!uid) throw new HttpsError('unauthenticated', 'Sign in required.');
+
+  const hospital = await loadHospital(slug);
+  if (!hospital) throw new HttpsError('not-found', 'Hospital not found.');
+
+  const isAdmin = hospital.adminUid === uid ||
+    hospital.adminEmail === (request.auth.token && request.auth.token.email);
+  const dSnap = await db.doc(`hospitals/${slug}/doctors/${doctorId}`).get();
+  if (!dSnap.exists) throw new HttpsError('not-found', 'Doctor not found.');
+  if (!isAdmin && dSnap.data().authUid !== uid) {
+    throw new HttpsError('permission-denied', 'Not authorized for this doctor.');
+  }
+
+  const n = Math.floor(Number(dailyLimit));
+  if (!Number.isFinite(n) || n < 0 || n > 999) {
+    throw new HttpsError('invalid-argument', 'dailyLimit must be a whole number 0-999 (0 = unlimited).');
+  }
+  await dSnap.ref.update({ dailyLimit: n, dailyLimitUpdatedAt: new Date().toISOString() });
+  await audit(uid, slug, 'doctor:daily-limit', doctorId, 'ok', { dailyLimit: n });
+  return { ok: true, dailyLimit: n };
 });
 
 // ------------------------------------------------------------------
@@ -798,7 +869,7 @@ exports.listAvailableSlots = onCall({ rateLimiting: RL.listSlots }, async (reque
 });
 
 exports.createAppointment = onCall({ rateLimiting: RL.createAppt }, async (request) => {
-  const { slug, doctorId, date, slotStart, name, phone } = request.data || {};
+  const { slug, doctorId, date, slotStart, name, phone, email } = request.data || {};
   if (!slug || !doctorId || !date || !slotStart) {
     throw new HttpsError('invalid-argument', 'slug + doctorId + date + slotStart required.');
   }
@@ -806,6 +877,10 @@ exports.createAppointment = onCall({ rateLimiting: RL.createAppt }, async (reque
   if (!hospital) throw new HttpsError('not-found', 'Hospital not found.');
   const cleanName = String(name || '').trim().slice(0, 60);
   const cleanPhone = String(phone || '').replace(/\D/g, '').slice(-10);
+  const cleanEmail = String(email || '').trim().slice(0, 120);
+  if (cleanEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(cleanEmail)) {
+    throw new HttpsError('invalid-argument', 'A valid email address is required for the reminder.');
+  }
   if (!cleanName) throw new HttpsError('invalid-argument', 'Patient name required.');
   if (!cleanPhone || cleanPhone.length < 10) throw new HttpsError('invalid-argument', 'Valid 10-digit phone required.');
 
@@ -842,6 +917,7 @@ exports.createAppointment = onCall({ rateLimiting: RL.createAppt }, async (reque
       slotStart,
       patientName: cleanName,
       phone: cleanPhone,
+      email: cleanEmail || null,
       status: 'booked',
       tokenId: null,
       createdBy: 'patient',
@@ -904,6 +980,23 @@ exports.checkInAppointment = onCall({ rateLimiting: RL.apptCheckIn }, async (req
       throw new HttpsError('failed-precondition', 'This appointment is not check-in-able today (already checked in or completed).');
     }
     phone = String(a.phone || '');
+
+    // Doctor's daily token limit (0/unset = unlimited). Counted inside the
+    // txn so concurrent check-ins cannot exceed the cap.
+    const dSnap2 = await tx.get(db.doc(`hospitals/${slug}/doctors/${a.doctorId}`));
+    const dailyLimit = dSnap2.exists ? Number(dSnap2.data().dailyLimit || 0) : 0;
+    if (dailyLimit > 0) {
+      const dayTokens = await tx.get(db.collection(`hospitals/${slug}/tokens`)
+        .where('doctorId', '==', a.doctorId).where('date', '==', today));
+      let issuedToday = 0;
+      dayTokens.forEach((d) => {
+        if (normalizeStatus(d.data().status) !== 'canceled') issuedToday++;
+      });
+      if (issuedToday >= dailyLimit) {
+        throw new HttpsError('resource-exhausted',
+          `This doctor's daily token limit of ${dailyLimit} has been reached. Please try again tomorrow.`);
+      }
+    }
 
     // Number uniqueness: the same daily counter the desk uses.
     const counterRef = db.doc(`hospitals/${slug}/counters/${today}`);
@@ -1002,23 +1095,40 @@ async function runAppointmentSweep(slug, hospital) {
       noShowsMarked++;
       return;
     }
-    // Within the next 2 hours → one reminder per visit.
-    if (minsUntil > 0 && minsUntil <= 120 && !a.reminderSent2h && a.phone) {
-      await notifyPatient(slug, hospital, a.phone,
-        `Reminder: Your appointment at ${hospital.name || slug} is at ${a.slotStart}. Please be ready — you are next in line soon.`);
+    // Within the next 2 hours → one reminder per visit (SMS/WhatsApp via
+    // the outbox, plus an email when the patient left one).
+    if (minsUntil > 0 && minsUntil <= 120 && !a.reminderSent2h && (a.phone || a.email)) {
+      const cleanMail = String(a.email || '').trim();
+      if (a.phone) {
+        await notifyPatient(slug, hospital, a.phone,
+          `Reminder: Your appointment at ${hospital.name || slug} is at ${a.slotStart}. Please be ready — you are next in line soon.`);
+      }
+      if (cleanMail) {
+        await enqueueEmailNotify(slug, cleanMail,
+          `Appointment reminder today — ${hospital.name || slug}`,
+          `Hi ${a.patientName || 'there'},\n\nThis is a reminder that your appointment at ${hospital.name || slug} is TODAY at ${a.slotStart}.\nPlease be ready — you are next in line soon.\n\nRegards,\n${hospital.name || slug}`);
+      }
       await d.ref.update({ reminderSent2h: new Date() });
       remindersSent++;
     }
   }));
 
-  // Tomorrow: single day-before reminder.
+  // Tomorrow: single day-before reminder (SMS/WhatsApp + email).
   const tomorrowDocs = await db.collection(`hospitals/${slug}/appointments`)
     .where('date', '==', tomorrow).where('status', '==', 'booked').get();
   await Promise.all(tomorrowDocs.docs.map(async (d) => {
     const a = d.data();
-    if (a.reminderSent1d || !a.phone) return;
-    await notifyPatient(slug, hospital, a.phone,
-      `Reminder: Your appointment at ${hospital.name || slug} is tomorrow at ${a.slotStart}. Please arrive 10 minutes early.`);
+    const cleanMail = String(a.email || '').trim();
+    if (a.reminderSent1d || !(a.phone || cleanMail)) return;
+    if (a.phone) {
+      await notifyPatient(slug, hospital, a.phone,
+        `Reminder: Your appointment at ${hospital.name || slug} is tomorrow at ${a.slotStart}. Please arrive 10 minutes early.`);
+    }
+    if (cleanMail) {
+      await enqueueEmailNotify(slug, cleanMail,
+        `Your appointment tomorrow — ${hospital.name || slug}`,
+        `Hi ${a.patientName || 'there'},\n\nThis is a reminder that your appointment at ${hospital.name || slug} is TOMORROW at ${a.slotStart}.\nPlease arrive 10 minutes early.\n\nRegards,\n${hospital.name || slug}`);
+    }
     await d.ref.update({ reminderSent1d: new Date() });
     remindersSent++;
   }));
@@ -1307,6 +1417,7 @@ exports.getMyDoctorProfile = onCall({ rateLimiting: RL.myProfile }, async (reque
     name: d.name || '',
     department: d.department || '',
     room: d.room || d.counter || d.department || 'Consultation Room',
+    dailyLimit: d.dailyLimit ? Number(d.dailyLimit) : 0,
     hospitalSlug: slug,
     hospitalName: hospital.name || slug,
     hospitalCode: hospital.hospitalCode || '',
@@ -1332,9 +1443,17 @@ exports.registerPushToken = onCall({ rateLimiting: RL.pushToken }, async (reques
 //  provisionDoctor / revokeDoctor — no PINs, ever
 // ------------------------------------------------------------------
 exports.provisionDoctor = onCall({ rateLimiting: RL.provision }, async (request) => {
-  const { slug, doctorId, email, name, department, room } = request.data || {};
+  const { slug, doctorId, email, name, department, room, dailyLimit } = request.data || {};
   await assertAdmin(request, slug);
   if (!email || !doctorId) throw new HttpsError('invalid-argument', 'email + doctorId required.');
+
+  let limitValue = 0;
+  if (dailyLimit !== undefined && dailyLimit !== null && dailyLimit !== '') {
+    limitValue = Math.floor(Number(dailyLimit));
+    if (!Number.isFinite(limitValue) || limitValue < 0 || limitValue > 999) {
+      throw new HttpsError('invalid-argument', 'dailyLimit must be a whole number 0-999 (0 = unlimited).');
+    }
+  }
 
   let user;
   try {
@@ -1346,7 +1465,8 @@ exports.provisionDoctor = onCall({ rateLimiting: RL.provision }, async (request)
 
   await db.doc(`hospitals/${slug}/doctors/${doctorId}`).set({
     authUid: user.uid, email, name: name || doctorId, department: department || '',
-    room: room || '', status: 'active', hospitalSlug: slug, updatedAt: new Date(),
+    room: room || '', status: 'active', hospitalSlug: slug, dailyLimit: limitValue,
+    updatedAt: new Date(),
   }, { merge: true });
 
   await audit(request.auth.uid, slug, 'doctor:provision', doctorId, 'ok', { authUid: user.uid });
@@ -1418,6 +1538,31 @@ exports.flushWhatsAppOutbox = onCall({ rateLimiting: RL.smsFlush }, async (reque
     d.ref.update({ status: 'sent', provider: 'whatsapp-console-stub', sentAt: new Date(), attempts: (d.data().attempts || 0) + 1 })));
   sent = pending.size;
   await audit(request.auth.uid, slug, 'whatsapp:flush', null, 'ok', { sent });
+  return { sent };
+});
+
+// ------------------------------------------------------------------
+//  flushEmailOutbox — admin-triggered processing of pending email
+//  reminder rows (channel 'email'). Plug a provider adapter (Resend /
+//  SendGrid / SES) into the loop below; until then rows are marked
+//  sent with a console log so the pipeline stays testable end-to-end.
+// ------------------------------------------------------------------
+exports.flushEmailOutbox = onCall({ rateLimiting: RL.smsFlush }, async (request) => {
+  const { slug } = request.data || {};
+  await assertAdmin(request, slug);
+  const pending = await db.collection('email_queue')
+    .where('slug', '==', slug).where('status', '==', 'pending').limit(30).get();
+  let sent = 0;
+  // NOTE: email provider adapter goes here (Resend/SendGrid/SES send,
+  // record provider message id). The console stub keeps it testable.
+  pending.forEach((d) => {
+    const row = d.data();
+    console.log('[email-outbox:stub] would send to', row.to, '=>', row.subject);
+  });
+  await Promise.all(pending.docs.map((d) =>
+    d.ref.update({ status: 'sent', provider: 'email-console-stub', sentAt: new Date(), attempts: (d.data().attempts || 0) + 1 })));
+  sent = pending.size;
+  await audit(request.auth.uid, slug, 'email:flush', null, 'ok', { sent });
   return { sent };
 });
 
@@ -1506,6 +1651,8 @@ exports.retentionRunner = onSchedule({ schedule: '30 4 * * *', timeZone: 'Asia/K
     () => db.collection('auditLog'), 'at', new Date(t - RETENTION_AUDIT_DAYS * 864e5), 400);
   results.sms = await deleteWhereOlderThan(
     () => db.collection('sms_queue'), 'createdAt', new Date(t - RETENTION_SMS_DAYS * 864e5), 400);
+  results.email = await deleteWhereOlderThan(
+    () => db.collection('email_queue'), 'createdAt', new Date(t - RETENTION_SMS_DAYS * 864e5), 400);
   // Feedback rows are date-keyed strings, so purge by the date field.
   results.feedback = await deleteWhereOlderThan(
     () => db.collectionGroup('feedback'), 'date', daysAgoIso(RETENTION_FEEDBACK_DAYS, t), 400);

@@ -176,6 +176,14 @@
             <div class="field"><label class="label" data-i18n="admin.docStatus">Status</label><select class="input" id="docStatus"><option value="open" data-i18n="common.open">Open</option><option value="closed" data-i18n="common.closed">Closed</option></select></div>
           </div>
 
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px;">
+            <div class="field"><label class="label" data-i18n="admin.docDailyLimit">Daily Token Limit</label><input class="input" id="docDailyLimit" type="number" min="0" max="999" placeholder="0 = unlimited" data-i18n-ph="admin.docDailyLimitPh" /></div>
+            <div class="field">
+              <label class="label" data-i18n="admin.docLimitNote">How it works</label>
+              <div class="muted" style="font-size:0.8rem;line-height:1.5;" data-i18n="admin.docLimitNoteSub">Doctor can also change this anytime from their desk. 0 = unlimited tokens.</div>
+            </div>
+          </div>
+
           <div class="btn-row mt-16">
             <button class="btn btn-green" id="btnSaveDoctor" onclick="saveDoctor()"><i class="fa-solid fa-floppy-disk"></i> <span data-i18n="admin.saveDoctor">Save Doctor</span></button>
             <button class="btn btn-slate" onclick="cancelDoctorEdit()"><span data-i18n="common.cancel">Cancel</span></button>
@@ -686,11 +694,14 @@
           const statusBadge = doc.status === 'closed' ? '<span class="badge red">' + l10n('common.closed', 'Closed') + '</span>' : '<span class="badge green">' + l10n('common.open', 'Open') + '</span>';
           const pinBadge = '';
           const roomBadge = doc.room ? `<span class="badge blue">${escHtml(doc.room)}</span>` : '';
+          const limitBadge = Number(doc.dailyLimit || 0) > 0
+            ? `<span class="badge blue">${l10n('admin.docLimitBadge', 'Max %s/day').replace('%s', doc.dailyLimit)}</span>`
+            : `<span class="badge slate">${l10n('admin.docLimitNone', 'Unlimited')}</span>`;
 
           list.innerHTML += `<div class="mgmt-card" style="padding:14px;border-radius:12px;background:var(--bg);border:1px solid var(--line);margin-bottom:10px;">
             <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
               <div style="flex:1;min-width:200px;">
-                <div style="font-weight:700;color:var(--ink);">${escHtml(doc.name || docId)} ${statusBadge} ${pinBadge} ${roomBadge}</div>
+                <div style="font-weight:700;color:var(--ink);">${escHtml(doc.name || docId)} ${statusBadge} ${pinBadge} ${roomBadge} ${limitBadge}</div>
                 <div class="muted" style="font-size:.82rem;margin-top:2px;">${escHtml(doc.department || l10n('admin.general', 'General'))} ${doc.email ? '· ' + escHtml(doc.email) : ''}</div>
                 <div class="muted" style="font-size:.78rem;margin-top:2px;"><i class="fa-solid fa-clock"></i> ${scheduleSummary(doc.schedule)}</div>
               </div>
@@ -764,6 +775,7 @@
       document.getElementById('docEmail').value = '';
       document.getElementById('docPin').value = '';
       document.getElementById('docRoom').value = '';
+      document.getElementById('docDailyLimit').value = '0';
       document.getElementById('docEmail').disabled = false;
       document.getElementById('doctorForm').classList.remove('hidden'); 
     }
@@ -872,6 +884,7 @@
         document.getElementById('docPin').value = '';
         document.getElementById('docPin').placeholder = l10n('admin.docPinPh', 'Disabled pending secure account provisioning');
         document.getElementById('docRoom').value = doc.room || doc.counter || '';
+        document.getElementById('docDailyLimit').value = doc.dailyLimit || 0;
         document.getElementById('docStatus').value = doc.status || 'open';
       } catch (e) { console.error(e); }
     }
@@ -883,6 +896,14 @@
       const email = document.getElementById('docEmail').value.trim().toLowerCase();
       const room = document.getElementById('docRoom').value.trim();
       const status = document.getElementById('docStatus').value;
+      const dailyLimitRaw = document.getElementById('docDailyLimit').value.trim();
+      let dailyLimit = 0;
+      if (dailyLimitRaw !== '') {
+        dailyLimit = Math.floor(Number(dailyLimitRaw));
+        if (!Number.isFinite(dailyLimit) || dailyLimit < 0 || dailyLimit > 999) {
+          return showToast(l10n('admin.err.dailyLimit', 'Daily limit must be a number between 0 and 999 (0 = unlimited).'), true);
+        }
+      }
       const btn = document.getElementById('btnSaveDoctor');
 
       if (!name) return showToast(l10n('admin.err.docName', 'Enter doctor name.'), true);
@@ -902,14 +923,14 @@
             // fixed at provisioning time (use revoke + re-provision to move).
             await window._fs.updateDoc(window._fs.doc(window._db, 'hospitals', assignedHospitalSlug, 'doctors', editDoctorId), {
               name, department: dept || 'Consultation', room: room || 'Room 1',
-              counter: room || 'Room 1', updatedAt: window._fs.serverTimestamp(),
+              counter: room || 'Room 1', dailyLimit, updatedAt: window._fs.serverTimestamp(),
             });
             showToast(l10n('admin.ok.docUpdated', 'Doctor profile updated.'));
           } else {
             if (!email) return showToast(l10n('admin.err.docEmailProvision', 'Enter doctor email to provision secure sign-in.'), true);
             const doctorId = String(email.split('@')[0]).replace(/[^a-z0-9]/gi, '-').toLowerCase();
             const res = await window.TokSpotAPI.provisionDoctor({
-              slug: assignedHospitalSlug, doctorId, email, name, department: dept, room,
+              slug: assignedHospitalSlug, doctorId, email, name, department: dept, room, dailyLimit,
             });
             showToast(l10n('admin.ok.docProvisioned', 'Doctor provisioned. Temp credentials were issued to %s (authUid %s…).').replace('%s', email).replace('%s', res.authUid.slice(0, 6)));
           }
@@ -926,6 +947,7 @@
           department: dept || l10n('token.consultation', 'Consultation'), 
           room: room || 'Room 1',
           counter: room || 'Room 1',
+          dailyLimit,
           status, 
           hospitalSlug: assignedHospitalSlug,
           hospitalCode: currentHospitalCode,

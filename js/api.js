@@ -103,6 +103,26 @@
     let tokenId = '';
     let tokenNum = '';
     await win._fs.runTransaction(win._db, async (transaction) => {
+      // Doctor's daily token limit (0/unset = unlimited) — mirrors the
+      // server-side check so prototype mode behaves identically.
+      const doctorSnap = await transaction.get(win._fs.doc(win._db, 'hospitals', slug, 'doctors', doctorId));
+      const dailyLimit = doctorSnap.exists() ? Number(doctorSnap.data().dailyLimit || 0) : 0;
+      if (dailyLimit > 0) {
+        const daySnap = await transaction.get(win._fs.query(
+          win._fs.collection(win._db, 'hospitals', slug, 'tokens'),
+          win._fs.where('doctorId', '==', doctorId),
+          win._fs.where('date', '==', date)
+        ));
+        let issuedToday = 0;
+        daySnap.docs.forEach((dd) => {
+          const s = String(dd.data().status || '').toLowerCase();
+          if (s !== 'canceled') issuedToday++;
+        });
+        if (issuedToday >= dailyLimit) {
+          throw new Error('This doctor\'s daily token limit of ' + dailyLimit + ' has been reached. Please try again tomorrow.');
+        }
+      }
+
       const counterDoc = await transaction.get(counterRef);
       const nextCount = win.TokspotQueue.nextTokenNumber(
         counterDoc.exists() ? (counterDoc.data().count || 0) : 0
@@ -262,10 +282,36 @@
   }
 
   async function createAppointment(opts) {
-    const { slug, doctorId, date, slotStart, name, phone } = opts || {};
+    const { slug, doctorId, date, slotStart, name, phone, email } = opts || {};
     if (!slug || !doctorId || !date || !slotStart) throw new Error('slug + doctorId + date + slotStart required.');
     if (apiMode() !== 'functions') return readNeedsFunctions('createAppointment');
-    return callFunction('createAppointment', { slug, doctorId, date, slotStart, name, phone });
+    return callFunction('createAppointment', { slug, doctorId, date, slotStart, name, phone, email });
+  }
+
+  // Doctor self-service or admin: cap how many tokens the doctor accepts
+  // per day (0 = unlimited). Works in both modes; every change is audited
+  // server-side in functions mode.
+  async function setDoctorDailyLimit(opts) {
+    const { slug, doctorId, dailyLimit } = opts || {};
+    if (!slug || !doctorId) throw new Error('Hospital and doctor are required.');
+    const n = Math.floor(Number(dailyLimit));
+    if (!Number.isFinite(n) || n < 0 || n > 999) {
+      throw new Error('Daily limit must be a whole number 0-999 (0 = unlimited).');
+    }
+    if (apiMode() === 'functions') {
+      const res = await callFunction('setDoctorDailyLimit', { slug, doctorId, dailyLimit: n });
+      return { ok: Boolean(res.ok), dailyLimit: res.dailyLimit };
+    }
+    await ensureAuth();
+    requireFs();
+    await win._fs.updateDoc(
+      win._fs.doc(win._db, 'hospitals', slug, 'doctors', doctorId),
+      {
+        dailyLimit: n,
+        dailyLimitUpdatedAt: win._fs.serverTimestamp ? win._fs.serverTimestamp() : new Date().toISOString(),
+      }
+    );
+    return { ok: true, dailyLimit: n };
   }
 
   async function listTodayAppointments(opts) {
@@ -300,10 +346,10 @@
 
   // Admin — provision/revoke Auth-backed doctor accounts.
   async function provisionDoctor(opts) {
-    const { slug, doctorId, email, name, department, room } = opts || {};
+    const { slug, doctorId, email, name, department, room, dailyLimit } = opts || {};
     if (!slug || !doctorId || !email) throw new Error('slug, doctorId and email required.');
     if (apiMode() !== 'functions') return readNeedsFunctions('provisionDoctor');
-    return callFunction('provisionDoctor', { slug, doctorId, email, name, department, room });
+    return callFunction('provisionDoctor', { slug, doctorId, email, name, department, room, dailyLimit });
   }
 
   async function revokeDoctor(opts) {
@@ -327,6 +373,14 @@
     if (!slug) throw new Error('slug required.');
     if (apiMode() !== 'functions') return readNeedsFunctions('flushWhatsAppOutbox');
     return callFunction('flushWhatsAppOutbox', { slug });
+  }
+
+  // Admin — drain the pending email outbox (appointment reminders).
+  async function flushEmailOutbox(opts) {
+    const { slug } = opts || {};
+    if (!slug) throw new Error('slug required.');
+    if (apiMode() !== 'functions') return readNeedsFunctions('flushEmailOutbox');
+    return callFunction('flushEmailOutbox', { slug });
   }
 
   // Desk — run the reminder + no-show sweep for the station's hospital.
@@ -432,6 +486,8 @@
     getTokenByNumber,
     resolveHospitalByCode,
     listDoctorsPublic,
+    setDoctorDailyLimit,
+    flushEmailOutbox,
     listAuditEvents,
     getMyDoctorProfile,
     provisionDoctor,
