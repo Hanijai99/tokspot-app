@@ -28,11 +28,22 @@ service cloud.firestore {
       return request.auth != null;
     }
 
+    // Anonymous / PIN-era sign-ins carry no `email` claim. Reading it
+    // directly makes the rules engine raise an evaluation error instead
+    // of denying, which surfaced as "Missing or insufficient
+    // permissions" on every isAdmin()-gated rule. Check the claim exists
+    // first so an email-less caller is denied cleanly. Mirrors
+    // firestore.rules.target (regression pinned by
+    // tests/firestore-rules-live.test.cjs).
+    function callerEmail() {
+      return ('email' in request.auth.token) ? request.auth.token.email : null;
+    }
+
     // Admin = the email/password account stored on the hospital doc.
     function isAdmin(slug) {
       return signedIn() && (
         get(/databases/$(database)/documents/hospitals/$(slug)).data.adminUid == request.auth.uid ||
-        get(/databases/$(database)/documents/hospitals/$(slug)).data.adminEmail == request.auth.token.email
+        get(/databases/$(database)/documents/hospitals/$(slug)).data.adminEmail == callerEmail()
       );
     }
 
