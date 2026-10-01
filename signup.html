@@ -1,10 +1,10 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <script src="js/loader.js?v=20261001"></script>
+  <script src="js/loader.js?v=20261002"></script>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-  <title>Register Hospital — TokMark</title>
+  <title>Register Hospital — TokSpot</title>
   <link rel="stylesheet" href="css/style.css?v=20261001" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
   <link rel="icon" type="image/png" href="logo.png?v=2" />
@@ -52,7 +52,7 @@
       100% { transform: scale(1); opacity: 1; }
     }
 
-    /* Animated Checkmark matching TokMark Cyan-to-Green Logo */
+    /* Animated Checkmark matching TokSpot Cyan-to-Green Logo */
     .svg-box {
       width: 100px;
       height: 100px;
@@ -64,7 +64,7 @@
       stroke-dashoffset: 290;
       stroke-width: 5;
       stroke-miterlimit: 10;
-      stroke: url(#tokmarkGrad);
+      stroke: url(#tokspotGrad);
       fill: none;
       animation: strokeCircle 0.7s cubic-bezier(0.65, 0, 0.45, 1) forwards;
     }
@@ -106,7 +106,7 @@
 
   <div class="topbar" style="background:#092328;border-bottom:1px solid #1E5C50;">
     <a class="brand" href="index.html" style="color:#8BBB92;">
-      <span class="logomark"><img src="logo.png?v=2" alt="TokMark" style="width:28px;height:28px;vertical-align:middle;margin-right:6px;" /></span>TokMark Setup
+      <span class="logomark"><img src="logo.png?v=2" alt="TokSpot" style="width:28px;height:28px;vertical-align:middle;margin-right:6px;" /></span>TokSpot Setup
     </a>
     <span class="spacer"></span>
     <button class="icn-btn" onclick="location.href='admin.html'" title="Existing Admin Login" style="color:#cbd5e1;"><i class="fa-solid fa-right-to-bracket"></i> Login</button>
@@ -150,7 +150,7 @@
             <input type="checkbox" id="privacyCheck" disabled style="width: 18px; height: 18px; accent-color: #8BBB92; margin-top: 2px; cursor: not-allowed;" />
             <div style="font-size: 0.83rem; line-height: 1.45; color: #94a3b8;">
               I confirm that I have read and agree to the 
-              <a href="privacy.html" id="privacyLink" target="_blank" style="color: #8BBB92; font-weight: 700; text-decoration: underline;">TokMark Privacy Policy & Doctor Security Protocol</a>.
+              <a href="privacy.html" id="privacyLink" target="_blank" style="color: #8BBB92; font-weight: 700; text-decoration: underline;">TokSpot Privacy Policy & Doctor Security Protocol</a>.
               <div id="readNotice" style="color: #f59e0b; font-size: 0.76rem; margin-top: 5px; font-weight: 600;">
                 <i class="fa-solid fa-circle-exclamation"></i> Click the policy link above to read and enable agreement.
               </div>
@@ -196,7 +196,7 @@
         <div class="svg-box">
           <svg viewBox="0 0 100 100" style="width:100%;height:100%;">
             <defs>
-              <linearGradient id="tokmarkGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+              <linearGradient id="tokspotGrad" x1="0%" y1="0%" x2="100%" y2="100%">
                 <stop offset="0%" stop-color="#8BBB92" />
                 <stop offset="100%" stop-color="#8BBB92" />
               </linearGradient>
@@ -218,10 +218,10 @@
     </div>
   </div>
 
-  <script src="js/firebase-config.js?v=20261001"></script>
-  <script src="js/app.js?v=20261001"></script>
-  <script src="js/firebase.js?v=20261001"></script>
-  <script src="js/api.js?v=20261001"></script>
+  <script src="js/firebase-config.js?v=20261002"></script>
+  <script src="js/app.js?v=20261002"></script>
+  <script src="js/firebase.js?v=20261002"></script>
+  <script src="js/api.js?v=20261002"></script>
   <script>
     window.showToast = window.showToast || function(msg) { alert(msg); };
 
@@ -234,7 +234,10 @@
     window.addEventListener('DOMContentLoaded', () => {
       const checkbox = document.getElementById('privacyCheck');
       const notice = document.getElementById('readNotice');
-      const isAlreadyRead = sessionStorage.getItem('tokmark_privacy_read') === 'true' || 
+      // Prefers the current key, falling back to the pre-rename `tokmark_*`
+      // key so consent already given in this session is still honoured.
+      const isAlreadyRead = sessionStorage.getItem('tokspot_privacy_read') === 'true' || 
+                            sessionStorage.getItem('tokmark_privacy_read') === 'true' || 
                             new URLSearchParams(window.location.search).get('policy_read') === '1';
 
       if (isAlreadyRead && checkbox) {
@@ -251,7 +254,7 @@
             checkbox.disabled = false;
             checkbox.checked = true;
             checkbox.style.cursor = 'pointer';
-            sessionStorage.setItem('tokmark_privacy_read', 'true');
+            sessionStorage.setItem('tokspot_privacy_read', 'true');
             notice.innerHTML = '<span style="color: #8BBB92;"><i class="fa-solid fa-circle-check"></i> Privacy Policy accepted.</span>';
           }
         }, 1500);
@@ -282,7 +285,7 @@
 
       // Strict check: Policy must be accepted
       if (!privacyCheck.checked) {
-        return alert('Please click and read the TokMark Privacy Policy & Doctor Security Protocol before proceeding.');
+        return alert('Please click and read the TokSpot Privacy Policy & Doctor Security Protocol before proceeding.');
       }
 
       btn.disabled = true;
@@ -322,9 +325,9 @@
         generatedSlug = created.slug;
 
         // Store active session keys
-        sessionStorage.setItem('tokmark_admin_hospital', generatedCode);
-        sessionStorage.setItem('tokmark_frontdesk_hospital', generatedCode);
-        localStorage.setItem('tokmark_hospital_code', generatedCode);
+        sessionStorage.setItem('tokspot_admin_hospital', generatedCode);
+        sessionStorage.setItem('tokspot_frontdesk_hospital', generatedCode);
+        localStorage.setItem('tokspot_hospital_code', generatedCode);
 
         // 5. Open Verification Modal
         document.getElementById('sentEmailSpan').textContent = email;
@@ -365,7 +368,7 @@
                 console.warn('Firestore status update error:', e);
               }
 
-              // Show TokMark Neon Animated Checkmark
+              // Show TokSpot Neon Animated Checkmark
               document.getElementById('modalWaitingState').classList.add('hidden');
               document.getElementById('modalSuccessState').classList.remove('hidden');
             }

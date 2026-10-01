@@ -1,5 +1,5 @@
 // =========================================================================
-// UNIVERSAL MULTI-LANGUAGE VOICE ANNOUNCEMENT ENGINE FOR TOKMARK
+// UNIVERSAL MULTI-LANGUAGE VOICE ANNOUNCEMENT ENGINE FOR TOKSPOT
 // =========================================================================
 
 // =========================================================================
@@ -39,7 +39,7 @@ window.hk = (function () {
   return { applyDark: applyDark, toggleDark: toggleDark };
 })();
 
-window.TOKMARK_LANGS = {
+window.TOKSPOT_LANGS = {
   // --- Indian Languages ---
   'ta': {
     code: 'ta-IN',
@@ -105,9 +105,6 @@ window.TOKMARK_LANGS = {
   }
 };
 
-// Backwards compatibility alias
-window.TOKSPOT_LANGS = window.TOKMARK_LANGS;
-
 /**
  * Universal Multi-language Caller
  * @param {string|number} tokenNumber 
@@ -122,7 +119,9 @@ window.announceToken = function(tokenNumber, patientName, counter, selectedLangK
   window.speechSynthesis.cancel();
 
   // Pick hospital configured languages or default to Tamil + English
-  const savedLangs = JSON.parse(localStorage.getItem('tokmark_voice_langs') || localStorage.getItem('tokspot_voice_langs') || '["ta", "en"]');
+  // Prefers the current key, falling back to the pre-rename `tokmark_*`
+  // key so returning users keep their saved language choice.
+  const savedLangs = JSON.parse(localStorage.getItem('tokspot_voice_langs') || localStorage.getItem('tokmark_voice_langs') || '["ta", "en"]');
   const langsToPlay = selectedLangKeys || savedLangs;
 
   const cleanCounter = counter ? String(counter).replace(/^Counter\s*/i, '') : 'A';
@@ -132,7 +131,7 @@ window.announceToken = function(tokenNumber, patientName, counter, selectedLangK
   const utterances = [];
 
   langsToPlay.forEach(key => {
-    const langConfig = window.TOKMARK_LANGS[key];
+    const langConfig = window.TOKSPOT_LANGS[key];
     if (!langConfig) return;
 
     const speechText = langConfig.template(tokenNumber, cleanName, cleanCounter);

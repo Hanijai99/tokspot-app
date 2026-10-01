@@ -1,10 +1,10 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <script src="js/loader.js?v=20261001"></script>
+  <script src="js/loader.js?v=20261002"></script>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-  <title>Doctor Desk — TokMark</title>
+  <title>Doctor Desk — TokSpot</title>
   <link rel="stylesheet" href="css/style.css?v=20261001" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
   <link rel="manifest" href="manifest.json" />
@@ -82,7 +82,7 @@
 
   <div class="topbar" style="background:#1E5C50;border-bottom:1px solid #334155;">
     <a class="brand" href="index.html" style="color:#8BBB92;">
-      <span class="logomark"><img src="logo.png?v=2" alt="TokMark" /></span><span data-i18n="doctor.brand">TokMark Doctor</span>
+      <span class="logomark"><img src="logo.png?v=2" alt="TokSpot" /></span><span data-i18n="doctor.brand">TokSpot Doctor</span>
     </a>
     <span class="spacer"></span>
     <button class="icn-btn" onclick="doctorLogout()" title="Logout Station" data-i18n-title="doctor.logout"><i class="fa-solid fa-power-off"></i></button>
@@ -180,13 +180,13 @@
     <source src="https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3" type="audio/mpeg">
   </audio>
 
-  <script src="js/firebase-config.js?v=20261001"></script>
-  <script src="js/app.js?v=20261001"></script>
-  <script src="js/firebase.js?v=20261001"></script>
-  <script src="js/queue-domain.js?v=20261001"></script>
-  <script src="js/api.js?v=20261001"></script>
-  <script src="js/i18n.js?v=20261001"></script>
-  <script src="js/medicines.js?v=20261001"></script>
+  <script src="js/firebase-config.js?v=20261002"></script>
+  <script src="js/app.js?v=20261002"></script>
+  <script src="js/firebase.js?v=20261002"></script>
+  <script src="js/queue-domain.js?v=20261002"></script>
+  <script src="js/api.js?v=20261002"></script>
+  <script src="js/i18n.js?v=20261002"></script>
+  <script src="js/medicines.js?v=20261002"></script>
   <script>
     if (window.I18N) I18N.init();
     function l10n(key, fb) { return (window.I18N && window.I18N.t) ? window.I18N.t(key) : fb; }
@@ -314,6 +314,9 @@
           if (unsubQueue) unsubQueue();
           if (unsubSecurity) unsubSecurity();
           sessionStorage.clear();
+          // Clear both the current and the pre-rename key: a leftover
+          // legacy value must not survive an access revocation.
+          localStorage.removeItem('tokspot_doctor_id');
           localStorage.removeItem('tokmark_doctor_id');
           alert(l10n('doctor.accessRevoked', 'ACCESS REVOKED: Your credentials have been decoupled from this hospital by the administrator. You are now logged out.'));
           window.location.replace('doctor-login.html');

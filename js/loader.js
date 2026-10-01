@@ -1,11 +1,11 @@
 /* ============================================================
-   TOKMARK GLOBAL AUTO-LOADER & SKELETON ENGINE
+   TOKSPOT GLOBAL AUTO-LOADER & SKELETON ENGINE
    ============================================================ */
 
 (function () {
   // 1. Inject Styles for Loader and Skeleton into Document Head
   const loaderStyle = document.createElement('style');
-  loaderStyle.id = 'tokmark-loader-styles';
+  loaderStyle.id = 'tokspot-loader-styles';
   loaderStyle.innerHTML = `
     #appLoader {
       position: fixed;
@@ -74,7 +74,7 @@
     loaderDiv.id = 'appLoader';
     loaderDiv.innerHTML = `
       <div class="tok-loader-wrap">
-        <img src="logo.png?v=2" alt="TokMark" class="tok-loader-logo" />
+        <img src="logo.png?v=2" alt="TokSpot" class="tok-loader-logo" />
       </div>
       <div class="tok-progress-track">
         <div class="tok-progress-fill"></div>

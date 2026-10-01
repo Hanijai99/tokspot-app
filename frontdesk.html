@@ -1,10 +1,10 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <script src="js/loader.js?v=20261001"></script>
+  <script src="js/loader.js?v=20261002"></script>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
-  <title>Front Desk — TokMark</title>
+  <title>Front Desk — TokSpot</title>
   <link rel="stylesheet" href="css/style.css?v=20261001" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
   <link rel="manifest" href="manifest.json" />
@@ -86,7 +86,7 @@
 </head>
 <body>
   <div class="topbar">
-    <a class="brand" href="index.html"><span class="logomark"><img src="logo.png?v=2" alt="TokMark" /></span><span data-i18n="desk.brand">TokMark Front Desk</span></a>
+    <a class="brand" href="index.html"><span class="logomark"><img src="logo.png?v=2" alt="TokSpot" /></span><span data-i18n="desk.brand">TokSpot Front Desk</span></a>
     <span class="spacer"></span>
     <button class="icn-btn" onclick="location.href='staff.html'" title="Staff Portal" data-i18n-title="desk.staffPortal"><i class="fa-solid fa-hospital-user"></i></button>
     <button class="icn-btn" onclick="launchTvFromDesk()" title="Open Display Board" data-i18n-title="desk.openDisplay"><i class="fa-solid fa-tv"></i></button>
@@ -298,12 +298,12 @@
 
   <button class="theme-toggle" onclick="hk.toggleDark()"><i class="fa-solid fa-moon"></i></button>
 
-  <script src="js/firebase-config.js?v=20261001"></script>
-  <script src="js/app.js?v=20261001"></script>
-  <script src="js/firebase.js?v=20261001"></script>
-  <script src="js/queue-domain.js?v=20261001"></script>
-  <script src="js/api.js?v=20261001"></script>
-  <script src="js/i18n.js?v=20261001"></script>
+  <script src="js/firebase-config.js?v=20261002"></script>
+  <script src="js/app.js?v=20261002"></script>
+  <script src="js/firebase.js?v=20261002"></script>
+  <script src="js/queue-domain.js?v=20261002"></script>
+  <script src="js/api.js?v=20261002"></script>
+  <script src="js/i18n.js?v=20261002"></script>
   <script>
     if (window.I18N) I18N.init();
     function l10n(key, fb) { return (window.I18N && window.I18N.t) ? window.I18N.t(key) : fb; }
@@ -392,7 +392,9 @@
 
       const params = new URLSearchParams(window.location.search);
       const urlCode = params.get('code') || params.get('h');
-      const savedCode = sessionStorage.getItem('tokmark_frontdesk_hospital') || sessionStorage.getItem('tokspot_frontdesk_hospital');
+      // Prefers the current key, falling back to the pre-rename `tokmark_*`
+      // key so a returning desk keeps its hospital.
+      const savedCode = sessionStorage.getItem('tokspot_frontdesk_hospital') || sessionStorage.getItem('tokmark_frontdesk_hospital');
 
       if (urlCode) {
         document.getElementById('gateCodeInput').value = urlCode.toUpperCase();
@@ -443,7 +445,7 @@
         currentHospitalName = hData.name || currentHospital;
         currentHospitalCode = hData.hospitalCode || codeInput;
 
-        sessionStorage.setItem('tokmark_frontdesk_hospital', currentHospitalCode);
+        sessionStorage.setItem('tokspot_frontdesk_hospital', currentHospitalCode);
 
         document.getElementById('stationHospitalTitle').textContent = currentHospitalName;
         document.getElementById('stationCitySubtitle').textContent = hData.city ? l10n('desk.stationPrefix', 'Station: %s').replace('%s', hData.city) : l10n('desk.reception', 'Reception Station');
@@ -465,6 +467,9 @@
 
     function disconnectStation() {
       if (!confirm(l10n('desk.confirm.exit', 'Disconnect this station from this hospital?'))) return;
+      // Clear both the current and the pre-rename key, otherwise a stale
+      // legacy value silently reconnects the station on the next load.
+      sessionStorage.removeItem('tokspot_frontdesk_hospital');
       sessionStorage.removeItem('tokmark_frontdesk_hospital');
       currentHospital = null;
       currentHospitalCode = null;
@@ -1068,7 +1073,7 @@
 
         if (phone) {
           const trackLink = `${getAppBaseUrl()}/token.html?id=${createdTokenId}&h=${currentHospital}`;
-          queueFreeSMS(phone, `TokMark Alert: Hello ${name}, your Token #${tokenNum} is booked. Live pass: ${trackLink}`);
+          queueFreeSMS(phone, `TokSpot Alert: Hello ${name}, your Token #${tokenNum} is booked. Live pass: ${trackLink}`);
         }
       } catch (e) {
         showToast(l10n('desk.err.failed', 'Failed: ') + e.message, true);
@@ -1121,7 +1126,7 @@
               const t = snap.data();
               if (t && t.phone) {
                 const trackLink = `${getAppBaseUrl()}/token.html?id=${id}&h=${currentHospital}`;
-                queueFreeSMS(t.phone, `TokMark Alert: Token #${t.number}, please proceed to ${t.counter || 'Counter A'}. Track: ${trackLink}`);
+                queueFreeSMS(t.phone, `TokSpot Alert: Token #${t.number}, please proceed to ${t.counter || 'Counter A'}. Track: ${trackLink}`);
               }
             }).catch(() => {});
           }
@@ -1151,7 +1156,7 @@
         if (cleanPhone.length === 10) cleanPhone = '91' + cleanPhone;
 
         const trackUrl = `${getAppBaseUrl()}/token.html?id=${id}&h=${currentHospital}`;
-        const msg = `TokMark Alert: Hello ${t.patientName}, your token #${t.number} is ready. Please proceed to ${t.counter || 'Counter A'}.\n\nLive Pass: ${trackUrl}`;
+        const msg = `TokSpot Alert: Hello ${t.patientName}, your token #${t.number} is ready. Please proceed to ${t.counter || 'Counter A'}.\n\nLive Pass: ${trackUrl}`;
         const text = encodeURIComponent(msg);
 
         const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);

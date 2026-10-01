@@ -2,9 +2,9 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <script src="js/loader.js?v=20261001"></script>
+  <script src="js/loader.js?v=20261002"></script>
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
-  <title>Admin — Manage Hospital — TokMark</title>
+  <title>Admin — Manage Hospital — TokSpot</title>
   <link rel="stylesheet" href="css/style.css?v=20261001" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
   <link rel="manifest" href="manifest.json" />
@@ -63,7 +63,7 @@
 </head>
 <body>
   <div class="topbar">
-    <a class="brand" href="index.html"><span class="logomark"><img src="logo.png?v=2" alt="TokMark" /></span><span data-i18n="admin.brand">TokMark Admin</span></a>
+    <a class="brand" href="index.html"><span class="logomark"><img src="logo.png?v=2" alt="TokSpot" /></span><span data-i18n="admin.brand">TokSpot Admin</span></a>
     <span class="spacer"></span>
     <button class="icn-btn" onclick="location.href='staff.html'" title="Staff Portal" data-i18n-title="desk.staffPortal"><i class="fa-solid fa-hospital-user"></i></button>
     <button class="icn-btn" onclick="hk.toggleDark()"><i class="fa-solid fa-moon"></i></button>
@@ -280,18 +280,18 @@
       <p style="font-size:16px;margin-bottom:20px;" data-i18n="admin.printScan">Scan below to view live OPD token progress</p>
       <div id="printQrTarget" style="display:inline-block;padding:10px;"></div>
       <h2 style="font-size:22px;letter-spacing:2px;margin-top:20px;" id="prtHospCode">HOSP-CODE</h2>
-      <p style="font-size:14px;color:#555;" data-i18n="admin.printPowered">Powered by TokMark Smart Hospital Engine</p>
+      <p style="font-size:14px;color:#555;" data-i18n="admin.printPowered">Powered by TokSpot Smart Hospital Engine</p>
     </div>
 
   </div>
 
   <button class="theme-toggle" onclick="hk.toggleDark()"><i class="fa-solid fa-moon"></i></button>
 
-  <script src="js/firebase-config.js?v=20261001"></script>
-  <script src="js/app.js?v=20261001"></script>
-  <script src="js/firebase.js?v=20261001"></script>
-  <script src="js/api.js?v=20261001"></script>
-  <script src="js/i18n.js?v=20261001"></script>
+  <script src="js/firebase-config.js?v=20261002"></script>
+  <script src="js/app.js?v=20261002"></script>
+  <script src="js/firebase.js?v=20261002"></script>
+  <script src="js/api.js?v=20261002"></script>
+  <script src="js/i18n.js?v=20261002"></script>
   <script>
     if (window.I18N) I18N.init();
     function l10n(key, fb) { return (window.I18N && window.I18N.t) ? window.I18N.t(key) : fb; }

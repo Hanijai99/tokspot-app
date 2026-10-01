@@ -1,10 +1,10 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <script src="js/loader.js?v=20261001"></script>
+  <script src="js/loader.js?v=20261002"></script>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-  <title>Doctor Login — TokMark</title>
+  <title>Doctor Login — TokSpot</title>
   <link rel="stylesheet" href="css/style.css?v=20261001" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
   <link rel="icon" type="image/png" href="logo.png?v=2" />
@@ -31,7 +31,7 @@
 
   <div class="topbar">
     <a class="brand" href="index.html">
-      <span class="logomark"><img src="logo.png?v=2" alt="TokMark" /></span><span data-i18n="doctor.brand">TokMark Doctor</span>
+      <span class="logomark"><img src="logo.png?v=2" alt="TokSpot" /></span><span data-i18n="doctor.brand">TokSpot Doctor</span>
     </a>
     <span class="spacer"></span>
     <button class="icn-btn" onclick="location.href='staff.html'" title="Staff Portal" data-i18n-title="desk.staffPortal"><i class="fa-solid fa-hospital-user"></i></button>
@@ -88,11 +88,11 @@
     </div>
   </div>
 
-  <script src="js/firebase-config.js?v=20261001"></script>
-  <script src="js/i18n.js?v=20261001"></script>
-  <script src="js/app.js?v=20261001"></script>
-  <script src="js/firebase.js?v=20261001"></script>
-  <script src="js/api.js?v=20261001"></script>
+  <script src="js/firebase-config.js?v=20261002"></script>
+  <script src="js/i18n.js?v=20261002"></script>
+  <script src="js/app.js?v=20261002"></script>
+  <script src="js/firebase.js?v=20261002"></script>
+  <script src="js/api.js?v=20261002"></script>
   <script>
     if (window.I18N) I18N.init();
     function l10n(key, fb) { return (window.I18N && window.I18N.t) ? window.I18N.t(key) : fb; }
@@ -119,7 +119,9 @@
       } catch(e) {}
 
       const urlCode = new URLSearchParams(window.location.search).get('code');
-      const savedHosp = urlCode || sessionStorage.getItem('tokmark_frontdesk_hospital') || sessionStorage.getItem('tokspot_frontdesk_hospital') || localStorage.getItem('tokmark_hospital_code');
+      // Prefers the current key, falling back to the pre-rename `tokmark_*`
+      // keys so a returning user is not asked for their hospital code again.
+      const savedHosp = urlCode || sessionStorage.getItem('tokspot_frontdesk_hospital') || sessionStorage.getItem('tokmark_frontdesk_hospital') || localStorage.getItem('tokspot_hospital_code') || localStorage.getItem('tokmark_hospital_code');
       if (savedHosp) document.getElementById('hospCode').value = savedHosp.toUpperCase();
     });
 
@@ -184,7 +186,7 @@
           loggedInVia: 'code',
         };
         sessionStorage.setItem('activeDoctor', JSON.stringify(session));
-        localStorage.setItem('tokmark_hospital_code', codeInput);
+        localStorage.setItem('tokspot_hospital_code', codeInput);
         window.location.replace('doctor.html');
       } catch (e) {
         showToast(e.message || l10n('login.err.failed', 'Sign-in failed.'), true, 5000);
@@ -233,7 +235,7 @@
           loggedInVia: 'auth',
         };
         sessionStorage.setItem('activeDoctor', JSON.stringify(session));
-        localStorage.setItem('tokmark_hospital_code', codeInput);
+        localStorage.setItem('tokspot_hospital_code', codeInput);
         window.location.replace('doctor.html');
       } catch (e) {
         let msg = e.message || l10n('login.err.failed', 'Sign-in failed.');

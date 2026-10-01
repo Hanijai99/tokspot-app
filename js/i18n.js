@@ -328,7 +328,7 @@
       'desk.advancedBook': 'Advanced booking',
       'desk.handoverDone': 'Waiting queue handed over to %s',
       'desk.handoverNoWait': 'No waiting tokens to hand over.',
-      'desk.brand': 'TokMark Front Desk',
+      'desk.brand': 'TokSpot Front Desk',
       'desk.staffPortal': 'Staff Portal',
       'desk.openDisplay': 'Open Display Board',
       'desk.stationHospitalTitle': 'Hospital Station',
@@ -395,7 +395,7 @@
       'doctor.tagline': 'Doctor Desk',
 
       // ---- doctor desk ----
-      'doctor.brand': 'TokMark Doctor',
+      'doctor.brand': 'TokSpot Doctor',
       'doctor.logout': 'Logout Station',
       'doctor.loading': 'Loading Doctor…',
       'doctor.waitNext': 'Waiting for next patient',
@@ -485,7 +485,7 @@
       'admin.retrieve': 'Retrieve Code',
       'admin.signingIn': 'Signing in...',
       'admin.hospCodeVal': 'Hospital Code',
-      'admin.brand': 'TokMark Admin',
+      'admin.brand': 'TokSpot Admin',
       'admin.err.emailPass': 'Enter email and password.',
       'admin.err.login': 'Login Error: ',
       'admin.ok.signedIn': 'Signed in successfully.',
@@ -566,7 +566,7 @@
       'admin.newPin': 'New 4-Digit PIN',
       'admin.updatePin': 'Update & Secure PIN',
       'admin.printScan': 'Scan below to view live OPD token progress',
-      'admin.printPowered': 'Powered by TokMark Smart Hospital Engine',
+      'admin.printPowered': 'Powered by TokSpot Smart Hospital Engine',
       'admin.verifyPre': 'We sent a verification link to',
       'admin.verifyPost': '. Open it, click Verify email, then press continue below.',
       'admin.verification sent': 'Verification email sent.',
@@ -666,7 +666,7 @@
       'admin.err.dailyLimit': 'Daily limit must be a number between 0 and 999 (0 = unlimited).',
 
       // ---- round 9.5: pharmacy counter queue (queue-only, no clinical data) ----
-      'pharmacy.brand': 'TokMark Pharmacy',
+      'pharmacy.brand': 'TokSpot Pharmacy',
       'pharmacy.tagline': 'Pharmacy counter — call &amp; dispense after consultation.',
       'pharmacy.gate.title': 'Pharmacy Counter Setup',
       'pharmacy.gate.sub': 'Enter your Hospital Code and a Counter Name to start the queue.',
@@ -1053,7 +1053,7 @@
       'desk.advancedBook': 'முன்பதிவு',
       'desk.handoverDone': 'காத்திருப்பு வரிசை %s க்கு மாற்றப்பட்டது',
       'desk.handoverNoWait': 'மாற்றுவதற்கு காத்திருப்பு டோக்கன்கள் இல்லை.',
-      'desk.brand': 'டோக்மார்க் முன் மேசை',
+      'desk.brand': 'டோக்ஸ்பாட் முன் மேசை',
       'desk.staffPortal': 'பணியாளர் போர்டல்',
       'desk.openDisplay': 'திரை காட்சியை திற',
       'desk.stationHospitalTitle': 'மருத்துவமனை நிலையம்',
@@ -1120,7 +1120,7 @@
       'doctor.tagline': 'டாக்டர் மேசை',
 
       // ---- doctor desk ----
-      'doctor.brand': 'டோக்மார்க் டாக்டர்',
+      'doctor.brand': 'டோக்ஸ்பாட் டாக்டர்',
       'doctor.logout': 'நிலையத்திலிருந்து வெளியேறு',
       'doctor.loading': 'டாக்டர் ஏற்றப்படுகிறார்…',
       'doctor.waitNext': 'அடுத்த நோயாளிக்காக காத்திருக்கிறது',
@@ -1208,7 +1208,7 @@
       'admin.recoverSub': 'உங்கள் நிர்வாக மின்னஞ்சல் மற்றும் தனிப்பட்ட மீட்பு விசையை உள்ளிட்டு உங்கள் மருத்துவமனையின் நோயாளி பதிவு குறியீட்டைப் பார்க்கவும்.',
       'admin.recoveryKey': 'மீட்பு விசை (RCV-XXXX-XXXX)',
       'admin.retrieve': 'குறியீட்டை பெறு',
-      'admin.brand': 'டோக்மார்க் நிர்வாகம்',
+      'admin.brand': 'டோக்ஸ்பாட் நிர்வாகம்',
       'admin.err.emailPass': 'மின்னஞ்சல் மற்றும் கடவுச்சொல்லை உள்ளிடவும்.',
       'admin.err.login': 'உள்நுழைவு பிழை: ',
       'admin.ok.signedIn': 'வெற்றிகரமாக உள்நுழைந்தீர்கள்.',
@@ -1289,7 +1289,7 @@
       'admin.newPin': 'புதிய 4 இலக்க PIN',
       'admin.updatePin': 'PIN ஐ புதுப்பித்து பாதுகாக்கவும்',
       'admin.printScan': 'லைவ் OPD டோக்கன் முன்னேற்றத்தைப் பார்க்க கீழே ஸ்கேன் செய்யவும்',
-      'admin.printPowered': 'டோக்மார்க் ஸ்மார்ட் மருத்துவமனை இயந்திரத்தால் இயக்கப்படுகிறது',
+      'admin.printPowered': 'டோக்ஸ்பாட் ஸ்மார்ட் மருத்துவமனை இயந்திரத்தால் இயக்கப்படுகிறது',
       'admin.verifyPre': 'சரிபார்ப்பு இணைப்பை அனுப்பியுள்ளோம்',
       'admin.verifyPost': '. அதைத் திறந்து, மின்னஞ்சலை சரிபார்க்கவும், பிறகு தொடரவும் அழுத்தவும்.',
       'admin.signingIn': 'உள்நுழைகிறது...',
@@ -1391,7 +1391,7 @@
       'admin.err.dailyLimit': 'தினசரி வரம்பு 0 முதல் 999 வரையிலான எண்ணாக இருக்க வேண்டும் (0 = வரம்பு இல்லை).',
 
       // ---- round 9.5: pharmacy counter queue (queue-only, no clinical data) ----
-      'pharmacy.brand': 'டோக்மார்க் மருந்தகம்',
+      'pharmacy.brand': 'டோக்ஸ்பாட் மருந்தகம்',
       'pharmacy.tagline': 'மருந்தக கவுண்டர் — ஆலோசனைக்குப் பின் அழைத்து விநியோகிக்கவும்.',
       'pharmacy.gate.title': 'மருந்தக கவுண்டர் அமைப்பு',
       'pharmacy.gate.sub': 'வரிசையைத் தொடங்க மருத்துவமனை குறியீடு மற்றும் கவுண்டர் பெயரை உள்ளிடவும்.',
