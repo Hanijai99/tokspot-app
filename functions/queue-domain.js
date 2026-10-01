@@ -74,6 +74,25 @@ function estimateWaitMinutes({ waitingCount, avgServeMinutes = null }) {
   return Math.max(1, Math.round(waiting * serve));
 }
 
+/**
+ * Reduces pharmacy-stage rows to what the public TV board shows: the
+ * token being served at a counter plus the number still waiting.
+ * Mirrors js/queue-domain.js so the sanitized feed and the prototype
+ * snapshot agree (see tests/domain-sync.test.cjs).
+ * @param {Array<object>} rows tokens routed to the pharmacy
+ * @returns {{active: object|null, waiting: number}}
+ */
+function pharmacyBoardView(rows) {
+  const list = Array.isArray(rows) ? rows : [];
+  const served = list.filter((t) => String(t.pharmacyStatus || '') === 'called');
+  const active = served.reduce((best, row) => {
+    if (!best) return row;
+    return (timestampMillis(row.pharmacyCalledAt) || 0) > (timestampMillis(best.pharmacyCalledAt) || 0) ? row : best;
+  }, null) || null;
+  const waiting = list.filter((t) => String(t.pharmacyStatus || '') === 'waiting').length;
+  return { active, waiting };
+}
+
 module.exports = {
   ALLOWED_TRANSITIONS,
   canTransition,
@@ -82,4 +101,5 @@ module.exports = {
   timestampMillis,
   averageWaitMinutes,
   estimateWaitMinutes,
+  pharmacyBoardView,
 };

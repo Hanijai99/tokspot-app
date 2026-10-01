@@ -34,6 +34,7 @@ const auth = getAuth();
 // Queue domain — single source of truth shared with the client build
 // (js/queue-domain.js); tests/domain-sync.test.cjs fails on drift.
 const { ALLOWED_TRANSITIONS, normalizeStatus, canTransition, averageWaitMinutes, estimateWaitMinutes } = require('./queue-domain');
+const queueDomain = require('./queue-domain');
 
 // Measured + estimate wait stats for a set of day rows.
 function queueStats(rows) {
@@ -837,6 +838,35 @@ exports.getTvFeed = onCall({ rateLimiting: RL.tvFeed }, async (request) => {
   board.waiting.sort((a, b) => Number(a.number) - Number(b.number));
   board.serving.sort((a, b) => (b.calledAt || 0) - (a.calledAt || 0));
 
+  // Pharmacy counter board. Sanitized like the rest of the TV feed: the
+  // token number and the counter label only, never a patient name, phone
+  // or the prescription itself. A token joins this stage once the
+  // consultation is completed and it has been routed to the pharmacy.
+  // The projection is shared with the browser via functions/queue-domain.js.
+  const pharmacyRows = [];
+  docs.forEach((d) => {
+    const t = d.data();
+    if (t.pharmacy !== true || normalizeStatus(t.status) !== 'completed') return;
+    pharmacyRows.push({
+      pharmacyStatus: String(t.pharmacyStatus || 'waiting'),
+      number: t.number,
+      counter: String(t.pharmacyCounter || ''),
+      calledAt: t.pharmacyCalledAt ? t.pharmacyCalledAt.toMillis() : 0,
+    });
+  });
+  const pharmacyView = queueDomain.pharmacyBoardView(pharmacyRows);
+  const pharmacy = pharmacyView.active
+    ? {
+      active: {
+        number: pharmacyView.active.number,
+        counter: pharmacyView.active.counter,
+        calledAt: pharmacyView.active.calledAt,
+      },
+      waiting: pharmacyView.waiting,
+    }
+    : { active: null, waiting: pharmacyView.waiting };
+  board.pharmacy = pharmacy;
+
   // Hall-level measured/estimate wait stats (all doctors, today).
   const hallRows = [];
   docs.forEach((d) => {
@@ -868,6 +898,7 @@ exports.getTvFeed = onCall({ rateLimiting: RL.tvFeed }, async (request) => {
 
   return {
     ...board,
+    pharmacy,
     waitEstimateMinutes: hallStats.waitEstimateMinutes,
     avgServeMinutes: hallStats.avgServeMinutes,
     doctors,

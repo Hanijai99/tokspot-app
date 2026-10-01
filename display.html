@@ -195,6 +195,7 @@
   <script src="js/firebase-config.js?v=20261001"></script>
   <script src="js/app.js?v=20261001"></script>
   <script src="js/firebase.js?v=20261001"></script>
+  <script src="js/queue-domain.js?v=20261001"></script>
   <script src="js/api.js?v=20261001"></script>
   <script src="js/i18n.js?v=20261001"></script>
   <script>
@@ -402,7 +403,7 @@
         });
 
         renderTvBoard(called, waiting, computeTvExtra(waiting, called));
-        renderTvPharmacyPanel(pharmacyRows);
+        renderTvPharmacyPanel(tvPharmacyView(pharmacyRows));
       }, (err) => {
         console.error('Realtime sync error:', err);
       });
@@ -540,6 +541,20 @@
             waitEstimateMinutes: board.waitEstimateMinutes,
             doctors: board.doctors || [],
           });
+          // The sanitized feed carries pharmacy numbers + counter label only;
+          // map it into the same row shape the snapshot path produces.
+          const ph = board.pharmacy || {};
+          const phRows = [];
+          if (ph.active) {
+            phRows.push({
+              pharmacyStatus: 'called',
+              number: ph.active.number,
+              pharmacyCounter: ph.active.counter || '',
+              pharmacyCalledAt: ph.active.calledAt || 0,
+            });
+          }
+          for (let i = 0; i < (Number(ph.waiting) || 0); i++) phRows.push({ pharmacyStatus: 'waiting' });
+          renderTvPharmacyPanel(tvPharmacyView(phRows));
         } catch (e) {
           console.error('TV feed error:', e);
         }
@@ -569,15 +584,29 @@
       `).join('');
     }
 
-    function renderTvPharmacyPanel(rows) {
+    // Normalizes the pharmacy stage into { active, waiting } so both data
+    // sources (prototype snapshot rows, functions TV feed) render the same.
+    // Shared with the backend via js/queue-domain.js — the public board only
+    // ever shows a token number and a counter label.
+    function tvPharmacyView(rows) {
+      if (window.TokspotQueue && window.TokspotQueue.pharmacyBoardView) {
+        return window.TokspotQueue.pharmacyBoardView(rows);
+      }
+      const list = rows || [];
+      const active = list.filter((t) => t.pharmacyStatus === 'called')
+        .sort((a, b) => tvMillis(b.pharmacyCalledAt) - tvMillis(a.pharmacyCalledAt))[0] || null;
+      const waiting = list.filter((t) => t.pharmacyStatus === 'waiting').length;
+      return { active, waiting };
+    }
+
+    function renderTvPharmacyPanel(view) {
       const section = document.getElementById('tvPharmacySection');
       if (!section) return;
       const nowEl = document.getElementById('tvPharmacyNow');
       const waitEl = document.getElementById('tvPharmacyWait');
 
-      const active = rows.filter((t) => t.pharmacyStatus === 'called')
-        .sort((a, b) => tvMillis(b.pharmacyCalledAt) - tvMillis(a.pharmacyCalledAt))[0] || null;
-      const waiting = rows.filter((t) => t.pharmacyStatus === 'waiting').length;
+      const active = (view && view.active) || null;
+      const waiting = (view && Number(view.waiting)) || 0;
 
       if (!active && waiting === 0) { section.classList.add('hidden'); return; }
       section.classList.remove('hidden');

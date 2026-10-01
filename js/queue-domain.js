@@ -68,6 +68,26 @@
     return Boolean(user && hospital && hospital.adminUid && user.uid === hospital.adminUid);
   }
 
+  /**
+   * Reduces pharmacy-stage rows to what the public TV board shows: the
+   * token being served at a counter plus the number still waiting.
+   * Shared with functions/queue-domain.js so the sanitized server feed
+   * (numbers + counter label only) and the prototype snapshot agree.
+   * Skipped/dispensed rows are ignored — they are no longer in the queue.
+   * @param {Array<object>} rows tokens routed to the pharmacy
+   * @returns {{active: object|null, waiting: number}}
+   */
+  function pharmacyBoardView(rows) {
+    const list = Array.isArray(rows) ? rows : [];
+    const served = list.filter((t) => String(t.pharmacyStatus || '') === 'called');
+    const active = served.reduce((best, row) => {
+      if (!best) return row;
+      return (timestampMillis(row.pharmacyCalledAt) || 0) > (timestampMillis(best.pharmacyCalledAt) || 0) ? row : best;
+    }, null) || null;
+    const waiting = list.filter((t) => String(t.pharmacyStatus || '') === 'waiting').length;
+    return { active, waiting };
+  }
+
   async function transitionToken(fs, db, hospitalSlug, tokenId, nextStatus, changes) {
     const tokenRef = fs.doc(db, 'hospitals', hospitalSlug, 'tokens', tokenId);
 
@@ -114,5 +134,5 @@
     });
   }
 
-  return { canTransition, nextTokenNumber, averageWaitMinutes, estimateWaitMinutes, isHospitalAdmin, transitionToken, normalizeStatus };
+  return { canTransition, nextTokenNumber, averageWaitMinutes, estimateWaitMinutes, isHospitalAdmin, transitionToken, normalizeStatus, pharmacyBoardView };
 });
