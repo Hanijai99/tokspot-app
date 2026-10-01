@@ -177,6 +177,27 @@ if (!rulesTest || !EMU) {
   //  migrated to a callable. See PRODUCTION_READINESS.md (gate step 2).
   // ------------------------------------------------------------------
 
+  test('an admin cannot LIST the hospitals collection (admin.html must use getMyHospital)', async () => {
+    // Round 9.13: this query is what admin.html used to resolve its own
+    // hospital. Under the hardened rule it is denied, because the rule is
+    // evaluated per document and a bare collection scan cannot be proven
+    // to satisfy isAdminOf(). Pinned so the migration cannot ship a dead
+    // admin console — and so nobody "fixes" it by loosening the rule.
+    const admin = await testEnv.authenticatedContext('admin-1');
+    const db = admin.firestore();
+    await assert.rejects(
+      db.collection('hospitals').where('adminUid', '==', 'admin-1').get(),
+      DENIED
+    );
+  });
+
+  test('the owning admin CAN get their own hospital doc by direct path', async () => {
+    const admin = await testEnv.authenticatedContext('admin-1');
+    const db = admin.firestore();
+    const snap = await db.doc('hospitals/h1').get();
+    assert.strictEqual(snap.data().name, 'H1');
+  });
+
   test('a brand-new user still cannot self-create a hospital directly (callable owns it)', async () => {
     // createHospital (a callable) mints the slug/code and stamps adminUid
     // from the auth token. A client write must stay impossible, otherwise

@@ -539,14 +539,27 @@
       try {
         let matchedDoc = null;
 
-        const snap = await window._fs.getDocs(window._fs.collection(window._db, 'hospitals'));
+        if (FUNC) {
+          // The hardened rules evaluate per document, so scanning the
+          // whole `hospitals` collection cannot be proven to satisfy
+          // isAdminOf() and is denied. The callable resolves only the
+          // caller's own hospital.
+          try {
+            const mine = await window.TokSpotAPI.getMyHospital();
+            matchedDoc = { id: mine.slug, data: () => mine };
+          } catch (e) {
+            if (!/not-found|No hospital/i.test(e.message || '')) throw e;
+          }
+        } else {
+          const snap = await window._fs.getDocs(window._fs.collection(window._db, 'hospitals'));
 
-        if (!snap.empty) {
-          matchedDoc = snap.docs.find(d => {
-            const data = d.data();
-            const aUid = data.adminUid || '';
-            return aUid === user.uid;
-          });
+          if (!snap.empty) {
+            matchedDoc = snap.docs.find(d => {
+              const data = d.data();
+              const aUid = data.adminUid || '';
+              return aUid === user.uid;
+            });
+          }
         }
 
         if (!matchedDoc) {
@@ -594,19 +607,18 @@
       if (!name || !name.trim()) return;
       const city = prompt(l10n('admin.promptCity', 'Enter City (e.g. Chennai):')) || '';
 
-      const slug = name.toLowerCase().replace(/[^a-z0-9]/g, '-').replace(/-+/g, '-').slice(0, 30);
-      const hCode = 'HOSP-' + Math.floor(1000 + Math.random() * 9000);
-
       try {
-        await window._fs.setDoc(window._fs.doc(window._db, 'hospitals', slug), {
-          name: name.trim(),
-          city: city.trim(),
-          adminUid: uid,
-          adminEmail: email,
-          hospitalCode: hCode,
-          createdAt: window._fs.serverTimestamp()
+        // Both modes go through the adapter. In functions mode the
+        // hardened rules deny a direct write to a hospital that does not
+        // exist yet, and the callable also stamps adminUid server-side
+        // (plus slug + Hospital Code) so the admin cannot be forged.
+        const created = await window.TokSpotAPI.createHospital({
+          name: name,
+          city: city,
+          email: email
         });
         showToast(l10n('admin.ok.hospCreated', 'Hospital created successfully!'));
+        assignedHospitalSlug = created.slug;
         await resolveAdminHospital(activeAdminUser);
       } catch(e) {
         alert(l10n('admin.err.create', 'Creation failed: ') + e.message);

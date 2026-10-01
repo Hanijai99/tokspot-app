@@ -979,6 +979,52 @@ async function randomHospitalCode() {
   return `HOSP-${String(Date.now()).slice(-4)}`;
 }
 
+// ------------------------------------------------------------------
+//  getMyHospital — resolve the caller's OWN hospital doc.
+//
+//  Why: admin.html used to find its hospital by listing the whole
+//  `hospitals` collection and matching adminUid in the browser. Under the
+//  hardened rules that query is denied (the rule is evaluated per doc, so
+//  a bare collection scan cannot be proven to satisfy isAdminOf), which
+//  would leave an admin unable to reach their own dashboard. This
+//  callable does the lookup with Admin credentials and returns only the
+//  one hospital the caller owns — never a list, never another tenant.
+// ------------------------------------------------------------------
+exports.getMyHospital = onCall({ rateLimiting: RL.codeResolve }, async (request) => {
+  const uid = request.auth && request.auth.uid;
+  if (!uid) throw new HttpsError('unauthenticated', 'Sign in to load your hospital.');
+  const email = request.auth.token && request.auth.token.email;
+
+  let found = null;
+  const byUid = await db.collection('hospitals').where('adminUid', '==', uid).limit(1).get();
+  if (!byUid.empty) {
+    found = byUid.docs[0];
+  } else if (email) {
+    // Fall back to the email claim for hospitals provisioned before
+    // adminUid was stamped. Never matches more than one hospital: the
+    // query is capped and the create path enforces one per identity.
+    const byEmail = await db.collection('hospitals').where('adminEmail', '==', email).limit(1).get();
+    if (!byEmail.empty) found = byEmail.docs[0];
+  }
+  if (!found) {
+    await audit(uid, null, 'hospital:resolve', null, 'not-found', {});
+    throw new HttpsError('not-found', 'No hospital is linked to this account.');
+  }
+
+  const d = found.data();
+  const result = {
+    slug: found.id,
+    name: d.name || found.id,
+    city: d.city || '',
+    phone: d.phone || '',
+    hospitalCode: d.hospitalCode || d.code || '',
+    emailVerified: Boolean(d.emailVerified),
+    status: d.status || 'active',
+  };
+  await audit(uid, found.id, 'hospital:resolve', found.id, 'ok', {});
+  return result;
+});
+
 exports.createHospital = onCall({ rateLimiting: RL.createHospital }, async (request) => {
   const uid = request.auth && request.auth.uid;
   if (!uid) throw new HttpsError('unauthenticated', 'Sign in before creating a hospital.');

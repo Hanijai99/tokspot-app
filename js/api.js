@@ -451,6 +451,14 @@
     return { slug, hospitalCode: code };
   }
 
+  // Resolve the caller's OWN hospital doc. Replaces admin.html's
+  // collection scan (denied by the hardened rules, since a bare
+  // `hospitals` query cannot be proven to satisfy isAdminOf per doc).
+  async function getMyHospital() {
+    if (apiMode() !== 'functions') throw new Error('getMyHospital needs functions mode.');
+    return callFunction('getMyHospital', {});
+  }
+
   // Public hospital code → slug lookup (TV + doctor login).
   async function resolveHospitalByCode(opts) {
     const { code } = opts || {};
@@ -687,6 +695,7 @@
     getTvFeed,
     getTokenByNumber,
     createHospital,
+    getMyHospital,
     resolveHospitalByCode,
     listDoctorsPublic,
     setDoctorDailyLimit,
