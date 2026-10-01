@@ -974,11 +974,17 @@
           // Update hospital sub-collection
           await window._fs.updateDoc(window._fs.doc(coll, editDoctorId), data);
 
-          // Sync with root /doctors collection for multi-device login
-          try {
-            await window._fs.setDoc(window._fs.doc(window._db, 'doctors', editDoctorId), data, { merge: true });
-          } catch(e) {
-            console.warn('Root sync note:', e);
+          // Sync with root /doctors collection for multi-device login.
+          // Prototype-era mirror: the hardened rules have no match block for
+          // the root collection, so skip it in functions mode instead of
+          // firing a write that is guaranteed to be denied. Secure doctor
+          // sign-in there goes through the provisionDoctor callable.
+          if (!FUNC) {
+            try {
+              await window._fs.setDoc(window._fs.doc(window._db, 'doctors', editDoctorId), data, { merge: true });
+            } catch(e) {
+              console.warn('Root sync note:', e);
+            }
           }
 
           showToast(l10n('admin.ok.docSavedProto', 'Doctor profile saved; secure doctor sign-in still requires server provisioning.'));
@@ -988,14 +994,17 @@
           // Generate document in sub-collection
           const docRef = await window._fs.addDoc(coll, data);
           
-          // Mirror immediately to root collection with matching ID
-          try {
-            await window._fs.setDoc(window._fs.doc(window._db, 'doctors', docRef.id), {
-              id: docRef.id,
-              ...data
-            });
-          } catch(e) {
-            console.warn('Root create mirror note:', e);
+          // Mirror immediately to root collection with matching ID (prototype
+          // only — the hardened rules deny writes to the root collection).
+          if (!FUNC) {
+            try {
+              await window._fs.setDoc(window._fs.doc(window._db, 'doctors', docRef.id), {
+                id: docRef.id,
+                ...data
+              });
+            } catch(e) {
+              console.warn('Root create mirror note:', e);
+            }
           }
 
           showToast(l10n('admin.ok.docCreatedProto', 'Doctor profile created; secure doctor sign-in still requires server provisioning.'));

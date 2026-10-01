@@ -405,6 +405,52 @@
     return callFunction('getTokenByNumber', { code, number });
   }
 
+  // Hospital self-onboarding. The hardened rules deny a brand-new admin
+  // writing their own hospital doc (isAdminOf() needs a doc that does not
+  // exist yet), so the ends-state path goes through a callable that
+  // stamps adminUid server-side. Prototype mode keeps the direct write.
+  async function createHospital(opts) {
+    const { name, city, phone, email } = opts || {};
+    if (!name) throw new Error('Hospital name is required.');
+    if (apiMode() !== 'functions') return createHospitalPrototype({ name, city, phone, email });
+    return callFunction('createHospital', { name, city, phone, email });
+  }
+
+  async function createHospitalPrototype({ name, city, phone, email }) {
+    const baseSlug = String(name || '')
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '')
+      .slice(0, 48) || 'hospital';
+    let slug = baseSlug;
+    let attempt = 1;
+    // eslint-disable-next-line no-await-in-loop
+    while (attempt < 6) {
+      const existsSnap = await win._fs.getDoc(win._fs.doc(win._db, 'hospitals', slug));
+      if (!existsSnap.exists()) break;
+      slug = `${baseSlug}-${attempt}`;
+      attempt += 1;
+    }
+    const randomNum = Math.floor(1000 + Math.random() * 9000);
+    const code = `HOSP-${randomNum}`;
+    const hospDocRef = win._fs.doc(win._db, 'hospitals', slug);
+    await win._fs.setDoc(hospDocRef, {
+      name: String(name).trim().slice(0, 120),
+      city: String(city || '').trim().slice(0, 80),
+      phone: String(phone || '').trim().slice(0, 24),
+      hospitalCode: code,
+      code,
+      adminEmail: String(email || '').trim().slice(0, 160),
+      adminUid: win._auth && win._auth.currentUser ? win._auth.currentUser.uid : '',
+      emailVerified: false,
+      policyAccepted: true,
+      policyAcceptedAt: win._fs.serverTimestamp(),
+      createdAt: win._fs.serverTimestamp(),
+      status: 'active',
+    });
+    return { slug, hospitalCode: code };
+  }
+
   // Public hospital code → slug lookup (TV + doctor login).
   async function resolveHospitalByCode(opts) {
     const { code } = opts || {};
@@ -640,6 +686,7 @@
     checkInAppointment,
     getTvFeed,
     getTokenByNumber,
+    createHospital,
     resolveHospitalByCode,
     listDoctorsPublic,
     setDoctorDailyLimit,

@@ -221,6 +221,7 @@
   <script src="js/firebase-config.js?v=20261001"></script>
   <script src="js/app.js?v=20261001"></script>
   <script src="js/firebase.js?v=20261001"></script>
+  <script src="js/api.js?v=20261001"></script>
   <script>
     window.showToast = window.showToast || function(msg) { alert(msg); };
 
@@ -305,27 +306,20 @@
         // 2. TRIGGER VERIFICATION EMAIL
         await window._useAuth.sendEmailVerification(registeredUser);
 
-        // 3. Generate Random 4-digit Hospital Code & URL Slug
-        const randomNum = Math.floor(1000 + Math.random() * 9000);
-        generatedCode = `HOSP-${randomNum}`;
-        generatedSlug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || `hosp-${randomNum}`;
-
-        // 4. Save Hospital in Firestore
-        const hospDocRef = window._fs.doc(window._db, 'hospitals', generatedSlug);
-        await window._fs.setDoc(hospDocRef, {
+        // 3. Create the hospital.
+        //    The slug + Hospital Code are minted server-side in functions
+        //    mode: the hardened rules cannot let a brand-new admin write
+        //    their own hospital doc, so the callable stamps adminUid from
+        //    the authenticated caller (the client never chooses the owner).
+        //    Prototype mode keeps the original direct write.
+        const created = await window.TokSpotAPI.createHospital({
           name: name,
           city: city,
           phone: phone,
-          hospitalCode: generatedCode,
-          code: generatedCode,
-          adminEmail: email,
-          adminUid: adminUid,
-          emailVerified: false,
-          policyAccepted: true,
-          policyAcceptedAt: window._fs.serverTimestamp(),
-          createdAt: window._fs.serverTimestamp(),
-          status: 'active'
+          email: email,
         });
+        generatedCode = created.hospitalCode;
+        generatedSlug = created.slug;
 
         // Store active session keys
         sessionStorage.setItem('tokmark_admin_hospital', generatedCode);

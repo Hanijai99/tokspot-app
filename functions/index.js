@@ -74,6 +74,7 @@ const RL = {
   pushToken: { maxCalls: 30, periodSeconds: 60 },
   smsFlush: { maxCalls: 5, periodSeconds: 60 },
   provision: { maxCalls: 5, periodSeconds: 60 },
+  createHospital: { maxCalls: 5, periodSeconds: 3600 },
   codeResolve: { maxCalls: 30, periodSeconds: 60 },
   listSlots: { maxCalls: 60, periodSeconds: 60 },
   createAppt: { maxCalls: 20, periodSeconds: 60 },
@@ -941,6 +942,96 @@ exports.getTokenByNumber = onCall({ rateLimiting: RL.tokenByNumber }, async (req
   }
   await audit(request.auth && request.auth.uid, target.id, 'lookup:number', matches[0].id, 'ok', { number: wanted });
   return { slug: target.id, tokenId: matches[0].id, number: matches[0].num, hospitalName: target.name || target.id };
+});
+
+// ------------------------------------------------------------------
+//  createHospital — hospital self-onboarding, server-mediated.
+//
+//  Why this exists: under the hardened policy a brand-new admin cannot
+//  write their own /hospitals/{slug} doc (isAdminOf() needs a doc that
+//  does not exist yet), so signup.html's direct setDoc is denied. This
+//  callable performs the creation with Admin credentials and stamps
+//  adminUid from the authenticated caller — the client can never choose
+//  who owns the hospital.
+//
+//  Guards: requires a real (non-anonymous) Firebase Auth user, mints a
+//  server-side slug + hospital code, enforces one hospital per admin,
+//  and rate limits to 5/hour per caller. Nothing PII-bearing is trusted
+//  from the client beyond length-capped name/city/phone/email.
+// ------------------------------------------------------------------
+function slugifyHospitalName(name) {
+  return String(name || '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 48);
+}
+
+async function randomHospitalCode() {
+  for (let attempt = 0; attempt < 12; attempt += 1) {
+    const n = Math.floor(1000 + Math.random() * 9000);
+    const code = `HOSP-${n}`;
+    const clash = await db.collection('hospitals')
+      .where('hospitalCode', '==', code).limit(1).get();
+    if (clash.empty) return code;
+  }
+  // Fall back to a time-derived code rather than failing the signup.
+  return `HOSP-${String(Date.now()).slice(-4)}`;
+}
+
+exports.createHospital = onCall({ rateLimiting: RL.createHospital }, async (request) => {
+  const uid = request.auth && request.auth.uid;
+  if (!uid) throw new HttpsError('unauthenticated', 'Sign in before creating a hospital.');
+  if (request.auth.token && request.auth.token.firebase && request.auth.token.firebase.sign_in_provider === 'anonymous') {
+    throw new HttpsError('failed-precondition', 'Use an email/password account to register a hospital.');
+  }
+
+  const { name, city, phone, email } = request.data || {};
+  const cleanName = String(name || '').trim().slice(0, 120);
+  if (!cleanName) throw new HttpsError('invalid-argument', 'Hospital name is required.');
+  const cleanCity = String(city || '').trim().slice(0, 80);
+  const cleanPhone = String(phone || '').trim().slice(0, 24);
+  const cleanEmail = String(email || request.auth.token.email || '').trim().slice(0, 160);
+
+  // One hospital per admin — otherwise a compromised client could mint
+  // unlimited tenants under a single identity.
+  const owned = await db.collection('hospitals').where('adminUid', '==', uid).limit(1).get();
+  if (!owned.empty) {
+    const existing = owned.docs[0];
+    await audit(uid, existing.id, 'hospital:create', existing.id, 'rejected', { reason: 'already-owner' });
+    throw new HttpsError('already-exists', 'This account already owns a hospital.');
+  }
+
+  const baseSlug = slugifyHospitalName(cleanName) || 'hospital';
+  let slug = baseSlug;
+  let attempt = 1;
+  // eslint-disable-next-line no-await-in-loop
+  while (attempt < 6) {
+    const exists = await db.doc(`hospitals/${slug}`).get();
+    if (!exists.exists) break;
+    slug = `${baseSlug}-${attempt}`;
+    attempt += 1;
+  }
+  const taken = await db.doc(`hospitals/${slug}`).get();
+  if (taken.exists) throw new HttpsError('resource-exhausted', 'Could not allocate a hospital URL. Try a different name.');
+
+  const code = await randomHospitalCode();
+  const now = new Date();
+  await db.doc(`hospitals/${slug}`).set({
+    name: cleanName,
+    city: cleanCity,
+    phone: cleanPhone,
+    hospitalCode: code,
+    code,
+    adminEmail: cleanEmail,
+    adminUid: uid,
+    emailVerified: false,
+    status: 'active',
+    createdAt: now,
+    createdBy: 'signup',
+  });
+  await audit(uid, slug, 'hospital:create', slug, 'ok', { city: cleanCity });
+  return { slug, hospitalCode: code };
 });
 
 // ------------------------------------------------------------------

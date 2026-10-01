@@ -154,6 +154,71 @@ if (!rulesTest || !EMU) {
     assert.ok(!snap.empty);
   });
 
+  test('a signed-in stranger cannot read a hospital doc', async () => {
+    const stranger = await testEnv.authenticatedContext('random-user-9');
+    await assert.rejects(
+      stranger.firestore().doc('hospitals/h1').get(),
+      DENIED
+    );
+  });
+
+  test('anonymous cannot read a hospital doc (desk must use resolveHospitalByCode)', async () => {
+    const anon = testEnv.unauthenticatedContext();
+    await assert.rejects(
+      anon.firestore().doc('hospitals/h1').get(),
+      DENIED
+    );
+  });
+
+  // ------------------------------------------------------------------
+  //  KNOWN ENDS-STATE GAPS — pinned deliberately.
+  //  These denies are CORRECT for the hardened policy, but they break a
+  //  prototype-era client path, so they must stay visible until each is
+  //  migrated to a callable. See PRODUCTION_READINESS.md (gate step 2).
+  // ------------------------------------------------------------------
+
+  test('a brand-new user still cannot self-create a hospital directly (callable owns it)', async () => {
+    // createHospital (a callable) mints the slug/code and stamps adminUid
+    // from the auth token. A client write must stay impossible, otherwise
+    // a modified bundle could mint tenants with a forged owner.
+    const fresh = await testEnv.authenticatedContext('brand-new-admin');
+    await assert.rejects(
+      fresh.firestore().doc('hospitals/new-hosp').set({
+        name: 'New Hospital', adminUid: 'brand-new-admin', hospitalCode: 'HOSP-1234',
+      }),
+      DENIED
+    );
+  });
+
+  test('the admin who owns a hospital CAN update it (createHospital stamps adminUid)', async () => {
+    const owner = await testEnv.authenticatedContext('admin-1');
+    const db = owner.firestore();
+    await db.doc('hospitals/h1').update({ emailVerified: true });
+    const snap = await db.doc('hospitals/h1').get();
+    assert.strictEqual(snap.data().emailVerified, true);
+  });
+
+  test('GAP: admin cannot write the legacy root /doctors mirror admin.html still tries', async () => {
+    const admin = await testEnv.authenticatedContext('admin-1');
+    await assert.rejects(
+      admin.firestore().doc('doctors/d1').set({ id: 'd1', name: 'Dr One' }, { merge: true }),
+      DENIED
+    );
+  });
+
+  test('GAP: anonymous cannot write appointments/feedback (callables only)', async () => {
+    const anon = testEnv.unauthenticatedContext();
+    const db = anon.firestore(); // settings can only be applied once per context
+    await assert.rejects(
+      db.collection('hospitals/h1/appointments').add({ slotStart: '10:00' }),
+      DENIED
+    );
+    await assert.rejects(
+      db.collection('hospitals/h1/feedback').add({ rating: 5 }),
+      DENIED
+    );
+  });
+
   test('admin can read own hospital audit trail, not other tenants', async () => {
     const admin = await testEnv.authenticatedContext('admin-1');
     const db = admin.firestore();
