@@ -459,6 +459,18 @@
     return callFunction('getMyHospital', {});
   }
 
+  // Register this device's FCM token for ONE specific queue token.
+  // Subscribing per token (not per hospital) is what stops every
+  // patient's phone from buzzing when any other patient's number is
+  // called — tokenCalledNotify sends to the devices registered against
+  // that single token id. Push is functions-mode only.
+  async function registerPushToken(opts) {
+    const { slug, token, tokenId } = opts || {};
+    if (!slug || !token) throw new Error('slug + token required.');
+    if (apiMode() !== 'functions') return { ok: false, skipped: 'prototype' };
+    return callFunction('registerPushToken', { slug, token, tokenId });
+  }
+
   // Public hospital code → slug lookup (TV + doctor login).
   async function resolveHospitalByCode(opts) {
     const { code } = opts || {};
@@ -696,6 +708,7 @@
     getTokenByNumber,
     createHospital,
     getMyHospital,
+    registerPushToken,
     resolveHospitalByCode,
     listDoctorsPublic,
     setDoctorDailyLimit,

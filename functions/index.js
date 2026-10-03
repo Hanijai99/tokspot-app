@@ -1765,11 +1765,20 @@ exports.getMyDoctorProfile = onCall({ rateLimiting: RL.myProfile }, async (reque
 //  registerPushToken — patient device token under the hospital
 // ------------------------------------------------------------------
 exports.registerPushToken = onCall({ rateLimiting: RL.pushToken }, async (request) => {
-  const { slug, token } = request.data || {};
+  const { slug, token, tokenId } = request.data || {};
   if (!slug || !token || token.length < 20) throw new HttpsError('invalid-argument', 'slug + token required.');
+  if (!tokenId) throw new HttpsError('invalid-argument', 'tokenId required.');
   const uid = request.auth && request.auth.uid;
+
+  // The device is bound to ONE queue token, not to the hospital. Sending
+  // to every device registered at the hospital would buzz every patient's
+  // phone whenever any patient's number was called, and would disclose one
+  // patient's token number to all the others.
   await db.doc(`hospitals/${slug}/pushTokens/${token}`).set({
     uid: uid || 'anonymous',
+    // Which queue token this device is watching. tokenCalledNotify
+    // filters on it, so a device only ever hears about its own token.
+    tokenId: String(tokenId),
     registeredAt: new Date(),
     ua: (request.headers && request.headers['user-agent']) || null,
   }, { merge: true });
@@ -1915,19 +1924,45 @@ exports.tokenCalledNotify = onDocumentUpdated(
       return; // only fired on waiting → called
     }
     const slug = event.params.slug;
-    const tokens = await db.collection(`hospitals/${slug}/pushTokens`).get();
+    const tokenId = event.params.tokenId;
+
+    // ONLY the devices watching this exact queue token. Devices
+    // registered before the tokenId field existed, or for a different
+    // token, are deliberately skipped rather than sent a message about
+    // someone else's number.
+    const snap = await db.collection(`hospitals/${slug}/pushTokens`).get();
+    const targets = [];
+    snap.forEach((d) => {
+      const rec = d.data() || {};
+      if (String(rec.tokenId || '') === String(tokenId)) targets.push(d.id);
+    });
+
+    if (!targets.length) {
+      console.log('push: no devices subscribed to token', tokenId);
+      return;
+    }
+
     const message = {
       notification: {
         title: 'Your turn!',
         body: `Token #${after.number} is now called at ${after.counter || 'Counter A'}.`,
       },
-      data: { slug, tokenId: event.params.tokenId, number: String(after.number || '') },
-      tokens: tokens.docs.map((d) => d.id),
+      data: { slug, tokenId, number: String(after.number || '') },
+      tokens: targets,
     };
-    if (message.tokens.length) {
-      const res = await getMessaging().sendEachForMulticast(message);
-      console.log('push results', res.successCount, res.failureCount);
-    }
+    const res = await getMessaging().sendEachForMulticast(message);
+
+    // Drop devices FCM reports as unregistered so a reinstalled browser
+    // does not keep accumulating dead tokens.
+    const dead = [];
+    res.responses.forEach((r, i) => {
+      const code = r.error && r.error.code;
+      if (code === 'messaging/registration-token-not-registered' || code === 'messaging/invalid-registration-token') {
+        dead.push(targets[i]);
+      }
+    });
+    await Promise.all(dead.map((t) => db.doc(`hospitals/${slug}/pushTokens/${t}`).delete().catch(() => {})));
+    console.log('push results', res.successCount, res.failureCount, 'pruned', dead.length);
   }
 );
 

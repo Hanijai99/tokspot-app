@@ -62,8 +62,16 @@
       const currentToken = await messaging.getToken({ vapidKey: key() });
       if (!currentToken) return;
 
-      await win.TokSpotAPI.registerPushToken({ slug: ctx.slug, token: currentToken });
-      console.log('[push] device registered for', ctx.slug);
+      // Bound to THIS queue token, not the hospital: the backend filters
+      // devices on tokenId so a patient is only notified about their own
+      // number. Passing only the slug would register at hospital scope
+      // and buzz every patient when any token was called.
+      if (!ctx.tokenId) {
+        console.warn('[push] no tokenId in context; skipping registration');
+        return;
+      }
+      await win.TokSpotAPI.registerPushToken({ slug: ctx.slug, token: currentToken, tokenId: ctx.tokenId });
+      console.log('[push] device registered for', ctx.slug, 'token', ctx.tokenId);
     } catch (e) {
       console.warn('[push] registration skipped:', e.message);
     }
