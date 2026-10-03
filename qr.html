@@ -61,6 +61,7 @@
   <script src="js/firebase-config.js?v=20261002"></script>
   <script src="js/app.js?v=20261002"></script>
   <script src="js/firebase.js?v=20261002"></script>
+  <script src="js/api.js?v=20261003"></script>
   <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
   <script>
     let qHos = null;
@@ -83,9 +84,24 @@
     async function loadHospitals() {
       await waitForFB();
       if (!window._FB_READY) return;
+      const sel = document.getElementById('hospitalSelect');
+      const FUNC = window.TokSpotAPI && window.TokSpotAPI.mode() === 'functions';
       try {
+        if (FUNC) {
+          // firestore.rules.target denies a bare `hospitals` collection
+          // query: the read is gated on isAdminOf(slug), which cannot be
+          // proven to hold for a whole result set. The callable resolves
+          // only the caller's own hospital, so the standee can only ever
+          // be printed for the hospital the admin actually owns.
+          const mine = await window.TokSpotAPI.getMyHospital();
+          const o = document.createElement('option');
+          o.value = mine.slug;
+          o.textContent = (mine.name || mine.slug) + (mine.city ? ' — ' + mine.city : '');
+          sel.appendChild(o);
+          await onHos();
+          return;
+        }
         const snap = await window._fs.getDocs(window._fs.collection(window._db, 'hospitals'));
-        const sel = document.getElementById('hospitalSelect');
         snap.docs.forEach(d => { const h=d.data(); const o=document.createElement('option'); o.value=d.id; o.textContent=(h.name||d.id)+(h.city?' — '+h.city:''); sel.appendChild(o); });
       } catch (e) { showToast('Failed to load: ' + e.message, true); }
     }
@@ -97,8 +113,23 @@
       ds.innerHTML = '<option value="">All Doctors</option>';
       if (!qHos || !window._FB_READY) return;
       try {
-        const snap = await window._fs.getDocs(window._fs.collection(window._db, 'hospitals', qHos, 'doctors'));
-        snap.docs.forEach(d => { const doc=d.data(); if(doc.status==='closed') return; const o=document.createElement('option'); o.value=d.id; o.textContent=(doc.name||d.id)+(doc.department?' · '+doc.department:''); ds.appendChild(o); });
+        const FUNC = window.TokSpotAPI && window.TokSpotAPI.mode() === 'functions';
+        if (FUNC) {
+          // Same reason as loadHospitals(): the doctors subcollection read
+          // is admin/own-doctor only under the hardened rules, so it goes
+          // through the callable. It already filters out closed doctors
+          // and sorts by name, which is what this dropdown wants.
+          const res = await window.TokSpotAPI.listDoctorsPublic({ slug: qHos });
+          res.doctors.forEach(doc => {
+            const o = document.createElement('option');
+            o.value = doc.id;
+            o.textContent = (doc.name || doc.id) + (doc.department ? ' · ' + doc.department : '');
+            ds.appendChild(o);
+          });
+        } else {
+          const snap = await window._fs.getDocs(window._fs.collection(window._db, 'hospitals', qHos, 'doctors'));
+          snap.docs.forEach(d => { const doc=d.data(); if(doc.status==='closed') return; const o=document.createElement('option'); o.value=d.id; o.textContent=(doc.name||d.id)+(doc.department?' · '+doc.department:''); ds.appendChild(o); });
+        }
       } catch (e) { console.error(e); }
       gen();
     }

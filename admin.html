@@ -290,7 +290,7 @@
   <script src="js/firebase-config.js?v=20261002"></script>
   <script src="js/app.js?v=20261002"></script>
   <script src="js/firebase.js?v=20261002"></script>
-  <script src="js/api.js?v=20261002"></script>
+  <script src="js/api.js?v=20261003"></script>
   <script src="js/i18n.js?v=20261002"></script>
   <script>
     if (window.I18N) I18N.init();
@@ -587,7 +587,16 @@
         loadDoctorList();
         loadAuditLog();
 
-        if (!hData.hospitalCode || !hData.adminEmail || hData.recoveryKey) {
+        // Legacy self-heal: stamp the hospital code/owner and drop the
+        // old recoveryKey on records created before those were enforced.
+        // Functions mode must skip this. getMyHospital returns a
+        // sanitized projection with no adminEmail/adminUid/recoveryKey,
+        // so the condition below is always true there and every admin
+        // page load would fire a client-side rewrite of the hospital
+        // doc's owner fields — the exact client-chosen-ownership write
+        // the create path was moved off in round 9.13. The server owns
+        // those fields from here.
+        if (!FUNC && (!hData.hospitalCode || !hData.adminEmail || hData.recoveryKey)) {
           window._fs.updateDoc(window._fs.doc(window._db, 'hospitals', assignedHospitalSlug), {
             hospitalCode: hCode,
             recoveryKey: window._fs.deleteField(),

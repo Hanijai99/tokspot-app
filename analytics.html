@@ -139,7 +139,7 @@
   <script src="js/app.js?v=20261002"></script>
   <script src="js/firebase.js?v=20261002"></script>
   <script src="js/queue-domain.js?v=20261002"></script>
-  <script src="js/api.js?v=20261002"></script>
+  <script src="js/api.js?v=20261003"></script>
   <script>
     if (window.I18N) I18N.init();
     function l10n(key, fb) { return (window.I18N && window.I18N.t) ? window.I18N.t(key) : fb; }
@@ -164,9 +164,26 @@
     async function loadHospitals(user) {
       await waitForFB();
       if (!window._FB_READY) return;
+      const sel = document.getElementById('hospitalSelect');
+      const FUNC = window.TokSpotAPI && window.TokSpotAPI.mode() === 'functions';
       try {
+        if (FUNC) {
+          // firestore.rules.target gates a hospitals read on
+          // isAdminOf(slug), which cannot be proven to hold for a whole
+          // result set — a bare collection query is denied outright. The
+          // callable resolves only the caller's own hospital, and one
+          // verified admin owns one hospital, so the picker collapses to
+          // that single entry. No `?h=` cross-tenant selection either.
+          const mine = await window.TokSpotAPI.getMyHospital();
+          const o = document.createElement('option');
+          o.value = mine.slug;
+          o.dataset.name = mine.name || mine.slug;
+          o.textContent = (mine.name || mine.slug) + (mine.city ? ' — ' + mine.city : '');
+          sel.appendChild(o);
+          await loadAnalytics();
+          return;
+        }
         const snap = await window._fs.getDocs(window._fs.collection(window._db, 'hospitals'));
-        const sel = document.getElementById('hospitalSelect');
         snap.docs.filter(d => window.TokspotQueue.isHospitalAdmin(user, d.data())).forEach(d => {
           const h = d.data(); 
           const o = document.createElement('option'); 
@@ -180,7 +197,13 @@
           sel.value = requestedHospital;
           await loadAnalytics();
         }
-      } catch (e) { showToast(l10n('analytics.err.load', 'Failed to load: ') + e.message, true); }
+      } catch (e) {
+        if (FUNC && /not-found|No hospital/i.test(e.message || '')) {
+          showToast(l10n('analytics.err.unauthorized', 'You are not authorized to view this hospital report.'), true);
+          return;
+        }
+        showToast(l10n('analytics.err.load', 'Failed to load: ') + e.message, true);
+      }
     }
 
     async function loadAnalytics() {
