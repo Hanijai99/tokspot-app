@@ -268,6 +268,33 @@
       } catch(e){}
     });
 
+    // Does this Auth account already own a hospital? Mirrors the lookup in
+    // admin.html resolveAdminHospital: prototype mode matches adminUid from
+    // a bare `hospitals` scan, functions mode asks the server. Used so a
+    // repeated signup never mints a SECOND hospital for one admin.
+    async function findExistingHospitalFor(user) {
+      if (!user) return null;
+      if (window.TokSpotAPI && window.TokSpotAPI.mode() === 'functions') {
+        try {
+          const mine = await window.TokSpotAPI.getMyHospital();
+          if (mine && mine.slug) {
+            return { slug: mine.slug, hospitalCode: mine.hospitalCode || mine.code || '' };
+          }
+        } catch (e) { /* not-found: this admin owns nothing yet */ }
+        return null;
+      }
+      try {
+        const snap = await window._fs.getDocs(window._fs.collection(window._db, 'hospitals'));
+        if (!snap || snap.empty) return null;
+        const d = snap.docs.find(x => (((x.data() || {}).adminUid) || '') === user.uid);
+        if (!d) return null;
+        const data = d.data() || {};
+        return { slug: d.id, hospitalCode: data.hospitalCode || data.code || '' };
+      } catch (e) {
+        return null;
+      }
+    }
+
     async function registerHospital() {
       const name = document.getElementById('hospName').value.trim();
       const city = document.getElementById('hospCity').value.trim();
@@ -294,20 +321,66 @@
       try {
         // 1. Create Firebase Auth Account for Admin
         let userCred;
+        let resumed = false;
         try {
           userCred = await window._useAuth.createUserWithEmailAndPassword(window._auth, email, password);
         } catch (authErr) {
-          if (authErr.code === 'auth/email-already-in-use') {
-            throw new Error('Email already registered! Please sign in at admin.html.');
+          if (authErr.code !== 'auth/email-already-in-use') throw authErr;
+
+          // The account exists. That happens when an earlier attempt got as
+          // far as creating the Auth user but stopped before the hospital
+          // was created — the account then survives and every retry dies
+          // here. Dead-ending stranded admins with no way back into the
+          // form, so instead resume on the existing account using the
+          // password that was just typed.
+          try {
+            userCred = await window._useAuth.signInWithEmailAndPassword(window._auth, email, password);
+            resumed = true;
+          } catch (pwErr) {
+            const badPw = ['auth/wrong-password', 'auth/invalid-credential', 'auth/invalid-login-credentials', 'auth/user-disabled'];
+            if (badPw.indexOf(pwErr.code) > -1) {
+              throw new Error(
+                'An account already exists for ' + email + ', but that password does not match it. '
+                + 'Use the Login tab above instead — or delete this account and register again.'
+              );
+            }
+            throw pwErr;
           }
-          throw authErr;
+
+          // Already fully set up? Then never mint a second hospital for the
+          // same admin — hand back the existing Hospital Code and let
+          // admin.html own the rest (it handles the unverified gate itself).
+          const existing = await findExistingHospitalFor(userCred.user);
+          if (existing) {
+            if (existing.hospitalCode) {
+              sessionStorage.setItem('tokspot_admin_hospital', existing.hospitalCode);
+              sessionStorage.setItem('tokspot_frontdesk_hospital', existing.hospitalCode);
+              localStorage.setItem('tokspot_hospital_code', existing.hospitalCode);
+            }
+            alert('You already have a hospital registered to this email'
+              + (existing.hospitalCode ? ' — Hospital Code ' + existing.hospitalCode : '')
+              + '. Opening your dashboard.');
+            window.location.href = 'admin.html';
+            return;
+          }
         }
 
         registeredUser = userCred.user;
         const adminUid = registeredUser.uid;
 
         // 2. TRIGGER VERIFICATION EMAIL
-        await window._useAuth.sendEmailVerification(registeredUser);
+        //    Only when still unverified — re-sending to an already-verified
+        //    account rejects, which would strand an otherwise-finished
+        //    resumed signup.
+        if (!registeredUser.emailVerified) {
+          try {
+            await window._useAuth.sendEmailVerification(registeredUser);
+          } catch (mailErr) {
+            // A full mailbox or a rate limit must not destroy the hospital
+            // that was just created. The verify card has its own resend.
+            console.warn('Verification email not sent:', mailErr);
+          }
+        }
 
         // 3. Create the hospital.
         //    The slug + Hospital Code are minted server-side in functions
@@ -333,6 +406,16 @@
         document.getElementById('sentEmailSpan').textContent = email;
         document.getElementById('createdHospCode').textContent = generatedCode;
         document.getElementById('displayHospBadge').textContent = generatedCode;
+        // A resumed account may already be verified, in which case no new
+        // mail was sent and "Check Your Inbox" would be a lie.
+        const heading = document.querySelector('#modalWaitingState h2');
+        const sub = document.getElementById('sentEmailSpan');
+        if (registeredUser.emailVerified) {
+          if (heading) heading.textContent = 'Already Verified';
+          if (sub) sub.textContent = 'This account was already verified — signing you in.';
+        } else if (resumed) {
+          if (heading) heading.textContent = 'Check Your Inbox';
+        }
         document.getElementById('verifyModal').classList.remove('hidden');
 
         // 6. Start Polling for Verification Click
