@@ -16,3 +16,9 @@ Thumbs.db
 # secrets (never commit service account keys)
 *.service-account.json
 *_service_account.json
+
+# ML training artefacts — ml/data holds REAL hospital traffic extracts and
+# trained models. The JSONL exports are PHI-free by construction but still
+# describe a real clinic's patient flow, and must never be published.
+ml/data/
+*.jsonl
