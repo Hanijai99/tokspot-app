@@ -31,9 +31,9 @@
 const fs = require('fs');
 const path = require('path');
 
-const { buildDataset, buildVocabulary, toMatrix, assertNoLeakage, FEATURES, CATEGORICALS } = require('./features');
+const { buildDataset, buildVocabulary, toMatrix, rowsWithTarget, assertNoLeakage, FEATURES, CATEGORICALS } = require('./features');
 const { fitRidge, fitGBM } = require('./models');
-const { fitBaseline, timeSplit, evaluate, improvement, mean, SHIP_THRESHOLD_PCT } = require('./evaluate');
+const { fitBaseline, timeSplit, evaluate, improvement, report, mean, SHIP_THRESHOLD_PCT } = require('./evaluate');
 
 // ------------------------------------------------------------------
 
@@ -141,10 +141,27 @@ function main() {
   }
 
   // ---- time-ordered split ---------------------------------------
-  const { train, test } = timeSplit(rows, args.testFraction);
+  // Filter to rows that actually have a target BEFORE splitting. toMatrix
+  // drops null-target rows internally; splitting first would leave `test`
+  // longer than `E.y` and silently pair every row with the wrong target —
+  // including the baseline's score, which is what gates the ship decision.
+  const usableRows = rowsWithTarget(rows, 'waitMinutes');
+  const { train, test } = timeSplit(usableRows, args.testFraction);
   const vocab = buildVocabulary(train);          // vocab from TRAIN only
   const T = toMatrix(train, vocab, 'waitMinutes');
   const E = toMatrix(test, vocab, 'waitMinutes');
+
+  // Alignment is now an invariant, not an assumption. Assert it rather than
+  // trusting it: a future edit that reintroduces the filter-late bug should
+  // stop here with a clear message instead of reporting a plausible number.
+  if (train.length !== T.n || test.length !== E.n) {
+    console.error(
+      '\nMISALIGNED SPLIT — train rows ' + train.length + ' vs targets ' + T.n +
+      ', test rows ' + test.length + ' vs targets ' + E.n + '.'
+    );
+    console.error('Row metadata and targets must be filtered together. Refusing to report scores.');
+    process.exit(4);
+  }
 
   if (!T.n || !E.n) {
     console.error(`\nSplit produced train=${T.n} / test=${E.n} usable rows. Widen the date range.`);
@@ -185,19 +202,61 @@ function main() {
   console.log(`  ridge : ${impRidge.maePct == null ? 'n/a' : fmt(impRidge.maePct) + '% MAE reduction'} — ${impRidge.verdict}`);
   console.log(`  gbm   : ${impGbm.maePct == null ? 'n/a' : fmt(impGbm.maePct) + '% MAE reduction'} — ${impGbm.verdict}`);
 
-  // Slices. Bimanual-style bimodal load means an evening-only failure hides
-  // inside a good overall number.
+  // Slices. Bimodal OPD load means an evening-only failure hides inside a
+  // good overall number, so every band carries its own baseline. Printing the
+  // baseline is not optional — a band where the model beats the overall MAE
+  // but loses to the heuristic in that band is exactly the case that gets
+  // shipped by accident.
+  const predFns = {
+    baseline: (x, r) => baseline.predictRow(r),
+    ridge: (x) => ridge.predictRow(x),
+    gbm: (x) => gbm.predictRow(x),
+  };
   const slices = {};
-  for (const [name, pred] of [['ridge', (x, r) => ridge.predictRow(x)], ['gbm', (x) => gbm.predictRow(x)]]) {
-    const rep = require('./evaluate').report({
-      rows: test, X: E.X, y: E.y, predict: pred, label: name,
+  for (const [name, predict] of Object.entries(predFns)) {
+    // In-sample fit is only meaningful for the fitted models, and only they
+    // can be evaluated without row metadata. The baseline is a lookup keyed
+    // on the row, so asking for its in-sample score would hand it undefined
+    // rows and crash. Median heuristics have no train/test gap by definition.
+    const fitted = name === 'ridge' || name === 'gbm';
+    slices[name] = report({
+      rows: test, X: E.X, y: E.y, predict, label: name,
+      trainX: fitted ? T.X : undefined,
+      trainY: fitted ? T.y : undefined,
     });
-    slices[name] = rep;
   }
+
   console.log('\n[by time band]  0=pre-OPD 1=morning peak 2=lull 3=evening peak 4=late');
-  for (const band of slices.gbm.byTimeBand) {
-    const b = slices.ridge.byTimeBand.find((x) => x.slice === band.slice);
-    console.log(`  ${band.slice}  n=${String(band.n).padStart(4)}   baseline ${fmt(band.mae)}m -> ridge ${fmt(b.mae)}m -> gbm ${fmt(band.mae)}m`);
+  console.log('  band        n   baseline   ridge     gbm    ridge vs base   gbm vs base');
+  const bands = slices.gbm.byTimeBand.map((b) => b.slice);
+  for (const key of slices.ridge.byTimeBand.map((b) => b.slice)) {
+    if (bands.indexOf(key) === -1) bands.push(key);
+  }
+  for (const key of bands) {
+    const pick = (src) => src.byTimeBand.find((x) => x.slice === key);
+    const bB = pick(slices.baseline), bR = pick(slices.ridge), bG = pick(slices.gbm);
+    if (!bB || !bR || !bG) continue;
+    const pct = (m) => (bB.mae ? (((bB.mae - m.mae) / bB.mae) * 100).toFixed(0) + '%' : 'n/a');
+    console.log(
+      `  ${key.padEnd(8)} ${String(bG.n).padStart(4)}   ` +
+      `${fmt(bB.mae).padStart(6)}m ${fmt(bR.mae).padStart(6)}m ${fmt(bG.mae).padStart(6)}m` +
+      `     ${pct(bR).padStart(8)}   ${pct(bG).padStart(8)}`
+    );
+  }
+
+  // A model that wins overall but loses a band has not earned the number.
+  const losingBands = [];
+  for (const key of bands) {
+    const bB = slices.baseline.byTimeBand.find((x) => x.slice === key);
+    const bG = slices.gbm.byTimeBand.find((x) => x.slice === key);
+    const bR = slices.ridge.byTimeBand.find((x) => x.slice === key);
+    if (!bB || (!bG && !bR)) continue;
+    const best = Math.min(bR ? bR.mae : Infinity, bG ? bG.mae : Infinity);
+    if (Number.isFinite(best) && best > bB.mae) losingBands.push(key);
+  }
+  if (losingBands.length) {
+    console.log(`\n  ! the model LOSES to the plain heuristic in: ${losingBands.join(', ')}`);
+    console.log('    Do not show a predicted wait time to a patient in those bands.');
   }
 
   // ---- save -----------------------------------------------------

@@ -442,6 +442,229 @@ test('the PHI denylist covers every identifying field the app actually writes', 
   }
 });
 
+// ------------------------------------------------------------------
+//  12. Row/target alignment  (round 9.18)
+// ------------------------------------------------------------------
+//
+// Round 9.18 shipped a scoring bug that no assertion caught. toMatrix()
+// drops rows with a null target (tokens issued but never called), but the
+// time-ordered split ran on the FULL row set first. So `test` held 804 rows
+// while `E.y` held 780, and every `test[i]` was paired with the wrong
+// target — including the BASELINE's score, which is the number that decides
+// whether the model ships.
+//
+// It failed quietly. The baseline's MAE was reported as 7.42m when it was
+// really 4.33m, a flattering 63% improvement that was really 36%. The only
+// visible symptom was NaN in one time band, which looked like a display
+// glitch rather than a corrupt evaluation.
+//
+// Rule: row metadata and targets must be filtered together, before splitting.
+
+test('rowsWithTarget returns exactly the rows toMatrix keeps', () => {
+  const { rows } = buildDataset(syntheticOPD({ days: 20, seed: 21 }), {});
+  const usable = feat.rowsWithTarget(rows, 'waitMinutes');
+  const M = toMatrix(usable, buildVocabulary(usable), 'waitMinutes');
+
+  assert.strictEqual(usable.length, M.n,
+    'rowsWithTarget and toMatrix disagree on how many rows are usable');
+  assert.strictEqual(M.dropped, 0, 'nothing should be dropped after pre-filtering');
+
+  // And it must genuinely exclude the pending ones.
+  const pendingInRows = rows.filter((r) => r.waitMinutes == null).length;
+  assert.ok(usable.length === rows.length - pendingInRows);
+});
+
+test('the pipeline keeps row metadata aligned with targets end to end', () => {
+  const raw = syntheticOPD({ days: 30, seed: 33 });
+  const { rows } = buildDataset(raw, {});
+  const usable = feat.rowsWithTarget(rows, 'waitMinutes');
+  const { train, test } = timeSplit(usable, 0.25);
+  const vocab = buildVocabulary(train);
+  const T = toMatrix(train, vocab, 'waitMinutes');
+  const E = toMatrix(test, vocab, 'waitMinutes');
+
+  assert.strictEqual(train.length, T.n, 'train rows/targets misaligned');
+  assert.strictEqual(test.length, E.n, 'test rows/targets misaligned');
+});
+
+test('splitting BEFORE filtering is detectable, not silent', () => {
+  // Reproduce the old ordering and prove the misalignment is visible.
+  const { rows } = buildDataset(syntheticOPD({ days: 30, seed: 33 }), {});
+  const bad = timeSplit(rows, 0.25);                 // unfiltered, as before
+  const vocab = buildVocabulary(bad.train);
+  const E = toMatrix(bad.test, vocab, 'waitMinutes');
+  assert.notStrictEqual(bad.test.length, E.n,
+    'this dataset no longer reproduces the bug — the guard test is now vacuous');
+
+  // Reading past the end of the target array is what produced NaN before.
+  assert.strictEqual(E.y[E.y.length], undefined);
+  assert.ok(Number.isNaN(Math.abs(undefined - 1)));
+});
+
+test('per-slice evaluation never produces NaN', () => {
+  const raw = syntheticOPD({ days: 30, seed: 44 });
+  const r = runPipeline(raw, { nTrees: 60, maxDepth: 2 });
+
+  // Slice counts must reconstruct the test-set size exactly. Anything else
+  // means rows and targets drifted apart.
+  const src = fs.readFileSync(path.join(ml, 'train.js'), 'utf8');
+  assert.match(src, /if \(train\.length !== T\.n \|\| test\.length !== E\.n\)/,
+    'train.js must assert alignment rather than assume it');
+
+  for (const m of [r.baseline, r.ridge, r.gbm]) {
+    for (const k of ['mae', 'rmse', 'medianAbsErr', 'p90AbsErr']) {
+      assert.ok(Number.isFinite(m[k]), `${k} is ${m[k]} — scoring is broken`);
+    }
+  }
+});
+
+test('evaluate.report is exported and callable', () => {
+  // It was defined but not exported; train.js crashed on it at runtime.
+  assert.strictEqual(typeof ev.report, 'function');
+  const { rows } = buildDataset(syntheticOPD({ days: 10, seed: 51 }), {});
+  const usable = feat.rowsWithTarget(rows, 'waitMinutes');
+  const { train, test } = timeSplit(usable, 0.3);
+  const vocab = buildVocabulary(train);
+  const E = toMatrix(test, vocab, 'waitMinutes');
+
+  const rep = ev.report({
+    rows: test, X: E.X, y: E.y,
+    predict: (x) => x[0],
+    label: 'identity',
+  });
+  assert.ok(Number.isFinite(rep.overall.mae), 'report() returned a non-finite MAE');
+  // Every slice count must be accounted for.
+  const summed = rep.byTimeBand.reduce((s, b) => s + b.n, 0);
+  assert.ok(summed <= E.n,
+    `slice counts (${summed}) exceed the test set (${E.n}) — rows and targets are misaligned`);
+});
+
+// ------------------------------------------------------------------
+//  13. Sample data generator
+// ------------------------------------------------------------------
+
+test('the synthetic generator emits export-shaped records only', () => {
+  const { generate } = require(path.join(ml, 'sample-data'));
+  const recs = generate({ days: 4, seed: 9, volume: 1, start: '2026-06-01' });
+
+  assert.ok(recs.length > 50, `too few records to be useful: ${recs.length}`);
+  const ALLOWED = new Set(['createdAt', 'calledAt', 'doctorId', 'counter', 'status', 'priority']);
+  for (const r of recs) {
+    assert.deepStrictEqual(Object.keys(r).sort(), [...ALLOWED].sort(),
+      'generated record has the wrong shape — real exports will not load');
+    assert.ok(Number.isFinite(r.createdAt), 'createdAt must be epoch millis');
+    assert.ok(r.calledAt === null || Number.isFinite(r.calledAt));
+    if (r.calledAt != null) assert.ok(r.calledAt > r.createdAt, 'calledAt precedes createdAt');
+  }
+  // Sorted, as export.js emits.
+  for (let i = 1; i < recs.length; i++) {
+    assert.ok(recs[i].createdAt >= recs[i - 1].createdAt, 'records must be time-ordered');
+  }
+});
+
+test('the synthetic generator contains no identifying fields', () => {
+  const { generate } = require(path.join(ml, 'sample-data'));
+  const recs = generate({ days: 3, seed: 4, volume: 1, start: '2026-06-01' });
+  const keys = new Set(recs.flatMap((r) => Object.keys(r)));
+  for (const bad of ['patientName', 'name', 'phone', 'email']) {
+    assert.ok(!keys.has(bad), `generator emitted "${bad}" — training data must stay PHI-free`);
+  }
+});
+
+test('training on synthetic data must NOT be mistaken for a real model', () => {
+  const src = fs.readFileSync(path.join(ml, 'sample-data.js'), 'utf8');
+  assert.match(src, /NOT REAL PATIENTS/, 'the generator must label its own output');
+  assert.match(src, /SYNTHETIC-DEMO/, 'default filename must be self-evidently fake');
+  // And the artefacts must not be committable.
+  const ignore = fs.readFileSync(path.join(__dirname, '..', '.gitignore'), 'utf8');
+  assert.match(ignore, /ml[\\/]data/);
+  assert.match(ignore, /\.jsonl/);
+});
+
+// ------------------------------------------------------------------
+//  14. End-to-end: run the actual CLI
+// ------------------------------------------------------------------
+//
+// The source-level assertions above all passed while the trainer was still
+// splitting before filtering — reverting the fix broke nothing. So the only
+// honest guard is to RUN it.
+//
+// This executes ml\train.js as a child process over data that deliberately
+// contains pending (never-called) tokens, which is exactly the condition that
+// used to shift every row against its target.
+
+const { spawnSync } = require('node:child_process');
+const os = require('node:os');
+
+test('the training CLI runs clean on data containing pending tokens', (t) => {
+  const { generate } = require(path.join(ml, 'sample-data'));
+  const recs = generate({ days: 26, seed: 77, volume: 1, start: '2026-06-01' });
+
+  const pending = recs.filter((r) => r.calledAt == null).length;
+  assert.ok(pending > 0,
+    'fixture must contain uncalled tokens or it cannot catch the misalignment');
+
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'tokspot-ml-'));
+  const file = path.join(dir, 'fixture.jsonl');
+  fs.writeFileSync(file, recs.map((r) => JSON.stringify(r)).join('\n') + '\n');
+
+  const res = spawnSync(process.execPath, [
+    path.join(ml, 'train.js'), file, '--trees', '40', '--depth', '2',
+  ], { encoding: 'utf8', timeout: 240000 });
+
+  const out = (res.stdout || '') + (res.stderr || '');
+  t.diagnostic(`exit=${res.status}`);
+  fs.rmSync(dir, { recursive: true, force: true });
+
+  assert.strictEqual(res.status, 0,
+    `train.js exited ${res.status}\n${out.slice(-1500)}`);
+
+  // The NaN signature of the misaligned run. One band going NaN was the only
+  // visible symptom, and it read like a display glitch.
+  assert.doesNotMatch(out, /NaN/,
+    'training output contains NaN — row metadata and targets are misaligned');
+
+  // train + test must account for exactly the usable rows, and the printed
+  // per-band counts must reconstruct the test-set size.
+  const splitM = out.match(/train (\d+) rows.*?\| test (\d+) rows/);
+  assert.ok(splitM, 'could not parse the split line from train.js output');
+  const trainN = Number(splitM[1]);
+  const testN = Number(splitM[2]);
+
+  const bandNs = [...out.matchAll(/^\s+band\d\s+(\d+)\s+/gm)].map((m) => Number(m[1]));
+  assert.ok(bandNs.length > 0, 'no per-band rows printed');
+  const summed = bandNs.reduce((s, n) => s + n, 0);
+  assert.ok(summed <= testN,
+    `per-band counts sum to ${summed} but the test set is ${testN} — ` +
+    'rows are being counted against the wrong targets');
+
+  assert.strictEqual(trainN + testN, recs.length - pending,
+    'every usable row must land in exactly one side of the split');
+});
+
+test('the training CLI refuses to score on too little data', () => {
+  // The honest failure must stay an honest failure: a clinic with three days
+  // of traffic must be told it is not enough, not handed a model.
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'tokspot-ml-'));
+  const file = path.join(dir, 'tiny.jsonl');
+  const { generate } = require(path.join(ml, 'sample-data'));
+  const recs = generate({ days: 2, seed: 5, volume: 0.1, start: '2026-06-01' });
+  fs.writeFileSync(file, recs.map((r) => JSON.stringify(r)).join('\n') + '\n');
+
+  const res = spawnSync(process.execPath, [path.join(ml, 'train.js'), file],
+    { encoding: 'utf8', timeout: 120000 });
+  fs.rmSync(dir, { recursive: true, force: true });
+
+  const out = (res.stdout || '') + (res.stderr || '');
+  assert.notStrictEqual(res.status, 0, 'tiny dataset must not exit 0');
+  assert.match(out, /NOT ENOUGH DATA|need >=/,
+    `expected an explicit "not enough data" message, got:\n${out.slice(-600)}`);
+});
+
+// ------------------------------------------------------------------
+//  15. Training data directory is not committed accidentally
+// ------------------------------------------------------------------
+
 test('training data directory is not committed accidentally', () => {
   const root = path.join(__dirname, '..');
   const ignore = path.join(root, '.gitignore');

@@ -294,6 +294,32 @@ function toMatrix(rows, vocab, targetKey) {
   };
 }
 
+/**
+ * Rows whose target is actually present.
+ *
+ * WHY THIS MUST HAPPEN BEFORE THE SPLIT, NOT AFTER
+ * -----------------------------------------------
+ * `toMatrix()` drops rows with a null target (tokens issued but never yet
+ * called). If the time-ordered split runs on the full row set and the
+ * filtering happens inside toMatrix, then `test` holds N rows while `E.y`
+ * holds fewer — and every `test[i]` paired with `E.y[i]` is the WRONG ROW.
+ *
+ * That does not fail loudly. It produces plausible MAE numbers computed
+ * against shifted targets, and NaN in any slice report that reads past the
+ * end. The baseline is evaluated the same way, so the number that decides
+ * whether the model ships is itself computed on misaligned data.
+ *
+ * Filter first, split second, and row metadata stays aligned with targets by
+ * construction.
+ *
+ * @param {Array<object>} rows
+ * @param {string} [key='waitMinutes']
+ */
+function rowsWithTarget(rows, key) {
+  const k = key || 'waitMinutes';
+  return rows.filter((r) => Number.isFinite(r[k]));
+}
+
 // ------------------------------------------------------------------
 //  Leakage guard.
 // ------------------------------------------------------------------
@@ -336,6 +362,7 @@ module.exports = {
   buildVocabulary,
   encodeRow,
   toMatrix,
+  rowsWithTarget,
   assertNoLeakage,
   median,
   FEATURES,

@@ -179,6 +179,7 @@ module.exports = {
   fitBaseline,
   timeSplit,
   sliceReport,
+  report,
   mae,
   rmse,
   mean,

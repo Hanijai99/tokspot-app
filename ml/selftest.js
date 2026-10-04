@@ -23,7 +23,7 @@
 
 const assert = require('assert');
 
-const { buildDataset, buildVocabulary, toMatrix, assertNoLeakage, FEATURES } = require('./features');
+const { buildDataset, buildVocabulary, toMatrix, rowsWithTarget, assertNoLeakage, FEATURES } = require('./features');
 const { fitRidge, fitGBM } = require('./models');
 const { fitBaseline, timeSplit, evaluate, improvement, SHIP_THRESHOLD_PCT } = require('./evaluate');
 const { mulberry32 } = require('./models');
@@ -131,10 +131,15 @@ function runPipeline(raw, opts) {
   assertNoLeakage(FEATURES);
 
   const { rows } = buildDataset(raw, { minWaitMinutes: 0 });
-  const { train, test } = timeSplit(rows, o.testFraction);
+  // Filter BEFORE splitting — same reason as train.js. Splitting first leaves
+  // `test` longer than the target array and pairs rows with the wrong targets.
+  const usableRows = rowsWithTarget(rows, 'waitMinutes');
+  const { train, test } = timeSplit(usableRows, o.testFraction);
   const vocab = buildVocabulary(train);
   const T = toMatrix(train, vocab, 'waitMinutes');
   const E = toMatrix(test, vocab, 'waitMinutes');
+  assert.strictEqual(train.length, T.n, 'train rows and targets are misaligned');
+  assert.strictEqual(test.length, E.n, 'test rows and targets are misaligned');
 
   const baseline = fitBaseline(train);
   const ridge = fitRidge(T.X, T.y, { alpha: 1 });
