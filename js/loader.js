@@ -3,10 +3,10 @@
    ============================================================ */
 
 (function () {
-  // 1. Inject Styles for Loader and Skeleton into Document Head
+  // 1. Inject styles for the video loader and progress indicator.
   const loaderStyle = document.createElement('style');
   loaderStyle.id = 'tokspot-loader-styles';
-  loaderStyle.innerHTML = `
+  loaderStyle.textContent = `
     #appLoader {
       position: fixed;
       inset: 0;
@@ -23,19 +23,12 @@
       visibility: hidden;
       pointer-events: none;
     }
-    .tok-loader-wrap {
-      width: 72px;
-      height: 72px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      position: relative;
-    }
-    .tok-loader-logo {
-      width: 100%;
-      height: 100%;
+    .tok-loader-video {
+      display: block;
+      width: min(80vw, 560px);
+      max-height: 70vh;
       object-fit: contain;
-      animation: tokPulse 1.6s ease-in-out infinite;
+      border-radius: 16px;
     }
     .tok-progress-track {
       width: 120px;
@@ -56,40 +49,60 @@
       border-radius: 99px;
       animation: tokShimmer 1.1s infinite ease-in-out;
     }
-    @keyframes tokPulse {
-      0%, 100% { transform: scale(0.95); filter: drop-shadow(0 0 10px rgba(139, 187, 146, 0.25)); }
-      50% { transform: scale(1.06); filter: drop-shadow(0 0 22px rgba(139, 187, 146, 0.6)); }
-    }
     @keyframes tokShimmer {
       0% { left: -50%; }
       100% { left: 100%; }
     }
+    @media (prefers-reduced-motion: reduce) {
+      .tok-progress-fill { animation: none; left: 0; width: 100%; }
+      #appLoader { transition: none; }
+    }
   `;
   document.head.appendChild(loaderStyle);
 
-  // 2. Inject HTML element at top of Body as soon as DOM is ready
+  // 2. Inject the loader into the body as soon as it is available.
   function injectLoaderHTML() {
     if (document.getElementById('appLoader')) return;
+
     const loaderDiv = document.createElement('div');
     loaderDiv.id = 'appLoader';
+    loaderDiv.setAttribute('role', 'status');
+    loaderDiv.setAttribute('aria-label', 'Loading TokSpot');
     loaderDiv.innerHTML = `
-      <div class="tok-loader-wrap">
-        <img src="logo.png?v=2" alt="TokSpot" class="tok-loader-logo" />
-      </div>
-      <div class="tok-progress-track">
+      <video
+        class="tok-loader-video"
+        autoplay
+        muted
+        loop
+        playsinline
+        preload="auto"
+        aria-label="TokSpot loading animation"
+      >
+        <source src="apploaderhospital.mp4" type="video/mp4" />
+      </video>
+      <div class="tok-progress-track" aria-hidden="true">
         <div class="tok-progress-fill"></div>
       </div>
     `;
     document.body.prepend(loaderDiv);
+
+    // Muted autoplay is supported by modern browsers; retry playback where needed.
+    const video = loaderDiv.querySelector('video');
+    const playPromise = video.play();
+    if (playPromise && typeof playPromise.catch === 'function') {
+      playPromise.catch(() => {
+        // The progress indicator remains visible if autoplay is blocked or video fails.
+      });
+    }
   }
 
   if (document.body) {
     injectLoaderHTML();
   } else {
-    document.addEventListener('DOMContentLoaded', injectLoaderHTML);
+    document.addEventListener('DOMContentLoaded', injectLoaderHTML, { once: true });
   }
 
-  // 3. Global function to dismiss loader
+  // 3. Global function to dismiss the loader.
   window.hideAppLoader = function () {
     const el = document.getElementById('appLoader');
     if (el && !el.classList.contains('loaded')) {
@@ -100,11 +113,11 @@
     }
   };
 
-  // 4. Auto dismiss when window completes loading
+  // 4. Auto-dismiss after the page finishes loading.
   window.addEventListener('load', () => {
     setTimeout(window.hideAppLoader, 300);
   });
 
-  // Safety fallback (Max 3 seconds screen lock prevention)
+  // Safety fallback: never keep the screen locked for more than 3 seconds.
   setTimeout(window.hideAppLoader, 3000);
 })();
